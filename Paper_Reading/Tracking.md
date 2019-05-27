@@ -17,13 +17,14 @@ Yolo, SSD, Faster-RCNN, HOG/DPM(Deformable Part Model)
     * `Tracklets to trajectories`: Single-camera and inter-camera vehicle tracking and 3D speed estimation based on fusion of visual and semantic features_CVPRW18
     * `The whole pipeline`: Robust Object Tracking by Hierarchical Association of Detection Responses_ECCV08
 
-### Online Association  
-* `Hungarian Algorithm(Both offline and online)`: SORT/DeepSORT  
-* Network Flows(Both offline and online):  
+### Online Association
+> Strictly speaking, online is a special case of offline, so the following methods can also be applied in offline tracking.
+* `Hungarian Algorithm`: SORT/DeepSORT  
+* Network Flows:  
     * Global Data Association for Multi-Object Tracking Using Network Flows_CVPR08  
     * `Siamese CNN + Gradient Boosting + Network Flow: Learning by tracking`: Siamese CNN for robust target association_CVPRW16  
     * `Use DNN to calculate edges' costs`: Deep Network Flow for Multi-Object Tracking_CVPR17
-* Markov Decision Process(Online):  
+* Markov Decision Process:  
     * learning to Track: Online Multi-Object Tracking by Decision Making_ICCV15
 * Tracklet based:
     * Robust Online Multi-object Tracking Based on Tracklet Confidence and Online Discriminative Appearance Learning_CVPR14
