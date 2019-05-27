@@ -11,3 +11,11 @@
 
 # Visual Processing
 [Visual Processing on Embedded GPU](https://gstconf.ubicast.tv/protected/videos/v12586e9bc53dgvct23vir6pu9al37/attachments/213356.pdf)
+
+# Lightweight Tracking using OpenCV
+[Object Tracking](https://www.pyimagesearch.com/2018/07/30/opencv-object-tracking/)
+[Multiple Object Tracking](https://www.pyimagesearch.com/2018/08/06/tracking-multiple-objects-with-opencv/)
+
+# DeepStream  
+An Example of deepstream is to redact faces and license plates in video streams.
+[Intro](https://developer.nvidia.com/deepstream-sdk)

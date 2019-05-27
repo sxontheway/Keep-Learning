@@ -6,5 +6,7 @@
 1. [Linux](./Linux)
 1. [Hardware](./Hardware)
 1. [ROS](./ROS)
-1. [高翔 视觉SLAM14章](./SLAM14)   
+1. [高翔 视觉SLAM14章](./SLAM14)
+1. [Paper Reading](./Paper_Reading)  
+1. [Resources](./Resources)
 1. [Miscellaneous](./Miscellaneous)
