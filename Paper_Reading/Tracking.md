@@ -9,15 +9,15 @@ KCF/ SiameseFC, CFNet, DCFNet/ MDNet/ GOTURN
 * CityFlow: A City-Scale Benchmark for Multi-Target Multi-Camera Vehicle Tracking and Re-Identification_CVPR19  
 
 ## Tracking by detection 
-> Detector: Yolo, SSD, Faster-RCNN, HOG/DPM(Deformable Part Model)  
-For association, there are online and batch methods.
-### Offline(Batch) Methods
+### Detection: 
+Yolo, SSD, Faster-RCNN, HOG/DPM(Deformable Part Model)  
+### Offline(Batch) Association
 * detection -> tracklets -> trajectories
     * `Detections to tracklets`: Closed-Loop Tracking-by-Detection for ROV-Based Multiple Fish Tracking_16
     * `Tracklets to trajectories`: Single-camera and inter-camera vehicle tracking and 3D speed estimation based on fusion of visual and semantic features_CVPRW18
     * `The whole pipeline`: Robust Object Tracking by Hierarchical Association of Detection Responses_ECCV08
 
-### Online Methods  
+### Online Association  
 * `Hungarian Algorithm(Both offline and online)`: SORT/DeepSORT  
 * Network Flows(Both offline and online):  
     * Global Data Association for Multi-Object Tracking Using Network Flows_CVPR08  
