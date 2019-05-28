@@ -26,7 +26,7 @@ Yolo, SSD, Faster-RCNN, HOG/DPM(Deformable Part Model)
 > Strictly speaking, online is a special case of offline, so the following methods can also be applied in offline tracking.
 * Probabilistic: MCMC/ Particle Filter
 * Deterministic:
-   * Hungarian Algorithm: 
+   * Hungarian Algorithm/ KM Algorithm: 
       * `+ Kalman filter`: SORT/DeepSORT  
       * `+ Tracklet confidence`: Robust Online Multi-object Tracking Based on Tracklet Confidence and Online Discriminative Appearance Learning_CVPR14
    * Markov Decision Process(RL-based): 
