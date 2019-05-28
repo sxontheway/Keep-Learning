@@ -12,26 +12,29 @@ KCF/ SiameseFC, CFNet, DCFNet/ MDNet/ GOTURN
 ### Detection: 
 Yolo, SSD, Faster-RCNN, HOG/DPM(Deformable Part Model)  
 ### Offline(Batch) Association
-* detection -> tracklets -> trajectories
+> Two common frameworks:
+* (1) Hierarchical association: detection -> tracklets -> trajectories
     * `Detections to tracklets`: Closed-Loop Tracking-by-Detection for ROV-Based Multiple Fish Tracking_16
     * `Tracklets to trajectories`: Single-camera and inter-camera vehicle tracking and 3D speed estimation based on fusion of visual and semantic features_CVPRW18
     * `The whole pipeline`: Robust Object Tracking by Hierarchical Association of Detection Responses_ECCV08
-
-### Online Association
-> Strictly speaking, online is a special case of offline, so the following methods can also be applied in offline tracking.
-* `Hungarian Algorithm`: SORT/DeepSORT  
-* Network Flows:  
+* (2) Global optimization in a graph-based representation, eg. a network flows  
     * Global Data Association for Multi-Object Tracking Using Network Flows_CVPR08  
     * `Siamese CNN + Gradient Boosting + Network Flow: Learning by tracking`: Siamese CNN for robust target association_CVPRW16  
     * `Use DNN to calculate edges' costs`: Deep Network Flow for Multi-Object Tracking_CVPR17
-* Markov Decision Process:  
-    * learning to Track: Online Multi-Object Tracking by Decision Making_ICCV15
-* Tracklet based:
-    * Robust Online Multi-object Tracking Based on Tracklet Confidence and Online Discriminative Appearance Learning_CVPR14
+
+### Online Association
+> Strictly speaking, online is a special case of offline, so the following methods can also be applied in offline tracking.
+* Probabilistic: MCMC/ Particle Filter
+* Deterministic:
+   * Hungarian Algorithm: 
+      * `+ Kalman filter`: SORT/DeepSORT  
+      * `+ Tracklet confidence`: Robust Online Multi-object Tracking Based on Tracklet Confidence and Online Discriminative Appearance Learning_CVPR14
+   * Markov Decision Process(RL-based): 
+      * learning to Track: Online Multi-Object Tracking by Decision Making_ICCV15
 * Others:  
-    * `LSTM`: Online Multi-Target Tracking Using Recurrent Neural Networks_AAAI17  
-    * `Background deduction + KCF`: Multiple Object Tracking with Kernelized  Correlation Filters in Urban Mixed Traffic_CRV17  
-    * `Optimal Bayes Filters`: Towards a Principled Integration of Multi-Camera  Re-Identification and Tracking through Optimal Bayes Filters_CVPRW17  
+   * `LSTM`: Online Multi-Target Tracking Using Recurrent Neural Networks_AAAI17  
+   * `Background deduction + KCF`: Multiple Object Tracking with Kernelized  Correlation Filters in Urban Mixed Traffic_CRV17  
+   * `Optimal Bayes Filters`: Towards a Principled Integration of Multi-Camera  Re-Identification and Tracking through Optimal Bayes Filters_CVPRW17  
 
 ### Motion Prediction:  
 * `Decay model`: CaTDet: Cascaded Tracked Detector for Efficient Object Detection from Video  
