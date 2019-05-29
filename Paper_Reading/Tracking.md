@@ -46,4 +46,5 @@ Yolo, SSD, Faster-RCNN, HOG/DPM(Deformable Part Model)
 # Resources
 [Deep learning for tracking and detection](https://github.com/abhineet123/Deep-Learning-for-Tracking-and-Detection)  
 [Multi object tracking paper list](https://github.com/SpyderXu/multi-object-tracking-paper-list)  
-[SSD+SORT](https://github.com/SpyderXu/ssd_sort)
+[SSD+SORT](https://github.com/SpyderXu/ssd_sort)  
+[Yolo+DeepSORT](https://github.com/Qidian213/deep_sort_yolov3)
