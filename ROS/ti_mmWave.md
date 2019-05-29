@@ -21,5 +21,6 @@
 ------
 <br><br>
 
-# 2. 
+# 2. AWR1443 mmWave Demo 
+https://github.com/juruoWYC/AWR1443-Demo-Analysis
 
