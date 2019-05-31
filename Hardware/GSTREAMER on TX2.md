@@ -32,13 +32,16 @@ VP8, VP9: https://www.zhihu.com/question/21067823
 `gst-launch-0.10 videotestsrc ! video/x-raw-gray ! ffmpegcolorspace ! autovideosink`, 
 其中'video/x-raw-rgb'这种写法就相当于是GstCapsFilter插件，
 
-omx是openmax的缩写。Openmax是开放多媒体加速层（英语：Open Media Acceleration，缩写为OpenMAX），一个不需要授权、跨平台的软件抽象层，
+`omx`: openmax的缩写。Openmax是开放多媒体加速层（英语：Open Media Acceleration，缩写为OpenMAX），一个不需要授权、跨平台的软件抽象层，
 以C语言实现的软件接口，用来处理多媒体。它由Khronos Group提出，目标在于创造一个统一的接口，加速大量多媒体资料的处理。
 也即硬件厂商生产的硬件各不相同，但他们可以通过openmax这一个中间层使得用户接触到相同的api，用于多媒体数据的处理（视频等)  
 
 `NVMM`: 非易失性主内存，Non Volatile Main Memory， 也即断电之后短时间内不会丢失  
 `gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e` 
 报错"could not link v4l2src0 to nvvconv0"，也即v4l2src不能直接写入NVMM
+
+
+`ximagesink`和`xvimagesink`: 见 https://blog.csdn.net/jack0106/article/details/5592557  
 
 `nvvidconv`和`videoconvert`：
 nvvidconv is a Gstreamer-1.0 plug-in which allows conversion between OSS (raw) video formats and NVIDIA video formats. 例如：
@@ -48,7 +51,7 @@ nvvidconv is a Gstreamer-1.0 plug-in which allows conversion between OSS (raw) v
  nvvidconv flip-method=2 !
  video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink
  ```
-nvvidconv相当于一个桥梁，前边是"I420"类型过滤器，后边是BGRx类型过滤器。videoconvert同理，但是区别是 **nvvidconv有Nvidia优化过的硬件加速，videoconvert没有**
+nvvidconv相当于一个桥梁，前边是"I420"类型过滤器，后边是BGRx类型过滤器。videoconvert同理，但是区别是 **nvvidconv有Nvidia 硬件加速，videoconvert则是在CPU上运行，没有加速，见 https://developer.nvidia.com/nvidia-video-codec-sdk**
 
 <br>
 
@@ -76,19 +79,36 @@ This is an application based on gstreamer and omx to capture, encode and save vi
 ## 在TX2上用gstreamer启动CSI camera
 * on-board camera OV5693 (using nvcamerasrc)
   见 http://petermoran.org/csi-cameras-on-tx2/  
-  输出到屏幕：
-  ```
-  gst-launch-1.0 nvcamerasrc ! 'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)60/1' ! 
-  nvvidconv ! 'video/x-raw(memory:NVMM), format=(string)I420' ! nvoverlaysink -e
-  ```
-  用于ROS的launch文件：https://github.com/peter-moran/jetson_csi_cam/blob/master/jetson_csi_cam.launch
+  * 输出到屏幕：
+      ```
+      gst-launch-1.0 nvcamerasrc ! 
+      'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)60/1' ! 
+      nvvidconv ! 'video/x-raw(memory:NVMM), format=(string)I420' ! nvoverlaysink -e
+      ```
+    
+  * 用于ROS的launch文件：https://github.com/peter-moran/jetson_csi_cam/blob/master/jetson_csi_cam.launch
 
-* Others (using v4l2src)
-  输出到屏幕
-  ```
-  gst-launch-1.0 v4l2src device=/dev/video0 !  video/x-raw, width=\(int\)1920, height=\(int\)1080, format=\(string\)I420 ! 
-  videorate drop-only=true ! video/x-raw, framerate=60/1 ! 
-  nvvidconv ! nvoverlaysink overlay-w=1920 overlay-h=1080 sync=false
-  ```
-  用于ROS的launch文件：***[jetson_csi_cam.launch](./jetson_csi_cam.launch)***
-
+* Others (using v4l2src)  
+  * 输出到屏幕  
+      ```
+      gst-launch-1.0 v4l2src device=/dev/video0 !  
+      video/x-raw, width=\(int\)1920, height=\(int\)1080, format=\(string\)I420 ! 
+      videorate drop-only=true ! video/x-raw, framerate=60/1 ! 
+      nvvidconv ! nvoverlaysink overlay-w=1920 overlay-h=1080 sync=false
+      ```
+    
+  * 用于ROS的launch文件：***[jetson_csi_cam.launch](./jetson_csi_cam.launch)***  
+      其中的关键部分，Gstreamer Pipeline: 
+      ```
+      v4l2src device=/dev/video0 ! 
+        video/x-raw, format=(string)I420, width=(int)1920, height=(int)1080 !
+        videorate drop-only=true ! video/x-raw, framerate=$(arg fps)/1 ! 
+        nvvidconv ! video/x-raw(memory:NVMM), format=(string)I420, width=(int)$(arg width), height=(int)$(arg height) ! 
+        nvvidconv ! video/x-raw, format=(string)BGRx ! 
+        videoconvert ! video/x-raw, format=(string)BGR
+      ```
+      videorate： I420, 1920\*1080\*80fps -> I420, 1920\*1080\*30fps
+      nvvidconv： I420, 1920\*1080\*30fps -> I420, 960\*540\*30fps ->BGRx  
+      videoconvert: BGRx -> BGR
+      > videorate的参数drop-only=true不能省掉，`framerate=30/1`要单独写，不与height，width等写一起
+      > videorate需要卸载nvvidconv前面
