@@ -7,7 +7,7 @@ TX2板载相机型号OV5693 (2592*1944，比例4: 3)
 store命令`sudo  ~/jetson_clocks.sh --store`，restore命令`sudo  ~/jetson_clocks.sh --restore`	  
 * 查询工作模式`sudo nvpmodel -q verbose`  
 * 修改为性能模式`sudo nvpmodel -m 0`  
-* 查CPU占用率`top`, GPU占用`sudo ～/tegrastats`， TX2上用不了nvidia-smi
+* 查CPU占用率`top`, GPU占用`./tegrastats`， TX2上用不了nvidia-smi
 * 查看L4T版本`head -n 1 /etc/nv_tegra_release`  
 * 查看系统内核`uname -a`
 
