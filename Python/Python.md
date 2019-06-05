@@ -143,6 +143,9 @@ a = np.array([-1,2,3,-4,5])
 a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
 ```
 
+## 1.9 继承object类
+见： https://www.zhihu.com/question/19754936
+
 ---
 <br>
 
