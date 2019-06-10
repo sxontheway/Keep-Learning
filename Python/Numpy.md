@@ -18,7 +18,7 @@ python3 -m pip install --user numpy scipy matplotlib ipython jupyter pandas symp
 > python中提供： list, tuple, dictionary中就有的  
 > numpy中提供： array, mat  
 > tuple, list, array 三者有很多相似之处 
-* list 和 tuple
+* list 和 tuple 及 zip
     * 列表和元组的区别：创建元组后无法修改（替换、删除已有元素，加入新元素）； 而列表比较灵活
     * 列表和元组内的元素可以为任意对象： 列表内可以放元组，元组内可以装列表
     ```python
@@ -26,6 +26,7 @@ python3 -m pip install --user numpy scipy matplotlib ipython jupyter pandas symp
     a = [1,2,3]; b = (1,2,3)； 
     c = [a,b]; d = [a,b]
     ```
+    > zip的用法： http://www.runoob.com/python3/python3-func-zip.html
 * list 和 array  
     简单来说，np.array支持比list更多的索引方式，在numpy中使用更方便
     ```python
