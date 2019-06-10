@@ -59,6 +59,7 @@ import os, sys
 print( os.path.split(os.path.realpath(sys.argv[0]))[0], os.path.dirname(__file__) )    # 这两个都是文件所在目录
 print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路劲
 ```
+> os.path.expanduser（～/Desktop/a.txt）可将路径转换为根目录下的绝对路径
 
 ## 1.4 import
 * \_\_all__ 和 import * 
