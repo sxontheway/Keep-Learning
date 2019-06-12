@@ -388,7 +388,15 @@ def hello(name):
 if __name__ == "__main__":
     print(hello("Chen"))
 ```
-上面的两个装饰器等价于`add_prefix("dear ")(add_prefix("Prof.")(hello("Chen")))`  
+上面的两个装饰器等价于:
+```
+def hello(name):
+    return name
+    
+if __name__ == "__main__":
+    hello = add_prefix("dear ")( add_prefix("Prof.")(hello) )
+    print(hello("Chen"))
+```
 
 ### 3.4.5 其他
 [函数内部的变量在函数执行完后就销毁，为什么可变对象却能保存上次调用时的结果呢？](https://www.zhihu.com/question/264533969)
