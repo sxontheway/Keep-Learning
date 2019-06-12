@@ -209,7 +209,8 @@ a, b = b, a        # 交换a，b
 # 慎用连等，这会使得a,b,c都是同一个对象的引用。改变其中一个，其他两个也会被改变
 a = b = c = 1    
 a, b, c = 1, 2, "john"
-```
+```  
+
 ## 3.2 生成器和迭代器
 ### 3.2.1 生成器
 * 为什么要有生成器？  
@@ -277,6 +278,9 @@ isinstance([], Iterator)
 isinstance(iter([]), Iterator)
 isinstance(iter('abc'), Iterator)
 ```
+
+<br>
+
 ## 3.3 parser
 test.py文件的书写：
 ```python
@@ -296,3 +300,95 @@ if __name__ = "__main__":
     dataset_dir = args.dataset_dir
 ```
 命令行中用法： `python3 test.py --model_dir=data/model_epoch01.chkpt`  
+
+<br>
+
+## 3.4 闭包，装饰器，语法糖
+参见 https://www.zhihu.com/question/25950466/answer/31731502
+### 3.4.1 闭包
+> 所谓闭包，就是将组成函数的语句和这些语句的执行环境打包在一起时，得到的对象
+```
+#foo.py
+filename = "foo.py"
+
+def call_fun(f):
+    return f()
+```
+```
+# func.py
+import foo
+
+filename = "func.py"
+def show_filename():
+    return "filename: %s" % filenmame
+
+if __name__ == "__main__":
+    print(foo.call_fun(show_filename))  # 返回 filename:func.py
+```
+这个例子说明了尽管 show_filename 函数的调用发生在 foo.py 文件内，但 show_filename 函数包含了其执行所需的整个环境（也即filename变量的值），构成了一个闭包，其中 filename 变量的查找遵循`Local-> Enclosing-> Global-> Builtin`顺序查找:  
+* 本地函数(show_filename内部)：通过任何方式赋值的，而且没有被global关键字声明为全局变量的filename变量
+* 直接外围空间(show_filename外部)：如果有多层嵌套，则由内而外逐层查找，直至最外层的函数
+* 全局空间(func.py和其import部分)
+* 内置模块(\_\_builtin\_\_)  
+
+闭包在其捕捉的执行环境(def语句块所在上下文)中，也遵循LEGB规则逐层查找，直至找到符合要求的变量，或者抛出异常。  
+这说明函数内可以查找到函数外定义的变量，这是显而易见的，例如全局变量理所当然可以在任何位置被使用。***这与前面讲的变量作用域不冲突，就变量本身而言，函数内定义的变量生命周期只在函数内部。但函数被作为闭包返回，为函数内变量续了命***
+
+### 3.4.2 装饰器
+> 装饰器本质上是一个Python 函数或类。运用闭包能封存上下文的特性，它可以让其他函数或类在不做任何代码修改的前提下增加额外功能，装饰器的返回值也是一个函数/类对象
+
+下面的例子，用闭包的性质为add函数添加了新的功能：
+```
+def checkParams(fn):
+    def wrapper(a, b):
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            return fn(a,b)  # 解释器按照LEGB法则找到fn，也即add函数对象的一个引用
+        print("type incompatible")
+        return
+    return wrapper
+
+def add(a, b):
+    return a+b
+
+if __name__ == "__main__":
+    add = checkParams(add)  # 返回的是一个wrapper这个函数的闭包
+    add(3, "hello")
+```
+
+### 3.4.3 装饰器的语法糖
+> 装饰器的语法糖：在写法上简化上面的代码，参见：https://www.jianshu.com/p/fd746acbdf1e
+```
+def checkParams(fn):
+    # 这个函数的实现同上，不变
+
+@checkParams
+def add(a, b):
+    return a+b
+
+if __name__ == "__main__":
+    add(3, "hello")
+```
+简单来说，就是将`@checkParams`写在`add(a,b)`定义上面，等效于`add = checkParams(add)`
+
+### 3.4.4 用类写一个多重的，带参数的装饰器
+```
+class add_prefix(object):
+    def __init__(self, word):
+        self.word = word
+    def __call__(self, fn):
+        def wrapper(*args, **kwargs):
+            return self.word + fn(*args, **kwargs)
+        return wrapper
+
+@add_prefix("dear ")
+@add_prefix("Prof.")
+def hello(name):
+    return name
+
+if __name__ == "__main__":
+    print(hello("Chen"))
+```
+上面的两个装饰器等价于`add_prefix("dear ")(add_prefix("Prof.")(hello("Chen")))`  
+
+### 3.4.5 其他
+[函数内部的变量在函数执行完后就销毁，为什么可变对象却能保存上次调用时的结果呢？](https://www.zhihu.com/question/264533969)
