@@ -3,9 +3,11 @@
 
 YUV类：I420, NV12, YV12, NV21，参见：http://blog.chinaunix.net/uid-28458801-id-4638708.html 
 
+如果摄像头输出是YUV2格式，那一般指的是Raw Video的色彩编码格式，比MJPEG大很多
+
 <br>
 
-## 视频编码
+## 视频压缩编码
 大体上分3派：MPEG2/4, 国际电联的H.264/H.265, Google的VP8/VP9  
 
 同等码率的前提下，各种标准的视频质量：MPEG2 < H.263 < MPEG4(又叫mp4) < H.264(又叫AVC） < H.265(又叫HEVC) 
