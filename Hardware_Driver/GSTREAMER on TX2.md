@@ -114,5 +114,5 @@ This is an application based on gstreamer and omx to capture, encode and save vi
       videorate： (I420, 1920\*1080\*80fps) -> (I420, 1920\*1080\*30fps)  
       nvvidconv： (I420, 1920\*1080\*30fps) -> (I420, 960\*540\*30fps) -> (BGRx, 960\*540\*30fps)  
       videoconvert: BGRx -> BGR
-      > videorate的参数drop-only=true不能省掉，`framerate=30/1`要单独写，不与height，width等写一起
-      > videorate需要卸载nvvidconv前面
+      > videorate的参数drop-only=true不能省掉，`framerate=30/1`要单独写，不与height，width等写一起  
+      > videorate需要写在nvvidconv前面
