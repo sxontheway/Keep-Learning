@@ -1,9 +1,9 @@
 ## 色彩编码
-色彩编码大体上纷纷YUV和BGR两类，一般来说YUV类多用于传输，因为其所需的带宽比BGR编码的小。  
+色彩编码大体上纷纷YUV和BGR两类，一般来说YUV类多用于传输，因为其所需的带宽比BGR编码的小。并且不需要三个通道同时传输，只有Y通道就能还原图像，只不过是黑白的 
 
-YUV类：I420, NV12, YV12, NV21，参见：http://blog.chinaunix.net/uid-28458801-id-4638708.html 
+YUV类：YUV可以有4:4:4, 4:2:2(UYVY等), 4:2:0(I420，NV12等)三种采样方式。参见：https://www.cnblogs.com/azraelly/archive/2013/01/01/2841269.html
 
-如果摄像头输出是YUV2格式，那一般指的是Raw Video的色彩编码格式，比MJPEG大很多
+YUV是色彩编码，和视频压缩编码是两个独立的东西。但摄像头如果说它是YUV输出，一般代表输出是YUV编码的Raw Video，而不是MJPEG等压缩过得视频流。
 
 <br>
 
@@ -12,9 +12,9 @@ YUV类：I420, NV12, YV12, NV21，参见：http://blog.chinaunix.net/uid-2845880
 
 MJPEG：Motion-JPG，只有帧内的JPG压缩，无帧间压缩  
 MPEG-1/2/4：帧内JPEG压缩+帧间压缩  
-同等码率下，各种编码的视频质量：MJPEG < MPEG2 < H.263 < MPEG4(又叫mp4) < H.264(又叫AVC） < H.265(又叫HEVC) 
+同等码率下，编码的视频质量：MJPEG < MPEG-2 < H.263 < MPEG-4(又叫mp4) < H.264(又叫AVC） < H.265(又叫HEVC) 
 
-数量级： MPEG-2: 1/25, H.264: 1/100  
+参考数量级： MJPEG: 1/20，MPEG-2: 1/40，MPEG-4: 1/70，H.264: 1/100  
 
 VP8, VP9: https://www.zhihu.com/question/21067823
 
@@ -41,9 +41,6 @@ VP8, VP9: https://www.zhihu.com/question/21067823
 也即硬件厂商生产的硬件各不相同，但他们可以通过openmax这一个中间层使得用户接触到相同的api，用于多媒体数据的处理（视频等)  
 
 `NVMM`: 非易失性主内存，Non Volatile Main Memory， 也即断电之后短时间内不会丢失  
-`gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e` 
-报错"could not link v4l2src0 to nvvconv0"，也即v4l2src不能直接写入NVMM
-
 
 `ximagesink`和`xvimagesink`: 见 https://blog.csdn.net/jack0106/article/details/5592557  
 
@@ -116,3 +113,7 @@ This is an application based on gstreamer and omx to capture, encode and save vi
       videoconvert: BGRx -> BGR
       > videorate的参数drop-only=true不能省掉，`framerate=30/1`要单独写，不与height，width等写一起  
       > videorate需要写在nvvidconv前面
+  * 关于 NVMM 和 nvvidconv 的讨论：https://devtalk.nvidia.com/default/topic/1012417/jetson-tx1/tx1-gstreamer-nvvidconv-will-not-pass-out-of-nvmm-memory/post/5162187/#5162187
+    * `gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e` 
+报错"could not link v4l2src0 to nvvconv0"，也即v4l2src只能写入到普通内存中，不能直接写入NVMM
+    * `gst-launch-1.0 nvcamerasrc ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e` 可行。因为nvcamerasrc插件直接将raw video写进NVMM了，nvvidconv要求input/output中至少有一个是NVMM（可以两个都是；只有一个是时有memoey copy的过程）
