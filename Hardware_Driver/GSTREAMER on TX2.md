@@ -8,9 +8,11 @@ YUV类：I420, NV12, YV12, NV21，参见：http://blog.chinaunix.net/uid-2845880
 <br>
 
 ## 视频压缩编码
-大体上分3派：MPEG2/4, 国际电联的H.264/H.265, Google的VP8/VP9  
+大体上分4派：MJPEG，MPEG-1/2/4, 国际电联的H.264/H.265, Google的VP8/VP9  
 
-同等码率的前提下，各种标准的视频质量：MPEG2 < H.263 < MPEG4(又叫mp4) < H.264(又叫AVC） < H.265(又叫HEVC) 
+MJPEG：Motion-JPG，只有帧内的JPG压缩，无帧间压缩  
+MPEG-1/2/4：帧内JPEG压缩+帧间压缩  
+同等码率下，各种编码的视频质量：MJPEG < MPEG2 < H.263 < MPEG4(又叫mp4) < H.264(又叫AVC） < H.265(又叫HEVC) 
 
 数量级： MPEG-2: 1/25, H.264: 1/100  
 
