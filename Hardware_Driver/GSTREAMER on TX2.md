@@ -72,7 +72,7 @@ TX2的板载的摄像头是OV5693
 是gstreamer给linux的一个插件，一般只用于video capture（也即decode）的功能
 * nvcamerasrc：
 参见 https://developer.ridgerun.com/wiki/index.php?title=Gstreamer_pipelines_for_Jetson_TX2  
-是Nvidia公司写的一个gstreamer插件，TX2板载摄像头OV5693一般用nvcamerasrc，其他摄像头可能在TX2shang用不了nvcamerasrc，只能用v4l2src  
+是Nvidia公司写的一个gstreamer插件，TX2板载摄像头OV5693一般用nvcamerasrc，其他摄像头可能在TX2上用不了nvcamerasrc，只能用v4l2src  
 * nvgstcapture-1.0  
 nvgstcapture-1.0 is a program included with L4T that makes it easy to capture and save video to file. It’s also a quick way to pull up the view from your camera.
 This is an application based on gstreamer and omx to capture, encode and save video to the filesystem.  
@@ -111,8 +111,8 @@ This is an application based on gstreamer and omx to capture, encode and save vi
         nvvidconv ! video/x-raw, format=(string)BGRx ! 
         videoconvert ! video/x-raw, format=(string)BGR
       ```
-      videorate： I420, 1920\*1080\*80fps -> I420, 1920\*1080\*30fps
-      nvvidconv： I420, 1920\*1080\*30fps -> I420, 960\*540\*30fps ->BGRx  
+      videorate： (I420, 1920\*1080\*80fps) -> (I420, 1920\*1080\*30fps)  
+      nvvidconv： (I420, 1920\*1080\*30fps) -> (I420, 960\*540\*30fps) -> (BGRx, 960\*540\*30fps)  
       videoconvert: BGRx -> BGR
       > videorate的参数drop-only=true不能省掉，`framerate=30/1`要单独写，不与height，width等写一起
       > videorate需要卸载nvvidconv前面
