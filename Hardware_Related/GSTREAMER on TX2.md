@@ -5,6 +5,7 @@ YUV类：YUV可以有4:4:4, 4:2:2(UYVY等), 4:2:0(I420，NV12等)三种采样方
 
 YUV是色彩编码，和视频压缩编码是两个独立的东西。但摄像头如果说它是YUV输出，一般代表输出是YUV编码的Raw Video，而不是MJPEG等压缩过得视频流。
 
+---
 <br>
 
 ## 视频压缩编码
@@ -18,6 +19,7 @@ MPEG-1/2/4：帧内JPEG压缩+帧间压缩
 
 VP8, VP9: https://www.zhihu.com/question/21067823
 
+---
 <br>
 
 ## 一些术语
@@ -54,66 +56,70 @@ nvvidconv is a Gstreamer-1.0 plug-in which allows conversion between OSS (raw) v
  ```
 nvvidconv相当于一个桥梁，前边是"I420"类型过滤器，后边是BGRx类型过滤器。videoconvert同理，但是区别是 **nvvidconv有Nvidia 硬件加速，videoconvert则是在CPU上运行，没有加速，见 https://developer.nvidia.com/nvidia-video-codec-sdk**
 
+---
 <br>
 
 ## 关于TX2
 TX2的GPU是pascal架构，pascal之后是最新的turing  
 TX2的板载的摄像头是OV5693
 
+---
 <br>
 
-## Gstreamer pipelines for Jetson TX2
-> 参见：***[ACCELERATED GSTREAMER FOR TEGRA X2 USER GUIDE](https://developer.download.nvidia.com/embedded/L4T/r28_Release_v1.0/Docs/Jetson_TX2_Accelerated_GStreamer_User_Guide.pdf?WVsbP1jiU5zK7ALWD3CN2SG2B6AqhZelh1cDn5CVNFnQMT8tK50S-MrbuUHKQmhD5zg6GOucEAxUPlr8BbrVWNElvDXoMRMkyMRCMM2ONjNaeXBJDMnRQbrh0v997n1O_V_BlpmvMLgtA-mQRSueIpqppyJt4sMacTZg4GaDihcpD5wMwBlmaxMNGxK0yiEeMw)***  
-* v4l2src
+## Gstreamer pipelines on Jetson TX2
+> 官方文档：[ACCELERATED GSTREAMER FOR TEGRA X2 USER GUIDE](https://developer.download.nvidia.com/embedded/L4T/r28_Release_v1.0/Docs/Jetson_TX2_Accelerated_GStreamer_User_Guide.pdf?WVsbP1jiU5zK7ALWD3CN2SG2B6AqhZelh1cDn5CVNFnQMT8tK50S-MrbuUHKQmhD5zg6GOucEAxUPlr8BbrVWNElvDXoMRMkyMRCMM2ONjNaeXBJDMnRQbrh0v997n1O_V_BlpmvMLgtA-mQRSueIpqppyJt4sMacTZg4GaDihcpD5wMwBlmaxMNGxK0yiEeMw)
+
+### 几个插件
+* v4l2src  
 参见：https://blog.csdn.net/jack0106/article/details/5592557  
 是gstreamer给linux的一个插件，一般只用于video capture（也即decode）的功能
-* nvcamerasrc：
+* nvcamerasrc  
 参见 https://developer.ridgerun.com/wiki/index.php?title=Gstreamer_pipelines_for_Jetson_TX2  
-是Nvidia公司写的一个gstreamer插件，TX2板载摄像头OV5693一般用nvcamerasrc，其他摄像头可能在TX2上用不了nvcamerasrc，只能用v4l2src  
+是Nvidia公司写的一个gstreamer插件，用于TX2上可以获得比v4l2src更低的CPU占用率
 * nvgstcapture-1.0  
 nvgstcapture-1.0 is a program included with L4T that makes it easy to capture and save video to file. It’s also a quick way to pull up the view from your camera.
 This is an application based on gstreamer and omx to capture, encode and save video to the filesystem.  
-这是一个程序了，基于gstreamer 和v4l2src的程序，而不像v4l2src/nvcamerasrc是gstreamer 的一个插件
+这是一个程序了，基于gstreamer和v4l2src的程序，而不像v4l2src/nvcamerasrc是gstreamer的一个插件
 
 <br>
 
-## 在TX2上用gstreamer启动CSI camera
-* on-board camera OV5693 (using nvcamerasrc)
-  见 http://petermoran.org/csi-cameras-on-tx2/  
-  * 输出到屏幕：
-      ```
-      gst-launch-1.0 nvcamerasrc ! 
-      'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)60/1' ! 
-      nvvidconv ! 'video/x-raw(memory:NVMM), format=(string)I420' ! nvoverlaysink -e
-      ```
-    
-  * 用于ROS的launch文件：https://github.com/peter-moran/jetson_csi_cam/blob/master/jetson_csi_cam.launch
+### gstreamer在TX2上的具体实现
+> 主要参考了 http://petermoran.org/csi-cameras-on-tx2/ 的ROS部分，对其gstreamer pipeline的部分进行修改即可  
+> 需要修改的部分见 ***[gstreamer_code.md](./gstreamer_code.md)***  
 
-* Others (using v4l2src)  
-  * 输出到屏幕  
-      ```
-      gst-launch-1.0 v4l2src device=/dev/video0 !  
-      video/x-raw, width=\(int\)1920, height=\(int\)1080, format=\(string\)I420 ! 
-      videorate drop-only=true ! video/x-raw, framerate=60/1 ! 
-      nvvidconv ! nvoverlaysink overlay-w=1920 overlay-h=1080 sync=false
-      ```
-    
-  * 用于ROS的launch文件：***[jetson_csi_cam.launch](./jetson_csi_cam.launch)***  
-      其中的关键部分，Gstreamer Pipeline: 
-      ```
-      v4l2src device=/dev/video0 ! 
-        video/x-raw, format=(string)I420, width=(int)1920, height=(int)1080 !
-        videorate drop-only=true ! video/x-raw, framerate=$(arg fps)/1 ! 
-        nvvidconv ! video/x-raw(memory:NVMM), format=(string)I420, width=(int)$(arg width), height=(int)$(arg height) ! 
-        nvvidconv ! video/x-raw, format=(string)BGRx ! 
-        videoconvert ! video/x-raw, format=(string)BGR
-      ```
-      videorate： (I420, 1920\*1080\*80fps) -> (I420, 1920\*1080\*30fps)  
-      nvvidconv： (I420, 1920\*1080\*30fps) -> (I420, 960\*540\*30fps) -> (BGRx, 960\*540\*30fps)  
-      videoconvert: BGRx -> BGR
-      > videorate的参数drop-only=true不能省掉，`framerate=30/1`要单独写，不与height，width等写一起  
-      > videorate需要写在nvvidconv前面
-  * 关于 NVMM 和 nvvidconv 的讨论：https://devtalk.nvidia.com/default/topic/1012417/jetson-tx1/tx1-gstreamer-nvvidconv-will-not-pass-out-of-nvmm-memory/post/5162187/#5162187
-    * `gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e` 
-报错"could not link v4l2src0 to nvvconv0"，也即v4l2src只能写入到普通内存中，不能直接写入NVMM
-    * `gst-launch-1.0 nvcamerasrc ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e` 可行。因为nvcamerasrc插件直接将raw video写进NVMM了，nvvidconv要求input/output中至少有一个是NVMM（可以两个都是；只有一个是时有memoey copy的过程）
+用nvcamerasrc实现:  
+除了最后一步其余都在NVMM上，节省了NVMM到standard memory之间的内存拷贝，也可以比v4l2src实现少用一个nvvidconv  
+
+用v4l2实现:  
+```
+v4l2src device=/dev/video0 ! 
+  video/x-raw, format=(string)I420, width=(int)1920, height=(int)1080 !
+  videorate drop-only=true ! video/x-raw, framerate=30/1 ! 
+  nvvidconv ! video/x-raw(memory:NVMM), format=(string)I420, width=(int)$(arg width), height=(int)$(arg height) ! 
+  nvvidconv ! video/x-raw, format=(string)BGRx ! 
+  videoconvert ! video/x-raw, format=(string)BGR
+```
+
+* 用到的插件
+  * videorate: (I420, 1920\*1080\*80fps) -> (I420, 1920\*1080\*30fps)  
+  * nvvidconv1: (I420, 1920\*1080\*30fps) -> (I420, 960\*540\*30fps, NVMM) 
+  * nvvidconv2: (I420, 960\*540\*30fps, NVMM) -> (BGRx, 960\*540\*30fps)  
+  * videoconvert: BGRx -> BGR
+  
+* 说明
+  * videorate的参数drop-only=true不能省掉，`framerate=30/1`要单独写，不与height，width等写一起  
+  * videorate需要写在nvvidconv前面  
+  * drop videorate是因为摄像头的输出分辨率是成对设置的(具体数值需参考摄像头文档)。例如对某CSI camera，要输出4k，只能是30fps；要输出1080p，只能是80fps。这时要想输出540p/30fps，只能在pipeline中手动更改分辨率和帧率
+  * 两个nvvidconv不能合并，因为有一个从`普通内存->NVMM->普通内存`的过程
+
+<br>
+
+### NVMM的使用
+参见: [关于 NVMM 和 nvvidconv 的讨论](https://devtalk.nvidia.com/default/topic/1012417/jetson-tx1/tx1-gstreamer-nvvidconv-will-not-pass-out-of-nvmm-memory/post/5162187/#5162187)  
+* `gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e`  
+报错"could not link v4l2src0 to nvvconv0"，也即v4l2src只能写入到普通内存中，不能直接写入NVMM  
+* `gst-launch-1.0 nvcamerasrc ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e`   
+    可行。因为nvcamerasrc插件直接将raw video写进NVMM了，nvvidconv要求input/output中至少有一个是NVMM（可以两个都是；只有一个是时有memoey copy的过程）
+
+
+
