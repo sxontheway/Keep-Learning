@@ -113,38 +113,15 @@ test(1,2,3,d='4',e=5)
     
 所以，当.py文件被直接运行时，`if __name__ == '__main__'`为真；当.py文件被作为模块导入其他文件时，`if __name__ == '__main__'`为假。
 
-## 1.7 变量作用域
-* 每个变量都有作用域，Python中除了`def/class/lambda`外，其他如`if/elif/else/， try/except， for/while`等都不能改变变量作用域  
-* 因为函数(def)会改变变量作用域，在函数内部定义的变量，是局部变量，函数外外面看不到。***局部变量会和同名全局变量冲突***
-* 带`self.`的 类的成员变量作用域只在类内部，***不会与同名全局变量/局部变量都冲突***
-    ```python
-    class test:
-        def __init__(self):
-            self.global_var = 3;    # 类的成员变量不会和同名全局变量冲突
-        def main(self):
-            local_var = 2           # 类的成员变量不会和同名局部变量冲突
-            self.local_var = 4;    
-            print(global_var, local_var, self.global_var, self.local_var)
-            global global_var       # 提示warning，全局变量可能被修改。没有global关键词会报错
-            global_var = 5          # 全局变量
-    if __name__ == '__main__':
-        global_var = 1              # if不改变作用域，所以是全局变量
-        # ss.main() 会报错，因为并没有先初始化类
-        test().main()               # 或 s = test(); s.main()
-        
-    print(global_var)               # 此处v是全局变量
-    # print(local_var) 会报错
 
-    # 输出结果分别为1 2 3 4 5
-    ```
-## 1.8 扁平结构比嵌套结构好
+## 1.7 扁平结构比嵌套结构好
  ```python
 import numpy as np
 a = np.array([-1,2,3,-4,5])
 a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
 ```
 
-## 1.9 继承object类
+## 1.8 继承object类
 见： https://www.zhihu.com/question/19754936
 
 ---
@@ -303,24 +280,68 @@ if __name__ = "__main__":
 
 <br>
 
-## 3.4 闭包，装饰器，语法糖
+## 3.4 变量作用域
+* 每个变量都有作用域，Python中除了`def/class/lambda`外，其他如`if/elif/else/， try/except， for/while`等都不能改变变量作用域  
+* 因为函数(def)会改变变量作用域，在函数内部定义的变量，是局部变量，函数外外面看不到。***局部变量会和同名全局变量冲突***
+* 带`self.`的 类的成员变量作用域只在类内部，***不会与同名全局变量/局部变量都冲突***
+    ```python
+    class test:
+        def __init__(self):
+            self.global_var = 3;    # 类的成员变量不会和同名全局变量冲突
+        def main(self):
+            local_var = 2           # 类的成员变量不会和同名局部变量冲突
+            self.local_var = 4;    
+            print(global_var, local_var, self.global_var, self.local_var)
+            global global_var       # 提示warning，提醒用户全局变量可能被修改。没有global关键词会报错
+            global_var = 5          # 在函数中修改全局变量
+
+    if __name__ == '__main__':
+        global_var = 1              # if不改变作用域，所以是全局变量
+        test().main()               # 或 s = test(); s.main() 但test.main()会报错，因为并没有先初始化类
+        
+    print(global_var)               # 此处v是全局变量
+    # print(local_var) 会报错
+
+    # 输出结果分别为1 2 3 4 5
+    ```
+* global和nonlocal关键字的使用: https://blog.csdn.net/youngbit007/article/details/64905070
+  * python变量查找法则：LEGB（见闭包一节）。  
+  * global关键字用于在函数或其他局部作用域中使用全局变量。但是如果不修改全局变量也可以不使用global关键字，直接使用即可（例如print，例子见上面)。  
+  * nonlocal关键字用来在函数或其他作用域中使用外层 **(非全局)** 变量
+    ```python
+    def funx():
+        x=5
+        def funy():
+            nonlocal x
+            x += 1
+            return x
+        return funy
+
+    if __name__ == "__main__":
+        a=funx()
+        print(a())
+    ```
+
+<br>
+
+## 3.5 闭包，装饰器，语法糖
 参见 https://www.zhihu.com/question/25950466/answer/31731502
-### 3.4.1 闭包
+### 3.5.1 闭包
 > 所谓闭包，就是将组成函数的语句和这些语句的执行环境打包在一起时，得到的对象
-```
+```python
 #foo.py
 filename = "foo.py"
 
 def call_fun(f):
     return f()
 ```
-```
+```python
 # func.py
 import foo
 
 filename = "func.py"
 def show_filename():
-    return "filename: %s" % filenmame
+    return "filename: %s" % filemame
 
 if __name__ == "__main__":
     print(foo.call_fun(show_filename))  # 返回 filename:func.py
@@ -334,11 +355,11 @@ if __name__ == "__main__":
 闭包在其捕捉的执行环境(def语句块所在上下文)中，也遵循LEGB规则逐层查找，直至找到符合要求的变量，或者抛出异常。  
 这说明函数内可以查找到函数外定义的变量，这是显而易见的，例如全局变量理所当然可以在任何位置被使用。***这与前面讲的变量作用域不冲突，就变量本身而言，函数内定义的变量生命周期只在函数内部。但函数被作为闭包返回，为函数内变量续了命***
 
-### 3.4.2 装饰器
+### 3.5.2 装饰器
 > 装饰器本质上是一个Python 函数或类。运用闭包能封存上下文的特性，它可以让其他函数或类在不做任何代码修改的前提下增加额外功能，装饰器的返回值也是一个函数/类对象
 
 下面的例子，用闭包的性质为add函数添加了新的功能：
-```
+```python
 def checkParams(fn):
     def wrapper(a, b):
         if isinstance(a, (int, float)) and isinstance(b, (int, float)):
@@ -355,9 +376,9 @@ if __name__ == "__main__":
     add(3, "hello")
 ```
 
-### 3.4.3 装饰器的语法糖
+### 3.5.3 装饰器的语法糖
 > 装饰器的语法糖：在写法上简化上面的代码，参见：https://www.jianshu.com/p/fd746acbdf1e
-```
+```python
 def checkParams(fn):
     # 这个函数的实现同上，不变
 
@@ -370,8 +391,8 @@ if __name__ == "__main__":
 ```
 简单来说，就是将`@checkParams`写在`add(a,b)`定义上面，等效于`add = checkParams(add)`
 
-### 3.4.4 用类写一个多重的，带参数的装饰器
-```
+### 3.5.4 用类写一个多重的，带参数的装饰器
+```python
 class add_prefix(object):
     def __init__(self, word):
         self.word = word
@@ -398,5 +419,8 @@ if __name__ == "__main__":
     print(hello("Chen"))
 ```
 
-### 3.4.5 其他
+### 3.5.5 其他
 [函数内部的变量在函数执行完后就销毁，为什么可变对象却能保存上次调用时的结果呢？](https://www.zhihu.com/question/264533969)
+
+
+
