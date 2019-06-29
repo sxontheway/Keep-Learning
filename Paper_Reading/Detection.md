@@ -64,6 +64,7 @@ https://blog.csdn.net/shwan_ma/article/details/84924142
 ## Conclusion
 * About backbones  
     In terms of the backbone, under the same resolution (256*256):
+    
     |Darknet53|Darknet19|ResNet50|ResNet18|ResNet10/ShuffleNet/MobileNet varients|
     |:--:|:--:|:--:|:--:|:--:|
     |18.7G|7.3G|9.7G|4.3G|could <1G|
@@ -71,6 +72,7 @@ https://blog.csdn.net/shwan_ma/article/details/84924142
 
 
 * About the whole model
+
     |Model|Dataset|Totoal GFLOPS|
     |--|:--:|:--:|
     |Res50 + Faster-RCNN| KITTI, 1242*375|254.3|
