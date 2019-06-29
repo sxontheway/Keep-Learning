@@ -7,12 +7,12 @@
     * For different networks, the portion of operations between the backbone and the head could vary a lot.
 
 * One-stage or two-stage?  
-    Both one-stage and two-stage can be modified by changing either backbones or heads.  
-    [Light-Head R-CNN: In Defense of Two-Stage Object Detector](https://arxiv.org/abs/1711.07264)
+    Both one-stage and two-stage can be modified by changing either backbones or heads. See:  
+    [Light-Head R-CNN: In Defense of Two-Stage Object Detector](https://arxiv.org/abs/1711.07264)  
     [Single-Shot Refinement Neural Network for Object Detection](http://openaccess.thecvf.com/content_cvpr_2018/papers/Zhang_Single-Shot_Refinement_Neural_CVPR_2018_paper.pdf)
 
 * How to calculate FLOPs?  
-https://blog.csdn.net/shwan_ma/article/details/84924142
+   https://blog.csdn.net/shwan_ma/article/details/84924142
 
 <br>
 
@@ -63,7 +63,7 @@ https://blog.csdn.net/shwan_ma/article/details/84924142
 
 ## Conclusion
 * About backbones  
-    In terms of the backbone, under the same resolution (256*256):
+    In terms of the backbone, under the same resolution (256\*256), the FLOPS:  
     
     |Darknet53|Darknet19|ResNet50|ResNet18|ResNet10/ShuffleNet/MobileNet varients|
     |:--:|:--:|:--:|:--:|:--:|
