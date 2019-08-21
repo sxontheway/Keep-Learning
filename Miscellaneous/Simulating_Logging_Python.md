@@ -1,10 +1,10 @@
 # Main Steps
 * Using Fiddler to capture the URL and th post pasckage when user logging in (Using whatever account names and passwords).
     <p align="center" >
-        <img src="./pictures/url.png", width='800'>
+        <img src="./Pictures/url.png", width='800'>
     </p>
     <p align="center" >
-        <img src="./pictures/fiddler.png", width='800'>
+        <img src="./Pictures/fiddler.png", width='800'>
     </p>
 * In python, fill the data in a form of the dictionary.
 * Post the request
