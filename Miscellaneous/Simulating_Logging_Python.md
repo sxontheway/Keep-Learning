@@ -8,6 +8,7 @@
     </p>
 * In python, fill the data in a form of the dictionary.
 * Post the request
+* From key words of the received messages from website, figure out whether logging succesfully.
 
 # Reference
 * [Two ways to post requests using python.](https://blog.csdn.net/qq_29113041/article/details/79084544)  
