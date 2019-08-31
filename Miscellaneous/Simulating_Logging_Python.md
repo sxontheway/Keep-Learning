@@ -16,8 +16,9 @@
 * [输入密码经过本地加密怎么办？](https://zhuanlan.zhihu.com/p/57375111)
 
 # Example Code
+#!/usr/bin/python 在windows下没用，运行程序还是要用类似`python main.py`的命令
 ```python
-#!/usr/bin/python
+#!/usr/bin/python   
 # -*- coding: utf-8 -*-
 
 import urllib.request
