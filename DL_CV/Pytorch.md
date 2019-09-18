@@ -17,7 +17,81 @@
 * 而如果我们只保留nn下的类的话，其实就牺牲了一部分灵活性，因为做一些简单的计算都需要创造一个类，这也与PyTorch的风格不符。
 > 见 https://www.zhihu.com/question/66782101/answer/246341271
 
-### 2.1.2 矩阵操作
+### 2.1.2  torch.no_grad(),  torch.set_grad_enabled(), torch.enable_grad() 和 model.eval()
+>见 https://zhuanlan.zhihu.com/p/64411611  
+
+* `model.eval()`: changes the forward() behaviour of the module it is called upon. It disables certain layers exclusive for training stage，e.g. BN，dropout.  
+BN层一般放在conv层后面，激活函数之前；Dropout对于conv层和FC层都可以适用   
+
+* `torch.no_grad()` or `torch.set_grad_enabled(False)`: Disable the gradient computation. In this mode, the result of every computation will have `requires_grad=False`, even when the inputs have `requires_grad=True`.  
+
+  ```python
+  # There is no different bewteen: 
+
+  with torch.no_grad():
+      <code>
+  # and
+
+  torch.set_grad_enabled(False)
+  <code>
+  torch.set_grad_enabled(True)   
+
+  # 只是torch.set_grad_enabled()可以选择是开还是关梯度计算，
+  # torch.no_grad()只能选择关
+  ```
+
+
+* `torch.enable_grad()`: Enables gradient calculation, if it has been disabled via `no_grad()` or `set_grad_enabled(False)`.
+  ```
+  >>> x = torch.tensor([1], requires_grad=True)
+  >>> with torch.no_grad():
+  ...   with torch.enable_grad():
+  ...     y = x * 2
+  >>> y.requires_grad
+  True
+  ```
+
+* `model.eval()` 和 `torch.no_grad()` 可以一起使用：
+  ```python
+  model = CNN()
+  for e in num_epochs:
+      # do training
+      model.train()
+
+  # evaluate model:
+  model = model.eval()
+  with torch.set_grad_enabled(False): 
+      logits, probas = model(testset_features)
+  ```
+
+### 2.1.3 model.zero_grad() 和 optimizer.zero_grad()
+* optimizer.zero_grad() 有什么用 ?  
+  一般的训练方式是进来一个batch更新一次梯度，所以每次计算梯度前都需要用 optimizer.zero_grad() 手动将梯度清零。如果不手动清零，pytorch会自动对梯度进行累加。
+  * 梯度累加可以模拟更大的batch size，在内存不够大的时候，是一种用更大batch size训练的trick，见 https://www.zhihu.com/question/303070254/answer/573037166  
+  * 梯度累加可以减少multi-task时的内存消耗问题。因为当调用了.backward()后，graph就从内存释放了。这样进行multi-task时，在任意时刻，在内存中最少只存储一个graph。 见 https://www.zhihu.com/question/303070254/answer/608153308
+    ```python
+    for idx, data in enumerate(train_loader):
+      xs, ys = data
+      
+      optmizer.zero_grad()
+      # 计算d(l1)/d(x)
+      pred1 = model1(xs) #生成graph1
+      loss = loss_fn1(pred1, ys)
+      loss.backward()  #释放graph1
+
+      # 计算d(l2)/d(x)
+      pred2 = model2(xs) #生成graph2
+      loss2 = loss_fn2(pred2, ys)
+      loss.backward()  #释放graph2
+
+      # 使用d(l1)/d(x)+d(l2)/d(x)进行优化
+      optmizer.step()
+    ```
+
+* model.zero_grad() 和 optimizer.zero_grad() 的区别  
+当`optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)`时，二者等效，其中SGD也可以换成其他优化器例如Adam。当一个model中用了多个optimizer时，model.zero_grad() 是将所有梯度清零，optimizer.zero_grad() 是清零一个optimizer
+
+### 2.1.3 矩阵操作
 |用途|命令|
 | :------------ | :-----|
 |创建随机数矩阵|x = torch.rand(5, 3)|
@@ -28,7 +102,7 @@
 |维度变换|x = y.view(-1,10)|
 |去掉个数为1的维度|x = y.squeeze()|
 
-### 2.1.3 Pytorch 和 Numpy 转换 
+### 2.1.4 Pytorch 和 Numpy 转换 
 * Torch -> NumPy:
 ```python
 a = torch.ones(5) # Torch Tensor
@@ -41,7 +115,7 @@ a = np.ones(5) # NumPy Array
 b = torch.from_numpy(a) # Torch Tensor
 ```
 
-### 2.1.4 在 CPU 和 GPU 之间移动数据
+### 2.1.5 在 CPU 和 GPU 之间移动数据
 ```# move the tensor to GPU
 x = x.to("cuda")
 # or
@@ -56,7 +130,7 @@ x = x.to("cpu")
 # or
 x = x.cpu()
 ```
-### 2.1.5 其他
+### 2.1.6 其他
 * torchvision 由以下四部分组成：  
 torchvision.datasets， torchvision.models， torchvision.transforms， torchvision.utils
   * torchvision.transforms 包含很多类，其中 torchvision.transforms.Compose() 可以把多个步骤合在一起  
@@ -107,7 +181,8 @@ tensor(23.1667, grad_fn=<MeanBackward1>)
   * x.grad 是求得的梯度
   * x.requires_grad 表示该变量是否需要autograd
   * y.grad_fn 记录了该变量求导应该用的function。 例如y由加法得到， y.grad_fn = \<AddBackward0\>; z由乘法得到， y.grad_fn = \<MulBackward0\> 
-> 参见： https://pytorch.org/tutorials/beginner/pytorch_with_examples.html,  
+> 参见：   
+https://pytorch.org/tutorials/beginner/pytorch_with_examples.html,  
 https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
 
 <br>
