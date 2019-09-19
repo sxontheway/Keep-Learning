@@ -68,7 +68,7 @@ BN层一般放在conv层后面，激活函数之前；Dropout对于conv层和FC�
 * optimizer.zero_grad() 有什么用 ?  
   一般的训练方式是进来一个batch更新一次梯度，所以每次计算梯度前都需要用 optimizer.zero_grad() 手动将梯度清零。如果不手动清零，pytorch会自动对梯度进行累加。
   * 梯度累加可以模拟更大的batch size，在内存不够大的时候，是一种用更大batch size训练的trick，见 https://www.zhihu.com/question/303070254/answer/573037166  
-  * 梯度累加可以减少multi-task时的内存消耗问题。因为当调用了.backward()后，graph就从内存释放了。这样进行multi-task时，在任意时刻，在内存中最少只存储一个graph。 见 https://www.zhihu.com/question/303070254/answer/608153308
+  * 梯度累加可以减少multi-task时的内存消耗问题。因为当调用了.backward()后，computation graph就从内存释放了。这样进行multi-task时，在任意时刻，在内存中最少只存储一个graph。 见 https://www.zhihu.com/question/303070254/answer/608153308
     ```python
     for idx, data in enumerate(train_loader):
       xs, ys = data
@@ -116,19 +116,18 @@ b = torch.from_numpy(a) # Torch Tensor
 ```
 
 ### 2.1.5 在 CPU 和 GPU 之间移动数据
-```# move the tensor to GPU
-x = x.to("cuda")
-# or
-x = x.cuda()
+```python
+# move the tensor to GPU
+x = x.to("cuda")  # or x = x.cuda()
 
 # directly create a tensor on GPU
-device = torch.device("cuda")
-y = torch.ones_like(x, device=device)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+torch.manual_seed(42)
+a = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
+b = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
 
 # move the tensor to CPU
-x = x.to("cpu")
-# or
-x = x.cpu()
+x = x.to("cpu") # or x = x.cpu()
 ```
 ### 2.1.6 其他
 * torchvision 由以下四部分组成：  
@@ -136,6 +135,8 @@ torchvision.datasets， torchvision.models， torchvision.transforms， torchvis
   * torchvision.transforms 包含很多类，其中 torchvision.transforms.Compose() 可以把多个步骤合在一起  
   例如 torchvision.transforms.Compose(\[transforms.CenterCrop(10), transforms.ToTensor()])
  > 见 https://pytorch.org/docs/master/torchvision/transforms.html?highlight=torchvision%20transforms
+
+* In PyTorch, every method that ends with an underscore (_) makes changes in-place, meaning, they will modify the underlying variable.
 
 <br>
 
