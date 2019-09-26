@@ -1,4 +1,14 @@
 # Domain Adaptive Object Detection
+Let's divide the methods in domain adaptation using number of networks:
+
+|Number of Networks Used in Total|Number of Networks to be Trained|Description|
+| :------------: |:---------------:|:-----:|
+| 1 | 1 | Self-Learning, Pseudo-Labeling, Regularized Tranfer Learning|
+| 2 | 1 | Knowledge Distillation, Feature Learning |
+| 2 | 2 | Co-Teaching |
+
+<br>
+
 * Few-shot domain adaptation  
     * `LSTD: A Low-Shot Transfer Detector for Object Detection_AAAI18` : Faster-RCNN + SSD + Extra Modules
     * `Few-shot Adaptive Faster_RCNN_CVPR19` :  Extra Modules
