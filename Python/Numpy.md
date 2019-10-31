@@ -147,7 +147,7 @@ a[np.arange(4), b] += 10   # a = [[11, 2, 3], [4, 5, 16], [17, 8, 9], [10, 21, 1
 ### 2.3.3 Broadcast的应用
 * 当对两个array进行element-wise运算时，NumPy会逐个比较它们的shape。只有在下述情况下才能够 broadcasting：
   * 相等
-  * 其中一个为1，（进而可进行拷贝拓展已至，shape匹配）
+  * 其中一个为1，（进而可进行拷贝拓展，直到shape匹配）
 ```python
 x = np.array([[1,2,3], [4,5,6], [7,8,9], [10, 11, 12]])
 v = np.array([1, 0, 1])
@@ -159,9 +159,12 @@ print(y) # Prints "[[ 2  2  4]，[ 5  5  7],  [ 8  8 10], [11 11 13]]"
 ### 2.3.4 花式索引
 如果目标是一维数组，那么索引的结果就是对应位置的元素；如果目标是二维数组，那么就是对应下标的行,尝试以下代码：
 ```python
-a = np.array([[1, 2], [3, 4], [5, 6]])
-b = np.array([[0, 1, 2], [0, 1, 0]])   # 花式索引， 用ndarry作为索引值
-c = ([0, 1, 2], [0, 1, 0])             # 多维索引， 用tuple作为索引值
-d = [[0, 1, 2], [0, 1, 0]]             # 会提示warning
+a = np.array([1, 2, 3, 4, 5, 6, 7 ,8])
+b = np.array([0, 1, 2, 3])
+print(a[b])
+
+c = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
+d = np.array([[1, 0], [2, 3]])  
+print(c[d], np.shape(c[d]))
 ```
 > 见 http://www.runoob.com/numpy/numpy-advanced-indexing.html 
