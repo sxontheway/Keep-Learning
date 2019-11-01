@@ -142,7 +142,7 @@ ROS下有4类命名空间： base, global, relatove, private
 <br>
 
 ## 1.4 ROS多线程
-### 1.4.1 解决程序终止在rospy.spin()处的问题
+### 1.4.1 解决程序终止在 rospy.spin() 处的问题
 https://blog.csdn.net/qq_30193419/article/details/100776075 
 ```python
 import threading
@@ -156,7 +156,59 @@ if __name__ == "__main__":
     add_stread.start()    
     #剩余代码...
 ```
-### 1.4.2 解决在callback func中调用matplotlib实时绘图的问题
+### 1.4.2 在callback func中调用 matplotlib 实时绘图的问题
+* 问题起源：   
+想在 callback 函数中用 matplotlib 画实时更新的图（图的数据由 msg 得到，没触发一次 callback 更新一次）
+* 常规想法：  
+用`plt.ion()`, 见：https://github.com/xianhu/LearnPython/blob/master/python_visual_animation.py 
+  ```python
+  import numpy as np
+  import matplotlib
+  import matplotlib.pyplot as plt
+  import matplotlib.font_manager as fm
+  from mpl_toolkits.mplot3d import Axes3D
+
+  def three_dimension_scatter():
+      # 生成画布
+      fig = plt.figure()
+
+      # 打开交互模式
+      plt.ion()
+
+      for index in range(50):
+          # 清除原有图像
+          fig.clf()
+
+          # 生成测试数据
+          point_count = 100
+          x = np.random.random(point_count)
+          y = np.random.random(point_count)
+          z = np.random.random(point_count)
+          color = np.random.random(point_count)
+          scale = np.random.random(point_count) * 100
+
+          # 生成画布
+          ax = fig.add_subplot(111, projection="3d")
+
+          # 画三维散点图
+          ax.scatter(x, y, z, s=scale, c=color, marker=".")
+
+          # 暂停
+          plt.pause(0.2)
+
+      plt.ioff()  # 关闭交互模式
+      plt.show()  # 图形显示
+      return
+      
+  three_dimension_scatter()
+  ```
+* 遇到的问题：  
+如上所示，`plt.ion()`需要写在 ROS callback 函数外面，`fig.clf()`等则需要写在 callback 函数内部。ROS中的 callback 内部是一个子线程，但matplotlib作图所用的后端 `TKinter` 要求所有操作在一个线程内进行。所以报错 `main thread is not in main loop`，见：https://stackoverflow.com/questions/34764535/why-cant-matplotlib-plot-in-a-different-thread 
+* 解决方案：  
+Matplotlib不支持多线程，只支持多进程。将处理的数据作为一个话题输出，在另外一个ROS node中订阅并plot。
+
+
+
 
 
 ---
