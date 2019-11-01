@@ -141,8 +141,29 @@ ROS下有4类命名空间： base, global, relatove, private
 ---
 <br>
 
-## 1.4 常见命令
-### 1.4.1 rosbag和rosparam
+## 1.4 ROS多线程
+### 1.4.1 解决程序终止在rospy.spin()处的问题
+https://blog.csdn.net/qq_30193419/article/details/100776075 
+```python
+import threading
+ 
+def thread_job():
+    rospy.spin()
+ 
+if __name__ == "__main__": 
+    # 代码...    
+    add_thread = threading.Thread(target = thread_job)
+    add_stread.start()    
+    #剩余代码...
+```
+### 1.4.2 解决在callback func中调用matplotlib实时绘图的问题
+
+
+---
+<br>
+
+## 1.5 其他
+### 1.5.1 rosbag和rosparam
 * rosbag并不携带parameters信息，需要读取rosparam时，要单独操作
 ```bash
 rqt_bag
@@ -156,7 +177,7 @@ rosparam load <filename>
 ---
 <br>
 
-## 1.5 ROS通信
+## 1.5.2 ROS通信
 Topic和Service的比较，参见：https://blog.csdn.net/ZXQHBD/article/details/72846865
 
 ---
