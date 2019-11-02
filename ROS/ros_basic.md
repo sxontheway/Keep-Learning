@@ -203,13 +203,11 @@ if __name__ == "__main__":
   three_dimension_scatter()
   ```
 * 遇到的问题：  
-如上所示，`plt.ion()`需要写在 ROS callback 函数外面，`fig.clf()`等则需要写在 callback 函数内部。ROS中的 callback 内部是一个子线程，但matplotlib作图所用的后端 `TKinter` 要求所有操作在一个线程内进行。所以报错 `main thread is not in main loop`，见：https://stackoverflow.com/questions/34764535/why-cant-matplotlib-plot-in-a-different-thread 
+如上所示，`plt.ion()`需要写在 ROS callback 函数外面，`fig.clf()`等则需要写在 callback 函数内部。  
+用rospy.spin()的话，`In rospy，each subscriber has its own thread which handles its callback functions automatically`，也即 callback 函数由单独一个线程执行，但matplotlib作图所用的后端 `TKinter` 要求所有操作在一个线程内进行。所以报错 `main thread is not in main loop`，见：https://stackoverflow.com/questions/34764535/why-cant-matplotlib-plot-in-a-different-thread 
 * 解决方案：  
-Matplotlib不支持多线程，只支持多进程。将处理的数据作为一个话题输出，在另外一个ROS node中订阅并plot。
-
-
-
-
+  * Matplotlib不支持多线程，只支持多进程。开一个独立于回调函数的新进程，在新的进程中画图，消息通过进程间通信传输（在ROS中是否能用有待验证）：https://stackoverflow.com/questions/19662906/plotting-with-matplotlib-in-threads 
+  * `plt.show(block = True)`替代`rospy.spin()`的阻塞功能，强制使得 callback 函数内部也在主线程执行但这会导致接收数据的帧率发生变化，从而造成 msgs 的堆积: https://stackoverflow.com/questions/35145555/python-real-time-plotting-ros-data
 
 ---
 <br>
@@ -230,6 +228,8 @@ rosparam load <filename>
 <br>
 
 ## 1.5.2 ROS通信
+> ROS本质上是提供了一个分布式进程间通信的系统，每个进程由一个节点封装。  
+
 Topic和Service的比较，参见：https://blog.csdn.net/ZXQHBD/article/details/72846865
 
 ---
