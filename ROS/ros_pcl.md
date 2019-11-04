@@ -1,4 +1,3 @@
----
 # 1. 数据类型
 ## 1.1 ROS中3种Point cloud类型
 参见：http://wiki.ros.org/pcl/Overview
@@ -53,7 +52,7 @@ ROS提供了封装好的节点，可以直接利用他们进行以下四者的�
 * 当诸如`pcl::PointXYZI`等类型不够用时（例如我们要定义一个点包含x,y,z,vx,vy,vz,az,ay,az），有两种方法：  
   * 自己定义`PointCloud<T>`
   * 直接对`sensor_msgs::PointCloud2`类型进行赋值  
-* 但1.1中说过，`sensor_msgs::PointCloud2`的格式复杂，且点云以二进制存储，对其直接进行填写有困难，一般是通过填写`PointCloud<T>`,让`pcl_ros`来进行序列化及发布：
+* 但1.1中说过，`sensor_msgs::PointCloud2`的格式复杂，且点云以二进制存储，对其直接进行填比较麻烦（但也不是不可以，下面会讲）。所以一般是通过填写`PointCloud<T>`,让`pcl_ros`来进行序列化及发布：
   ```cpp
   #include "pcl_ros/point_cloud.h"
 
@@ -114,3 +113,38 @@ ROS提供了封装好的节点，可以直接利用他们进行以下四者的�
         }; \
       };
       ```
+
+------
+<br>
+
+
+# 5. 编写自己的PointCloud2
+Debug指南：https://www.cnblogs.com/gdut-gordon/p/9155662.html  
+Python sensor_msgs.msg.PointCloud2() Examples: https://www.programcreek.com/python/example/99841/sensor_msgs.msg.PointCloud2  
+一个示例： 
+```
+def array_to_pointcloud2(self, data):
+        msg =  PointCloud2()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = self.frame_id   # frame_id告诉了ROS坐标怎样进行变换
+        msg.height = 1
+        msg.width = data.shape[0]   # 每一次发布的发布的数据包含多少个点
+
+        msg.fields = [
+            PointField('x', 0, PointField.FLOAT32, 1),
+            PointField('y', 4, PointField.FLOAT32, 1),
+            PointField('z', 8, PointField.FLOAT32, 1),
+            PointField('range', 12, PointField.FLOAT32, 1),
+            PointField('velocity', 16, PointField.FLOAT32, 1),
+            PointField('intesity', 20, PointField.FLOAT32, 1),
+            PointField('class', 24, PointField.FLOAT32, 1),
+        ]
+        msg.is_bigendian = 0
+        msg.is_dense = 1
+        msg.point_step = 28   # 每个点有7个属性，每个属性占4个bytes
+        msg.row_step = msg.point_step * data.shape[0]
+        msg.data = np.asarray(data, np.float32).tostring()
+        print(data.shape)
+        return msg 
+
+```
