@@ -32,6 +32,8 @@ python3 -m pip install --user numpy scipy matplotlib ipython jupyter pandas symp
     ```python
     # 用python创建二维列表，type(a1)得到list
     a1 = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
+    b = a1[:, 1]  # 报错
+    c = np.array(a1)[；， 1] # 正确
     # 用numpy创建二维数组，type(a2)得到numpy.ndarray
     a2 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
     # 列表与数组的相互转换
