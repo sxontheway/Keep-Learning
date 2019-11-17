@@ -93,7 +93,7 @@ np.shape(c)    # 得到(3, 1)
    dict2['num'].remove(1)
 
    # 输出结果
-   print(dict2)         # {'user': 'b', 'num': [2, 3]}
+   print(dict1)         # {'user': 'b', 'num': [2, 3]}
    print(dict2)         # {'user': 'b', 'num': [2, 3]}
    print(dict3)         # {'user': 'a', 'num': [2, 3]}
    print(dict4)         # {'user': 'a', 'num': [1, 2, 3]}
