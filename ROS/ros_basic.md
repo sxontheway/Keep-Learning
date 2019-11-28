@@ -7,6 +7,7 @@
 <br>
 
 ## 1.2 Python3 in ROS
+> 此问题在 ROS Melodic上得到缓解，可python3下使用cv2和cv_bridge了
 ### 1.2.1 ROS下cv2版本冲突的问题
 * 问题起源： 详见： [After install ROS Kinetic, cannot import OpenCV?](https://stackoverflow.com/questions/43019951/after-install-ros-kinetic-cannot-import-opencv)  
   * 用`pip3 install opencv-python --user`，安装了基于python3的OpenCV后，在python3下`import cv2`没问题  
