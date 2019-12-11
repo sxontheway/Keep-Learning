@@ -122,18 +122,29 @@ a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
 ```
 
 ## 1.8 继承object类
-见： https://www.zhihu.com/question/19754936
+见： https://www.zhihu.com/question/19754936  
+
+属于历史遗留问题，继承 object 类的是新式类，不继承 object 类的是经典类。在Python3中已经不存在这个问题，object已经作为所有东西的基类了。
 
 ---
 <br>
 
 # 2. 方法
 ## 2.1 super()和__call__()方法
-* super(): 使用继承时，基类的函数不会自动被调用。需要手动调用，例如`super().__init__()`  
-    * Python3.x 和 Python2.x 语法有区别: Python 3 可以使用直接使用`super().xxx`代替 Python 2 中的`super(Class, self).xxx`  
-    * 但此方法在多继承时只能代表继承的第一个父类。多继承时，用最原始的[类名+函数名]的方式可调用任意父类的函数。
+> https://www.zhihu.com/question/20040039
+* super(): 使用继承时，基类的函数不会自动被调用。需要手动调用，例如调用基类的构造函数：`super().__init__()`  
+    * Python3.x 和 Python2.x 语法有区别: Python2 中用`super(Class, self).xxx`，Python3 中简化了，可以用`super().xxx`  
+    * 多继承时， `super(A, self).func` 执行的是MRO中的下一个类的 func；MRO 全称是 Method Resolution Order，它代表了类继承的顺序。老老实实地用类名去掉就不会出现这种问题。
+        ```python
+        class C(A,B):
+        def __init__(self):
+            A.__init__(self)
+            B.__init__(self)
+        ```
+    * `self` 是首先调用自身的方法如果自身没有再去父类中，`super` 是直接从父类中找方法
 * \_\_call__()： 如果在创建class的时候写了`__call__()`方法，那么该class实例化出实例后，实例名()就是调用`__call__()`方法。`__call__()`方法使实例能够像函数一样被调用。
 ```python
+# Python2 代码
 class Person(object):
     def __init__(self, name, gender):
         self.name = name
@@ -142,7 +153,7 @@ class Person(object):
         print 'My name is %s...' % self.name
         print 'My friend is %s...' % friend
 
-//定义Student类时，只需要把额外的属性加上，例如score：
+# 定义Student类时，只需要把额外的属性加上，例如score：
 class Student(Person):
     def __init__(self, name, gender, score):
         super(Student, self).__init__(name, gender)  # 若不写这一句，子类将缺失name和gender属性

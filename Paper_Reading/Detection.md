@@ -1,5 +1,47 @@
-# Model Complexity Analysis
+# SSD的细节
+> https://zhuanlan.zhihu.com/p/33544892
+## 网络结构
+* SSD是全卷积网络。SSD对于一张图的输入，会产生8732个default boxes (先验框，简单理解为anchor)，其中：
+`8732 = 38*38*4 + (19*19 + 10*10 + 5*5)*6 + (3*3 + 1*1)*4`
+* 每个 default boxes 包含(c + 4)个浮点数信息，代表每个类别的置信度和bounding box regression所需的四个参数。  例如对于PASCAL VOC，c等于21，每个 default boxes 含有25个浮点数（20个物体类，1个背景类，4个位置参数）
+    <p align="center" >
+    <img src="./pictures/SSD1.png", width='800'>
+    </p>
 
+
+## Training
+* 正样本  
+所有 default boxes 中：与某一个GT的IOU最大的 + 与某一个GT的IOU大于0.5的(若存在)
+
+* 负样本  
+除了正样本的 default boxes 都是负样本
+
+* Loss Function
+    * X<sub>i,j</sub><sup>p</sup> = 1 是正样本，= 0 是负样本
+    * 每个Default box 都是正样本或负样本
+    * 对正样本要计算位置和分类误差，对于负样本只计算分类误差 
+    * 实际训练中，为了正负样本均衡，采用 hard negative mining。也即只选取部分负样本作为训练数据。具体一点，抽样时按照置信度误差进行降序排列，只选取最高的 k 个。这里就可以利用 k 来控制最后正、负样本的比例为 1 : 3
+
+        > PS:  预测背景的置信度也即 c<sub>i</sub><sup>0</sup>，是softmax得到的向量的第一个元素。c<sub>i</sub><sup>0</sup>越低，confidence loss 越大，表明这个样本更hard，也即更需要被用来训练
+
+        <p align="center" >
+            <img src="./pictures/SSD_loss.png", width='800'>
+        </p>
+
+
+## Inference 步骤
+* 对于每个预测框，首先根据类别置信度确定其类别（置信度最大者）与置信度值，并过滤掉属于背景的预测框
+* 根据置信度阈值（如0.5）过滤掉阈值较低的预测框 
+* 对于留下的预测框进行解码，根据先验框得到真实的位置（解码后一般还需要做clip，防止预测框位置超出图片）
+* 根据置信度进行降序排列，然后仅保留top-k（如400）个预测框
+* 进行NMS
+
+
+
+
+<br><br>
+
+# Model Complexity Analysis
 ## Introduction
 * Nowadays network model = backbone + head  
     * Backbone, i.e. the feature extractor: VGG, GoogleNet, ResNet, Darknet, MobileNet, ShuffeNet...  

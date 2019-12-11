@@ -22,5 +22,6 @@ pytorch 安装见:https://devtalk.nvidia.com/default/topic/1049071/jetson-nano/p
 pip,numpy,tensorflow,deepstream,tensorrt在刷机时就可以安好  
 torchvision安装：sudo pip3 install torchvision  
 scikit-learn安装: 需要先安装`sudo apt-get install gfortran`, `sudo pip3 install Cython`
+VSCode安装及Romote Control：https://www.jetsonhacks.com/2019/10/01/jetson-nano-visual-studio-code-python/ 
 
 

@@ -12,6 +12,7 @@
 # 2. Pytorch 的使用
 ## 2.1 常用命令
 ### 2.1.1 torch.nn 和 torch.nn.functional 的区别
+> torch.nn API: https://pytorch.org/docs/stable/nn.html 
 * torch.nn 是里面包含的是，torch.nn.functional 里面包含的是函数。  
 * 如果我们只保留nn.functional下的函数的话，在训练或者使用时，我们就要手动去维护weight, bias, stride这些中间量的值，这显然是给用户带来了不便。  
 * 而如果我们只保留nn下的类的话，其实就牺牲了一部分灵活性，因为做一些简单的计算都需要创造一个类，这也与PyTorch的风格不符。

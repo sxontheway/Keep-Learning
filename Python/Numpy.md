@@ -30,12 +30,17 @@ python3 -m pip install --user numpy scipy matplotlib ipython jupyter pandas symp
 * list 和 array  
     简单来说，np.array支持比list更多的索引方式，在numpy中使用更方便
     ```python
+    # 创建长度为定值的空二维列表
+    empty_list = [[]]*10
+
     # 用python创建二维列表，type(a1)得到list
     a1 = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
     b = a1[:, 1]  # 报错
     c = np.array(a1)[；， 1] # 正确
+
     # 用numpy创建二维数组，type(a2)得到numpy.ndarray
     a2 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
+
     # 列表与数组的相互转换
     a3 = a2.tolist()
     a3 = np.array(a1)
