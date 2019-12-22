@@ -3,11 +3,14 @@
 ## 网络结构
 * SSD是全卷积网络。SSD对于一张图的输入，会产生8732个default boxes (先验框，简单理解为anchor)，其中：
 `8732 = 38*38*4 + (19*19 + 10*10 + 5*5)*6 + (3*3 + 1*1)*4`
+    * ssd是 8732 detections per class
+    * yolov1 是 98 detections per class (7\*7的grid，每个grid预测两个)
+    * yolov2 是 845 detection per class (13\*13\*5)
+    * yolov3 是 10647 detection per class (13\*13\*3 + 26\*26\*3 + 52\*52\*3)
 * 每个 default boxes 包含(c + 4)个浮点数信息，代表每个类别的置信度和bounding box regression所需的四个参数。  例如对于PASCAL VOC，c等于21，每个 default boxes 含有25个浮点数（20个物体类，1个背景类，4个位置参数）
     <p align="center" >
     <img src="./pictures/SSD1.png", width='800'>
     </p>
-
 
 ## Training
 * 正样本  
@@ -30,15 +33,19 @@
 
 
 ## Inference 步骤
-* 对于每个预测框，首先根据类别置信度确定其类别（置信度最大者）与置信度值，并过滤掉属于背景的预测框
-* 根据置信度阈值（如0.5）过滤掉阈值较低的预测框 
-* 对于留下的预测框进行解码，根据先验框得到真实的位置（解码后一般还需要做clip，防止预测框位置超出图片）
-* 根据置信度进行降序排列，然后仅保留top-k（如400）个预测框
-* 进行NMS
-
-
-
-
+* SSD: 
+    * 对于每个预测框，首先根据类别置信度确定其类别（置信度最大者）与置信度值，并过滤掉属于背景的预测框
+    * 根据置信度阈值（如0.5）过滤掉阈值较低的预测框 
+    * 对于留下的预测框进行解码，根据先验框得到真实的位置（解码后一般还需要做clip，防止预测框位置超出图片）
+    * 根据置信度进行降序排列，然后仅保留top-k（如400）个预测框
+    * 进行NMS
+* Yolov3：https://blog.csdn.net/leviopku/article/details/82660381  
+    * Yolov3中，对于coco数据集，最后每个anchor对应`80+4+1=85`个浮点数（80个物体类，4个位置参数，1个对于这个预测的confidence）  
+    ssd也是85个，但是是：80个物体类 + 4个位置参数 + 1个背景类
+    * Yolov3和ssd不一样的地方：yolov3用80个logistic二分类代替ssd中的softmax，因为可能一个人既可能是people，又可能是women，也即一个box可以含有多个标签。  
+    * Yolov3在Inference时：
+        * 先滤掉confidence小于某个阈值的box
+        * 按类NMS
 <br><br>
 
 # Model Complexity Analysis
