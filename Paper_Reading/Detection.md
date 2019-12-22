@@ -42,7 +42,7 @@
 * Yolov3：https://blog.csdn.net/leviopku/article/details/82660381  
     * Yolov3中，对于coco数据集，最后每个anchor对应`80+4+1=85`个浮点数（80个物体类，4个位置参数，1个对于这个预测的confidence）  
     ssd也是85个，但是是：80个物体类 + 4个位置参数 + 1个背景类
-    * Yolov3和ssd不一样的地方：yolov3用80个logistic二分类代替ssd中的softmax，因为可能一个人既可能是people，又可能是women，也即一个box可以含有多个标签。  
+    * Yolov3和ssd不一样的地方：Loss计算上，yolov3用80个logistic二分类代替ssd中的softmax，因为可能一个人既可能是people，又可能是women，也即一个box可以含有多个标签（Yolov2也是用的softmax loss）  
     * Yolov3在Inference时：
         * 先滤掉confidence小于某个阈值的box
         * 按类NMS
