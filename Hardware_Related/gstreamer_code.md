@@ -54,8 +54,24 @@ nvvidconv ! nvoverlaysink overlay-w=1920 overlay-h=1080 sync=false
 ```
 ### for terminal command
 > http://petermoran.org/csi-cameras-on-tx2/
+* For Jetpack 3.3
 ```
 gst-launch-1.0 nvcamerasrc ! 
 'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)60/1' ! 
 nvvidconv ! 'video/x-raw(memory:NVMM), format=(string)I420' ! nvoverlaysink -e
+```
+* For Jetpack 4.2
+Change `nvcamerasrc`->`nvarguscamerasrc` and change `I420` -> `NV12` when using Jetpack 4.2
+
+### for OpenCV
+```python
+import cv2
+cap = cv2.VideoCapture("nvarguscamerasrc !\
+    video/x-raw(memory:NVMM), width=(int)1280, height=(int)720, format=(string)NV12, framerate=(fraction)20/1 !\
+    nvvidconv flip-method=0 ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink")
+    
+ret, orig_image = cap.read()
+if orig_image is None:
+    continue
+image = cv2.cvtColor(orig_image, cv2.COLOR_BGR2RGB)
 ```
