@@ -1,5 +1,5 @@
 ## 色彩编码
-色彩编码大体上纷纷YUV和BGR两类，一般来说YUV类多用于传输，因为其所需的带宽比BGR编码的小。并且不需要三个通道同时传输，只有Y通道就能还原图像，只不过是黑白的 
+色彩编码大体上分为YUV和BGR两类，一般来说YUV类多用于传输，因为其所需的带宽比BGR编码的小。并且不需要三个通道同时传输，只有Y通道就能还原图像，只不过是黑白的 
 
 YUV类：YUV可以有4:4:4, 4:2:2(UYVY等), 4:2:0(I420，NV12等)三种采样方式。参见：https://www.cnblogs.com/azraelly/archive/2013/01/01/2841269.html
 
@@ -48,13 +48,13 @@ VP8, VP9: https://www.zhihu.com/question/21067823
 
 `nvvidconv`和`videoconvert`：
 nvvidconv is a Gstreamer-1.0 plug-in which allows conversion between OSS (raw) video formats and NVIDIA video formats. 例如：
- ```
- gst-launch-1.0 nvcamerasrc ! 
- video/x-raw(memory:NVMM), width=1920, height=(int)1080, format=(string)I420, framerate=(fraction)30/1 !
- nvvidconv flip-method=2 !
- video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink
- ```
+```
+gst-launch-1.0 nvcamerasrc ! 'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)60/1' ! nvvidconv ! 'video/x-raw(memory:NVMM), format=(string)I420' ! nvoverlaysink -e
+```
 nvvidconv相当于一个桥梁，前边是"I420"类型过滤器，后边是BGRx类型过滤器。videoconvert同理，但是区别是 **nvvidconv有Nvidia 硬件加速，videoconvert则是在CPU上运行，没有加速，见 https://developer.nvidia.com/nvidia-video-codec-sdk**
+
+## On Jetpack4.2: 
+The above command works for Jetpack 3.3, change `nvcamerasrc`->`nvarguscamerasrc` and change `I420` -> `NV12` when using Jetpack 4.2.
 
 ---
 <br>
@@ -63,7 +63,6 @@ nvvidconv相当于一个桥梁，前边是"I420"类型过滤器，后边是BGRx�
 TX2的GPU是pascal架构，pascal之后是最新的turing  
 TX2的板载的摄像头是OV5693
 
----
 <br>
 
 ## Gstreamer pipelines on Jetson TX2
@@ -73,9 +72,11 @@ TX2的板载的摄像头是OV5693
 * v4l2src  
 参见：https://blog.csdn.net/jack0106/article/details/5592557  
 是gstreamer给linux的一个插件，一般只用于video capture（也即decode）的功能
-* nvcamerasrc  
+
+* nvcamerasrc  (In Jecpack4.2, change to nvarguscamerasrc)  
 参见 https://developer.ridgerun.com/wiki/index.php?title=Gstreamer_pipelines_for_Jetson_TX2  
 是Nvidia公司写的一个gstreamer插件，用于TX2上可以获得比v4l2src更低的CPU占用率
+
 * nvgstcapture-1.0  
 nvgstcapture-1.0 is a program included with L4T that makes it easy to capture and save video to file. It’s also a quick way to pull up the view from your camera.
 This is an application based on gstreamer and omx to capture, encode and save video to the filesystem.  
@@ -87,7 +88,7 @@ This is an application based on gstreamer and omx to capture, encode and save vi
 > 主要参考了 http://petermoran.org/csi-cameras-on-tx2/ 的ROS部分，对其gstreamer pipeline的部分进行修改即可  
 > 需要修改的部分见 ***[gstreamer_code.md](./gstreamer_code.md)***  
 
-用nvcamerasrc实现:  
+用nvcamerasrc实现 (In Jecpack4.2, change to nvarguscamerasrc):  
 除了最后一步其余都在NVMM上，节省了NVMM到standard memory之间的内存拷贝，也可以比v4l2src实现少用一个nvvidconv  
 
 用v4l2实现:  
@@ -118,8 +119,6 @@ v4l2src device=/dev/video0 !
 参见: [关于 NVMM 和 nvvidconv 的讨论](https://devtalk.nvidia.com/default/topic/1012417/jetson-tx1/tx1-gstreamer-nvvidconv-will-not-pass-out-of-nvmm-memory/post/5162187/#5162187)  
 * `gst-launch-1.0 v4l2src device=/dev/video0 ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e`  
 报错"could not link v4l2src0 to nvvconv0"，也即v4l2src只能写入到普通内存中，不能直接写入NVMM  
+
 * `gst-launch-1.0 nvcamerasrc ! "video/x-raw, format=I420(memory:NVMM)" ! nvvidconv ! nvoverlaysink -e`   
     可行。因为nvcamerasrc插件直接将raw video写进NVMM了，nvvidconv要求input/output中至少有一个是NVMM（可以两个都是；只有一个是时有memoey copy的过程）
-
-
-
