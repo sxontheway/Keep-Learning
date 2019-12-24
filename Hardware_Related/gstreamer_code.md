@@ -62,6 +62,7 @@ nvvidconv ! 'video/x-raw(memory:NVMM), format=(string)I420' ! nvoverlaysink -e
 ```
 * For Jetpack 4.2
 Change `nvcamerasrc`->`nvarguscamerasrc` and change `I420` -> `NV12` when using Jetpack 4.2
+Record and display: `gst-launch-1.0 -e nvarguscamerasrc num-buffers=300 ! 'video/x-raw(memory:NVMM), width=1920, height=1080, format=NV12, framerate=30/1' ! tee name=streams streams. ! queue ! nvv4l2h265enc bitrate=8000000 ! h265parse ! qtmux ! filesink location=video0.mp4 streams. ! queue ! nvoverlaysink -e`
 
 ### for OpenCV
 ```python
