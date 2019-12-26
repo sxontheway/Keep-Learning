@@ -126,6 +126,39 @@ a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
 
 属于历史遗留问题，继承 object 类的是新式类，不继承 object 类的是经典类。在Python3中已经不存在这个问题，object已经作为所有东西的基类了。
 
+## 1.9 异常处理
+> 见： https://blog.csdn.net/u012609509/article/details/72911564  
+
+`with` 和 `try except`功能不同，with语句只是帮忙关闭没有释放的资源，并且抛出异常，但是后面的语句是不能执行的。为了即能够输出我们自定义的错误信息，又能不影响后面代码的执行，必须还得使用`try except`语句
+
+* with
+    ```python
+    with clause as B:
+        do_something()
+    ```
+
+    * 紧跟 with 后面的语句 clause 被求值后，其返回值是一个对象，称它为A。该对象的`–enter–()`方法被调用，`–enter–()`方法的返回值将被赋值给as后面的变量 B
+    * 当 `do_something()` 全部被执行完之后，将调用 A 的`–exit–()`方法，其会自动释放资源。
+    * 在 with 后面的代码块抛出异常时，`exit()`方法也被执行。 
+
+* try except
+    > https://stackoverflow.com/questions/18675863/load-data-from-python-pickle-file-in-a-loop  
+    ```python
+    # 不用担心pkl.load()已经读取完毕报错
+    import pickle as pkl
+    def pickleLoader(pklFile):
+        try:
+            while True:
+                yield pkl.load(pklFile)
+        except EOFError:
+            pass
+
+    with open(filename) as f:
+        for event in pickleLoader(f):
+            do_something()
+    ```
+
+
 ---
 <br>
 

@@ -142,15 +142,16 @@ torchvision.datasets， torchvision.models， torchvision.transforms， torchvis
 <br>
 
 ## 2.2 Tensor是什么
+### 2.2.1 一个例子
 ```python
 import torch
 
 x = torch.Tensor([[1.,2.,3.],[4.,5.,6.]])
 x.requires_grad = True
-y = x+1
-z = y*y
+y = x + 1
+z = y * y
 out = z.mean()
-loss = 20-out
+loss = 20 - out
 loss.backward()
 
 print(x.data, '\n', x.dtype, '\n', x.device, 
@@ -164,12 +165,12 @@ print(out)
 ```
 tensor([[1., 2., 3.],
         [4., 5., 6.]]) 
- torch.float32 
- cpu 
- tensor([[-0.6667, -1.0000, -1.3333],
-        [-1.6667, -2.0000, -2.3333]]) 
- None 
- True 
+torch.float32 
+cpu 
+tensor([[-0.6667, -1.0000, -1.3333],
+      [-1.6667, -2.0000, -2.3333]]) 
+None 
+True 
 
 tensor([[1., 2., 3.],
         [4., 5., 6.]], requires_grad=True)
@@ -186,6 +187,27 @@ tensor(23.1667, grad_fn=<MeanBackward1>)
 > 参见：   
 https://pytorch.org/tutorials/beginner/pytorch_with_examples.html,  
 https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
+
+### 2.2.2 tensor其他操作
+* tensor能像numpy array一样进行索引
+* max 操作
+  `.max(k)`表示求第k维的最大值，对于二维tensor，求列最大 k = 0，行最大 k = 1
+  ```python
+  import torch
+  a = torch.tensor([[1, 2], [3, 4], [5, 6]])
+  print(a.max(1))     # 默认keepdim为false
+  print(a.max(1)[0])  # 最大值
+  print(a.max(1)[1])  # 最大值对应的index
+  print(a.max(1, keepdim = True))
+  ```
+  输出
+  ```
+  torch.return_types.max(values=tensor([2, 4, 6]), indices=tensor([1, 1, 1])) 
+  tensor([2, 4, 6]) 
+  tensor([1, 1, 1])
+  torch.return_types.max(values=tensor([[2], [4], [6]]), indices=tensor([[1], [1], [1]])) 
+  ```
+
 
 <br>
 
