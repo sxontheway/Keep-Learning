@@ -24,3 +24,5 @@
    * 开不了机：可能是显卡的原因，关闭`3D加速` 
    * 双线剪贴板：`安装增强功能`
    * 共享文件夹：`sudo usermod -aG vboxsf $(whoami)`
+   * 不能用USB 3.0：https://askubuntu.com/questions/783076/unable-to-enumerate-usb-device-under-virtualbox  
+   只能连usb2.0口，或者用一个usb2.0的hub接在usb3.0口上
