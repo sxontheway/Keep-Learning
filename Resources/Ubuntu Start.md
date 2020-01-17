@@ -20,3 +20,7 @@
     * `sudo lshw -c network`: see the model and vendor oationf the network card. For example, `BCM43142 802.11 b/g/m, vendor: Broadcom Corportion`  
     * For Broadcast network card:`sudo apt-get install`, `sudo apt-get bcmwl-kernel-source`
 
+* Virtual box
+   * 开不了机：可能是显卡的原因，关闭`3D加速` 
+   * 双线剪贴板：`安装增强功能`
+   * 共享文件夹：`sudo usermod -aG vboxsf $(whoami)`
