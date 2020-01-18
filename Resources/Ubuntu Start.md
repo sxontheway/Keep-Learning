@@ -2,8 +2,6 @@
     * 原来是Firefox的附加组件管理器不见了，我们只需要重新安装上即可: https://blog.csdn.net/JohnYu024/article/details/79763300  
     * Add-on manager link: http://mozilla.com.cn/thread-343905-1-1.html
 
-
-
 * Latex 安装：
     > 要加中文：`\usepackage[UTF8]{ctex}`即可：https://jdhao.github.io/2018/03/29/latex-chinese.zh/ 
     * Linux下， 安装vscode
@@ -12,8 +10,6 @@
 
     * Debug:
         * 有一篇的Bibtex的Library未找到，结果显示所有reference有错
-
-
 
 * No Wifi Model  
     * `iwconfig`: see whether there is a model called wlan0. If not, it means that the network card driver is not installed.  
@@ -42,3 +38,5 @@
       cap.release()
       cv2.destroyAllWindows()
       ```
+   * Note that most video capture devices (like webcams) only support specific sets of widths & heights.   
+     Use `uvcdynctrl -f` to see. 
