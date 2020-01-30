@@ -22,4 +22,4 @@
   >>> [False, True, False, True] 
   >>> [True, False, False, True]
   ```
-  要想按元素与运算，用 `np.logical_and(x,y)`
+  要想按元素与运算，用 `np.logical_and(x,y)`或`[a and b for a, b in zip(x, y)]`
