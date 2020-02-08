@@ -89,7 +89,7 @@ print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路劲
     例如，在开头加上`from __future__ import print_function`这句之后，即使在python2.X，
     print就可以像python3.X那样加括号使用（python2.X中print不需要括号，而在python3.X中则需要）
 
-* \_\_init__.py 的用途：构建模块
+* \_\_init__.py 的用途：构建模块  
 https://python3-cookbook.readthedocs.io/zh_CN/latest/c10/p01_make_hierarchical_package_of_modules.html  
 https://www.cnblogs.com/lands-ljk/p/5880483.html  
 
