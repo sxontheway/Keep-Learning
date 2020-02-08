@@ -63,31 +63,35 @@ print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路劲
 
 ## 1.4 import
 * \_\_all__ 和 import * 
-```python
-### 文件foo.py ###
-__all__ = ['x', 'test基础
+  ```python
+  ### 文件foo.py ###
+  __all__ = ['x', 'test基础
 
-    list和array 简单来说，numpy.array支持比list更多的索引方式，更易于使用
-']
-x = 2
-y = 3
-def test():
-    print('test')
-```
-```python
-### 文件main.py ###
-from foo import *
-print('x: ', x)
-print('y: ', y)     #此句会报错，因为没有导入y
-test()
+      list和array 简单来说，numpy.array支持比list更多的索引方式，更易于使用
+  ']
+  x = 2
+  y = 3
+  def test():
+      print('test')
+  ```
+  ```python
+  ### 文件main.py ###
+  from foo import *
+  print('x: ', x)
+  print('y: ', y)     #此句会报错，因为没有导入y
+  test()
 
-# `import *`表示导入import all；但`__all__`指定了能够被导入的部分（例如 y 就没有被包含）
-```
+  # `import *`表示导入import all；但`__all__`指定了能够被导入的部分（例如 y 就没有被包含）
+  ```
 * from \_\_future__ import  
 
     用于导入之后版本的一些功能。  
     例如，在开头加上`from __future__ import print_function`这句之后，即使在python2.X，
     print就可以像python3.X那样加括号使用（python2.X中print不需要括号，而在python3.X中则需要）
+
+* \_\_init__.py 的用途：构建模块
+https://python3-cookbook.readthedocs.io/zh_CN/latest/c10/p01_make_hierarchical_package_of_modules.html  
+https://www.cnblogs.com/lands-ljk/p/5880483.html  
 
 ## 1.5 \*args和\*\*kwargs
 ```python
