@@ -1,5 +1,42 @@
+# Custom DataLoader Example
+见： https://pytorch.org/tutorials/beginner/data_loading_tutorial.html  
+https://zhuanlan.zhihu.com/p/30934236  
+* 要点在于在 `CustomDataset(Dataset)`的`__init__`中不直接读入图片，而只读入csv文件，包含图片路径等；在`__getitem__`中才读入index所对应图片。这样可以节省内存。  
+* Pytorch的数据读取主要包含三个类，这三者大致是一个依次封装的关系: 1被装进2, 2被装进3
+    * Dataset: 提供了自定义数据集的方法，可在`__getitem__`中使用`transform`
+    * DataLoader: 在`Dataset`的基础上，加上了mini-batch, shuffle, multi-threading 的功能
+    * DataLoaderIter
+
+    ```python
+    from torch.utils.data import Dataset, DataLoader
+    from torchvision import transforms, utils
+
+    class CustomDataset(Dataset):
+       def __init__(self, transform = None):
+           XXX
+           self.transform = transform
+           
+       def __len__(self):
+           XXX
+           
+       def __getitem__(self, idx):
+           sample = XXX
+           if self.transform:
+               sample = self.transform(sample)
+           return sample
+
+    my_dataset = CustomDataset(transform=transforms.Compose([Rescale(256), RandomCrop(224), ToTensor()]))
+    dataloader = Dataloader(my_dataset, batch_size=4, shuffle=True, num_workers=4)
+
+    for index, sample in enumerate(dataloader):
+       # training...
+    ```
+
+
 
 # Linear Regression Example
+> 这个例子是把所有训练数据一次性读到内存中了的  
+
 见: https://gist.github.com/dvgodoy/1d818d86a6a0dc6e7c07610835b46fe4 
 * Only load the batch training data instead of the whole data into GPU because graphics card’s RAM is precious.
 * We need to send our model to the same device where the data is. If our data is made of GPU tensors, our model must “live” inside the GPU as well.
