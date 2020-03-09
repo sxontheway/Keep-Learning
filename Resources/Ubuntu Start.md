@@ -40,3 +40,9 @@
       ```
    * Note that most video capture devices (like webcams) only support specific sets of widths & heights.   
      Use `uvcdynctrl -f` to see. 
+
+* Vscode + jupyter-notbook:
+   > https://stackoverflow.com/questions/60330837/jupyter-server-not-started-no-kernel-in-vs-code  
+   * Press Command+Shift+P to open a new command pallete  
+   * Type >Python: Specify local or remote jupyter server for connections -> default  
+   * Type >Python: Select Intepreter to start jupyter notebook server
