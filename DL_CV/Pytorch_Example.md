@@ -36,7 +36,20 @@ https://zhuanlan.zhihu.com/p/30934236
    > https://zhuanlan.zhihu.com/p/30385675  
    > https://blog.csdn.net/weixin_42028364/article/details/81675021  
    
-   `collate_fn`中可以定义怎样将 从`__getitem__`获取的长度为`batch_size`的数据 组成`a batch of training data`，输入训练网络。比如文字识别，label是一个单词，每个label不一样长，需要先把他们统一成相同长度。  
+   `collate_fn`中可以定义怎样将 从`__getitem__`获取的长度为`batch_size`的数据 组成`a batch of training data`，输入训练网络。比如文字识别，label是一个单词，每个label不一样长，需要先把他们统一成相同长度。或者`multi-scale training: selects new image size every tenth batch`:
+   ```python
+   def collate_fn(self, batch):
+   
+       # Selects new image size every tenth batch
+       if self.multiscale and self.batch_count % 10 == 0:
+           self.img_size = random.choice(range(self.min_size, self.max_size + 1, 32))
+     
+       # Resize images to input shape
+       imgs = torch.stack([resize(img, self.img_size) for img in imgs])
+       self.batch_count += 1
+  
+       return paths, imgs, targets
+   ```
 
 # Linear Regression Example
 > 这个例子是把所有训练数据一次性读到内存中了的  
