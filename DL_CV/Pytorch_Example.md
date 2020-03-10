@@ -31,8 +31,12 @@ https://zhuanlan.zhihu.com/p/30934236
     for index, sample in enumerate(dataloader):
        # training...
     ```
-
-
+* collate_fn的使用:
+   > You can use your own collate_fn to process the list of samples to form a batch. The batch argument is a list with all your samples. E.g. if you would like to return variable-sized data.  
+   > https://zhuanlan.zhihu.com/p/30385675  
+   > https://blog.csdn.net/weixin_42028364/article/details/81675021  
+   
+   `collate_fn`中可以定义怎样将 从`__getitem__`获取的长度为`batch_size`的数据 组成`a batch of training data`，输入训练网络。比如文字识别，label是一个单词，每个label不一样长，需要先把他们统一成相同长度。  
 
 # Linear Regression Example
 > 这个例子是把所有训练数据一次性读到内存中了的  
