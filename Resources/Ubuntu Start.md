@@ -59,15 +59,15 @@
    * Pylint报错:
    ctrl+shift+p -> preference: open setting(JSON)  
    让pylint只显示error  
-   ```json
-   {
-       "files.exclude": {
-           "**/__pycache__": true
-       },
-       "python.linting.enabled": true,
-       "python.linting.pylintArgs": [
-           "--extension-pkg-whitelist=cv2", 
-           "--disable=C,W"
-       ],
-   }
-   ```
+      ```json
+      {
+          "files.exclude": {
+              "**/__pycache__": true
+          },
+          "python.linting.enabled": true,
+          "python.linting.pylintArgs": [
+              "--extension-pkg-whitelist=cv2", 
+              "--disable=C,W"
+          ],
+      }
+      ```
