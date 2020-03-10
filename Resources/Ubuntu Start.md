@@ -2,6 +2,8 @@
     * 原来是Firefox的附加组件管理器不见了，我们只需要重新安装上即可: https://blog.csdn.net/JohnYu024/article/details/79763300  
     * Add-on manager link: http://mozilla.com.cn/thread-343905-1-1.html
 
+<br>
+
 * Latex 安装：
     > 要加中文：`\usepackage[UTF8]{ctex}`即可：https://jdhao.github.io/2018/03/29/latex-chinese.zh/ 
     * Linux下， 安装vscode
@@ -10,11 +12,15 @@
 
     * Debug:
         * 有一篇的Bibtex的Library未找到，结果显示所有reference有错
+        
+<br>
 
 * No Wifi Model  
     * `iwconfig`: see whether there is a model called wlan0. If not, it means that the network card driver is not installed.  
     * `sudo lshw -c network`: see the model and vendor oationf the network card. For example, `BCM43142 802.11 b/g/m, vendor: Broadcom Corportion`  
     * For Broadcast network card:`sudo apt-get install`, `sudo apt-get bcmwl-kernel-source`
+
+<br>
 
 * Virtual box
    * 开不了机：可能是显卡的原因，关闭`3D加速` 
@@ -41,8 +47,27 @@
    * Note that most video capture devices (like webcams) only support specific sets of widths & heights.   
      Use `uvcdynctrl -f` to see. 
 
-* Vscode + jupyter-notbook:
-   > https://stackoverflow.com/questions/60330837/jupyter-server-not-started-no-kernel-in-vs-code  
-   * Press Command+Shift+P to open a new command pallete  
-   * Type >Python: Specify local or remote jupyter server for connections -> default  
-   * Type >Python: Select Intepreter to start jupyter notebook server
+<br>
+
+* Vscode
+   * Vscode + jupyter-notbook:
+      > https://stackoverflow.com/questions/60330837/jupyter-server-not-started-no-kernel-in-vs-code  
+      * Press Command+Shift+P to open a new command pallete  
+      * Type >Python: Specify local or remote jupyter server for connections -> default  
+      * Type >Python: Select Intepreter to start jupyter notebook server
+      
+   * Pylint报错:
+   ctrl+shift+p -> preference: open setting(JSON)  
+   让pylint只显示error  
+   ```json
+   {
+       "files.exclude": {
+           "**/__pycache__": true
+       },
+       "python.linting.enabled": true,
+       "python.linting.pylintArgs": [
+           "--extension-pkg-whitelist=cv2", 
+           "--disable=C,W"
+       ],
+   }
+   ```
