@@ -93,6 +93,26 @@ print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路劲
 https://python3-cookbook.readthedocs.io/zh_CN/latest/c10/p01_make_hierarchical_package_of_modules.html  
 https://www.cnblogs.com/lands-ljk/p/5880483.html  
 
+* import 相对路径  
+  > http://www.361way.com/python-import-dif-dir-module/4064.html  
+
+  程序结构：  
+    ```
+    -- src
+        |-- mod1.py
+        |-- lib
+        |    |-- mod2.py
+        |-- sub
+        |    |-- test2.py
+    ```
+  想从`test2.py`调用`mod1.py`和`mod2.py`，做法如下：  
+    ```
+    import sys
+    sys.path.append("..")
+    import mod1
+    import mod2.mod2
+  ```
+
 ## 1.5 \*args和\*\*kwargs
 ```python
 def test(a,*args,**kwargs):
