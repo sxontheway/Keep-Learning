@@ -100,8 +100,8 @@ python在import时，可以按三种方式找：
 
 ### 1.4.3 其他
 * import 其他文件夹下的module  
-  > * http://www.361way.com/python-import-dif-dir-module/4064.html  
-  > * https://medium.com/@alan81920/python-import-%E7%B0%A1%E6%98%93%E6%95%99%E5%AD%B8-c98e8e2553d3 
+  > http://www.361way.com/python-import-dif-dir-module/4064.html  
+  > https://medium.com/@alan81920/python-import-%E7%B0%A1%E6%98%93%E6%95%99%E5%AD%B8-c98e8e2553d3 
 
   程序结构：  
     ```
