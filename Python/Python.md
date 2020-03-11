@@ -78,8 +78,8 @@ print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路径
 
 ### 1.4.2 python import 的规则
 python在import时，可以按三种方式找：  
-* 按绝对路径找。  
-* 有 package 时，按相对路径找 
+* 按绝对导入方式查找包
+* 有 package 时，按相对导入方式查找包
 * 在 python 安装路径的 lib 库中（例如`/usr/lib/python3.X`）  
 
 ### 1.4.2 python import 的例子
