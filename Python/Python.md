@@ -70,9 +70,9 @@ print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路径
 
 | 导入方式 | 相对导入 | 绝对导入 |
 | :------------ |:---------------|:---|
-| 格式 | `from .A import B` 或 `from ..A import B`，，其中`.`代表当前模块，`..`代表上层模块，`...`代表上上层模块，依次类推|`import A.B` 或 `from A import B`|
+| 格式 | `from .A import B` 或 `from ..A import B`。其中`.`代表当前模块，`..`代表上层模块，依次类推（或需要配合`python -m`使用)|`import A.B` 或 `from A import B`|
 | 优点 | 相对导入可以避免硬编码，更改包名后，代码仍然可以运行，可维护好 | 可读性好。绝对导入可以避免与标准库命名的冲突，实际上也不推荐自定义模块与标准库命令相同。|
-| 从哪个目录出发 | import语句所在的文件，其所属package的目录 |当前工作目录（例如执行命令 `python3 a.py`时，文件`a.py`所在的目录）|
+| 以哪个目录为参考目录 | import语句所在的文件，其所属package的目录 |当前工作目录（例如执行命令 `python3 a.py`时，文件`a.py`所在的目录）|
 |要求| 必须要在package内，所谓的package，就是包含 `__init__.py` 文件的目录 | 有没有package都可以使用|
 
 
@@ -95,7 +95,7 @@ python在import时，可以按三种方式找：
 当前工作目录： `/src`,  
 命令行输入：`python3 train.py`,  
 想要在`dataset.py`中 `import utils.py`的函数，有两种方法： 
-* 使用绝对导入：`from utils.utils import *` (`from utils import *` 是行不通的，因为没有`/src/utils.py`) 
+* 使用绝对导入：`from utils.utils import *`，使用`from utils import *` 是行不通的，因为没有`/src/utils.py`) 
 * 使用相对导入：`from .utils import *`
 
 ### 1.4.3 其他
@@ -106,23 +106,24 @@ python在import时，可以按三种方式找：
   程序结构：  
     ```
     -- src
-        |-- func.py
-        |-- pkg_a
+        |-- __init__.py
+        |-- main.py: from pkg_a.a import all
+        |-- a
             |-- __init__.py
             |-- a.py
-        |-- pkg_b
+        |-- test
             |-- __init__.py
-            |-- b.py
+            |-- test.py
     ```
-    当前工作目录： `/src/pkg_a`,  
-    命令行输入：`python3 a.py`  
-    想从`a.py`调用`func.py`和`b.py`，做法如下：  
+    当前工作目录： `/src`,  
+    命令行输入：`python3 main.py`  
+    如果`a.py`中想要引入`test.py`，需要的做法如下：  
     ```python
     import sys
     sys.path.append("..")
-    from func import *
-    from pkg.b import *
-  ```
+    from test.test import *
+    ```
+    直接使用 `from ..test.test import *` 会导致报错：`attempted relative import beyond top-level package`。是因为`src`本身这个 package 并没有被记录下来，见：https://stackoverflow.com/questions/30669474/beyond-top-level-package-error-in-relative-import
 
 * \_\_all__ 和 import * 
   ```python
