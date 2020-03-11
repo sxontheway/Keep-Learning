@@ -5,7 +5,7 @@
   * `pip3`时，将路径中的`python2.7`换成`python3.5`即可。   
   * `dist-packages`是从包管理器安装的python包的路径； `site-packages`是从第三方库安装的的python包的路径
 
-   | 命令 | python包安装路劲 | 说明 |
+   | 命令 | python包安装路径 | 说明 |
    | :------------ |:---------------|:---|
    | sudo apt-get install | /usr/lib/python2.7/dist-packages |apt-get install必须要sudo|
    | sudo pip install | /usr/local/lib/python2.7/dist-packages |用sudo可能会报错：cannot import name 'main'|
@@ -18,7 +18,7 @@
   pprint.pprint(sys.path)   # 输出一个换一行
   ```
   可查看环境变量，环境变量顺序对应于包的导入顺序
-* 假设虚拟环境路劲为`~/venv`， python3虚拟环境中安装的包，还可以在`～/venv/lib/python3.5/`中找到，这些包只能在该虚拟环境下调用
+* 假设虚拟环境路径为`~/venv`， python3虚拟环境中安装的包，还可以在`～/venv/lib/python3.5/`中找到，这些包只能在该虚拟环境下调用
   * 例如要想在`jupytor-notebook`中能import在venv中安装的包，`jupytor-notebook`本身也需要安装在venv内
 
 ## 1.2 python虚拟环境
@@ -57,18 +57,77 @@ python --version        # 显示2.x
 ```python
 import os, sys
 print( os.path.split(os.path.realpath(sys.argv[0]))[0], os.path.dirname(__file__) )    # 这两个都是文件所在目录
-print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路劲
+print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路径
 ```
 > os.path.expanduser（～/Desktop/a.txt）可将路径转换为根目录下的绝对路径
 
 ## 1.4 import
+### 1.4.1 相对导入和绝对导入  
+> https://medium.com/@alan81920/python-import-%E7%B0%A1%E6%98%93%E6%95%99%E5%AD%B8-c98e8e2553d3  
+> https://blog.csdn.net/u010138758/article/details/80152151
+
+相对导入和绝对导入：
+
+| 导入方式 | 相对导入 | 绝对导入 |
+| :------------ |:---------------|:---|
+| 格式 | `from .A import B` 或 `from ..A import B`，，其中`.`代表当前模块，`..`代表上层模块，`...`代表上上层模块，依次类推|`import A.B` 或 `from A import B`|
+| 优点 | 相对导入可以避免硬编码，更改包名后，代码仍然可以运行，可维护好 | 可读性好。绝对导入可以避免与标准库命名的冲突，实际上也不推荐自定义模块与标准库命令相同。|
+| 从哪个目录出发 | import语句所在的文件，其所属package的目录 |当前工作目录（例如执行命令 `python3 a.py`时，文件`a.py`所在的目录）|
+|要求| 必须要在package内，所谓的package，就是包含 `__init__.py` 文件的目录 | 有没有package都可以使用|
+
+
+### 1.4.2 python import 的规则
+python在import时，可以按三种方式找：  
+* 按绝对路径找。  
+* 有 package 时，按相对路径找 
+* 在 python 安装路径的 lib 库中（例如`/usr/lib/python3.X`）  
+
+### 1.4.2 python import 的例子
+
+```
+-- src
+    |-- train.py: from utils.dataset import * 
+    |-- utils
+        |-- __init__.py
+        |-- dataset.py
+        |-- utils.py
+```
+当前工作目录： `/src`,  
+命令行输入：`python3 train.py`,  
+想要在`dataset.py`中 `import utils.py`的函数，有两种方法： 
+* 使用绝对导入：`from utils.utils import *` (`from utils import *` 是行不通的，因为没有`/src/utils.py`) 
+* 使用相对导入：`from .utils import *`
+
+### 1.4.3 其他
+* import 其他文件夹下的module  
+  > * http://www.361way.com/python-import-dif-dir-module/4064.html  
+  > * https://medium.com/@alan81920/python-import-%E7%B0%A1%E6%98%93%E6%95%99%E5%AD%B8-c98e8e2553d3 
+
+  程序结构：  
+    ```
+    -- src
+        |-- func.py
+        |-- pkg_a
+            |-- __init__.py
+            |-- a.py
+        |-- pkg_b
+            |-- __init__.py
+            |-- b.py
+    ```
+    当前工作目录： `/src/pkg_a`,  
+    命令行输入：`python3 a.py`  
+    想从`a.py`调用`func.py`和`b.py`，做法如下：  
+    ```python
+    import sys
+    sys.path.append("..")
+    from func import *
+    from pkg.b import *
+  ```
+
 * \_\_all__ 和 import * 
   ```python
   ### 文件foo.py ###
-  __all__ = ['x', 'test基础
-
-      list和array 简单来说，numpy.array支持比list更多的索引方式，更易于使用
-  ']
+  __all__ = ['x', 'test']
   x = 2
   y = 3
   def test():
@@ -83,35 +142,13 @@ print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路劲
 
   # `import *`表示导入import all；但`__all__`指定了能够被导入的部分（例如 y 就没有被包含）
   ```
+
 * from \_\_future__ import  
 
     用于导入之后版本的一些功能。  
     例如，在开头加上`from __future__ import print_function`这句之后，即使在python2.X，
-    print就可以像python3.X那样加括号使用（python2.X中print不需要括号，而在python3.X中则需要）
+    print就可以像python3.X那样加括号使用（python2.X中print不需要括号，而在python3.X中则需要） 
 
-* \_\_init__.py 的用途：构建模块  
-https://python3-cookbook.readthedocs.io/zh_CN/latest/c10/p01_make_hierarchical_package_of_modules.html  
-https://www.cnblogs.com/lands-ljk/p/5880483.html  
-
-* import 相对路径  
-  > http://www.361way.com/python-import-dif-dir-module/4064.html  
-
-  程序结构：  
-    ```
-    -- src
-        |-- mod1.py
-        |-- lib
-        |    |-- mod2.py
-        |-- sub
-        |    |-- test2.py
-    ```
-  想从`test2.py`调用`mod1.py`和`mod2.py`，做法如下：  
-    ```
-    import sys
-    sys.path.append("..")
-    import mod1
-    import mod2.mod2
-  ```
 
 ## 1.5 \*args和\*\*kwargs
 ```python
