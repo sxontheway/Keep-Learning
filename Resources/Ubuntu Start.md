@@ -71,3 +71,13 @@
           ],
       }
       ```
+   * Vscode 不能 peek definition：
+      ```
+      -- utils
+         -- utils.py
+      -- yolov3
+         -- utils
+            -- utils.py
+      -- train.py
+      ```
+      在`train.py`中`from utils.utils. import *`，但 import 的所有 functions 都不能 peek definition，是因为文件夹名称重复了
