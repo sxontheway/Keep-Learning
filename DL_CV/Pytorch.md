@@ -21,8 +21,7 @@
 ### 2.1.2  torch.no_grad(),  torch.set_grad_enabled(), torch.enable_grad() 和 model.eval()
 >见 https://zhuanlan.zhihu.com/p/64411611  
 
-* `model.eval()`: changes the forward() behaviour of the module it is called upon. It disables certain layers exclusive for training stage，e.g. BN，dropout.  
-BN层一般放在conv层后面，激活函数之前；Dropout对于conv层和FC层都可以适用   
+* `model.eval()`: changes the forward() behaviour of the module it is called upon. It disables certain layers exclusive for training stage，e.g. BN and dropout will only be performed during training. BN层一般放在conv层后面，激活函数之前；Dropout对于conv层和FC层都可以适用   
 
 * `torch.no_grad()` or `torch.set_grad_enabled(False)`: Disable the gradient computation. In this mode, the result of every computation will have `requires_grad=False`, even when the inputs have `requires_grad=True`.  
 
