@@ -8,31 +8,30 @@ https://zhuanlan.zhihu.com/p/30934236
       见: https://pytorch.org/docs/stable/torchvision/transforms.html
     * DataLoader: 在`Dataset`的基础上，加上了mini-batch, shuffle, multi-threading 的功能
     * DataLoaderIter
+      ```python
+      from torch.utils.data import Dataset, DataLoader
+      from torchvision import transforms, utils
 
-    ```python
-    from torch.utils.data import Dataset, DataLoader
-    from torchvision import transforms, utils
+      class CustomDataset(Dataset):
+         def __init__(self, transform = None):
+             XXX
+             self.transform = transform
 
-    class CustomDataset(Dataset):
-       def __init__(self, transform = None):
-           XXX
-           self.transform = transform
-           
-       def __len__(self):
-           XXX
-           
-       def __getitem__(self, idx):
-           sample = XXX
-           if self.transform:
-               sample = self.transform(sample)
-           return sample
+         def __len__(self):
+             XXX
 
-    my_dataset = CustomDataset(transform=transforms.Compose([Rescale(256), RandomCrop(224), ToTensor()]))
-    dataloader = Dataloader(my_dataset, batch_size=4, shuffle=True, num_workers=4)
+         def __getitem__(self, idx):
+             sample = XXX
+             if self.transform:
+                 sample = self.transform(sample)
+             return sample
 
-    for index, sample in enumerate(dataloader):
-       # training...
-    ```
+      my_dataset = CustomDataset(transform=transforms.Compose([Rescale(256), RandomCrop(224), ToTensor()]))
+      dataloader = Dataloader(my_dataset, batch_size=4, shuffle=True, num_workers=4)
+
+      for index, sample in enumerate(dataloader):
+         # training...
+      ```
     * torchvision: torchvision package provides some common datasets and transforms  
     见： https://pytorch.org/tutorials/beginner/data_loading_tutorial.html#afterword-torchvision
 * collate_fn的使用:
