@@ -1,3 +1,11 @@
+* Ubuntu 命令
+   * `uname -a`: 输出操作系统信息  
+   * `lsb_release -a`：查看Ubuntu版本  
+   * `df -lh`:查看存储  
+   * `sudo dmidecode`:查看硬件配置，最常用的选项就是用`-t`来限定关键字，例如 `bios, system, baseboard, chassis, processor, memory, cache, connector, slot`  
+   * `nvidia-smi`, `htop`, `nvtop`, `jtop`：不同平台下的资源monitor  
+
+
 * Firefox cannot synchronize  
     * 原来是Firefox的附加组件管理器不见了，我们只需要重新安装上即可: https://blog.csdn.net/JohnYu024/article/details/79763300  
     * Add-on manager link: http://mozilla.com.cn/thread-343905-1-1.html
