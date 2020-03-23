@@ -5,6 +5,7 @@
    * `sudo dmidecode`:查看硬件配置，最常用的选项就是用`-t`来限定关键字，例如 `bios, system, baseboard, chassis, processor, memory, cache, connector, slot`  
    * `nvidia-smi`, `htop`, `nvtop`, `jtop`：不同平台下的资源monitor  
 
+<br>
 
 * Firefox cannot synchronize  
     * 原来是Firefox的附加组件管理器不见了，我们只需要重新安装上即可: https://blog.csdn.net/JohnYu024/article/details/79763300  
