@@ -5,7 +5,8 @@ https://zhuanlan.zhihu.com/p/30934236
 * Pytorch的数据读取主要包含三个类，这三者大致是一个依次封装的关系: 1被装进2, 2被装进3
     * Dataset: 提供了自定义数据集的方法，可在`__getitem__`中使用`transform`
       * `class torchvision.transforms.Compose(transforms)`  
-      见: https://pytorch.org/docs/stable/torchvision/transforms.html
+      见: https://pytorch.org/docs/stable/torchvision/transforms.html  
+      https://blog.csdn.net/Hansry/article/details/84071316
     * DataLoader: 在`Dataset`的基础上，加上了mini-batch, shuffle, multi-threading 的功能
     * DataLoaderIter
       ```python
