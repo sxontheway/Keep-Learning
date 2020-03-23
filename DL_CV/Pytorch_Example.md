@@ -4,6 +4,8 @@ https://zhuanlan.zhihu.com/p/30934236
 * 要点在于在 `CustomDataset(Dataset)`的`__init__`中不直接读入图片，而只读入csv文件，包含图片路径等；在`__getitem__`中才读入index所对应图片。这样可以节省内存。  
 * Pytorch的数据读取主要包含三个类，这三者大致是一个依次封装的关系: 1被装进2, 2被装进3
     * Dataset: 提供了自定义数据集的方法，可在`__getitem__`中使用`transform`
+      * `class torchvision.transforms.Compose(transforms)`  
+      见: https://pytorch.org/docs/stable/torchvision/transforms.html
     * DataLoader: 在`Dataset`的基础上，加上了mini-batch, shuffle, multi-threading 的功能
     * DataLoaderIter
 
@@ -31,6 +33,8 @@ https://zhuanlan.zhihu.com/p/30934236
     for index, sample in enumerate(dataloader):
        # training...
     ```
+    * torchvision: torchvision package provides some common datasets and transforms  
+    见： https://pytorch.org/tutorials/beginner/data_loading_tutorial.html#afterword-torchvision
 * collate_fn的使用:
    > You can use your own collate_fn to process the list of samples to form a batch. The batch argument is a list with all your samples. E.g. if you would like to return variable-sized data.  
    > https://zhuanlan.zhihu.com/p/30385675  
