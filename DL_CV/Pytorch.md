@@ -11,14 +11,19 @@
 <br><br>
 # 2. Pytorch 的使用
 ## 2.1 常用命令
-### 2.1.1 torch.nn 和 torch.nn.functional 的区别
+### 2.1.1 torch.nn.Sequential() 和 torch.nn.ModuleList()
+> 见 https://zhuanlan.zhihu.com/p/64990232  
+* ModuleList 就是一个储存各种模块的 list，这些模块之间没有联系，没有实现 forward 功能。相比于普通的 Python list，ModuleList 可以把添加到其中的模块和参数自动注册到网络上。
+* Sequential 内的模块需要按照顺序排列，要保证相邻层的输入输出大小相匹配，内部 forward 功能已经实现，可以使代码更加整洁。
+
+### 2.1.2 torch.nn 和 torch.nn.functional 的区别
 > torch.nn API: https://pytorch.org/docs/stable/nn.html 
 * torch.nn 是里面包含的是，torch.nn.functional 里面包含的是函数。  
 * 如果我们只保留nn.functional下的函数的话，在训练或者使用时，我们就要手动去维护weight, bias, stride这些中间量的值，这显然是给用户带来了不便。  
 * 而如果我们只保留nn下的类的话，其实就牺牲了一部分灵活性，因为做一些简单的计算都需要创造一个类，这也与PyTorch的风格不符。
 > 见 https://www.zhihu.com/question/66782101/answer/246341271
 
-### 2.1.2  torch.no_grad(),  torch.set_grad_enabled(), torch.enable_grad() 和 model.eval()
+### 2.1.3  torch.no_grad(),  torch.set_grad_enabled(), torch.enable_grad() 和 model.eval()
 >见 https://zhuanlan.zhihu.com/p/64411611  
 
 * `model.eval()`: changes the forward() behaviour of the module it is called upon. It disables certain layers exclusive for training stage，e.g. BN and dropout will only be performed during training. BN层一般放在conv层后面，激活函数之前；Dropout对于conv层和FC层都可以适用   
@@ -64,7 +69,7 @@
       logits, probas = model(testset_features)
   ```
 
-### 2.1.3 model.zero_grad() 和 optimizer.zero_grad()
+### 2.1.4 model.zero_grad() 和 optimizer.zero_grad()
 * optimizer.zero_grad() 有什么用 ?  
   一般的训练方式是进来一个batch更新一次梯度，所以每次计算梯度前都需要用 optimizer.zero_grad() 手动将梯度清零。如果不手动清零，pytorch会自动对梯度进行累加。
   * 梯度累加可以模拟更大的batch size，在内存不够大的时候，是一种用更大batch size训练的trick，见 https://www.zhihu.com/question/303070254/answer/573037166  
@@ -91,7 +96,7 @@
 * model.zero_grad() 和 optimizer.zero_grad() 的区别  
 当`optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)`时，二者等效，其中SGD也可以换成其他优化器例如Adam。当一个model中用了多个optimizer时，model.zero_grad() 是将所有梯度清零，optimizer.zero_grad() 是清零一个optimizer
 
-### 2.1.3 矩阵操作
+### 2.1.5 矩阵操作
 |用途|命令|
 | :------------ | :-----|
 |创建随机数矩阵|x = torch.rand(5, 3)|
@@ -102,7 +107,7 @@
 |维度变换|x = y.view(-1,10)|
 |去掉个数为1的维度|x = y.squeeze()|
 
-### 2.1.4 Pytorch 和 Numpy 转换 
+### 2.1.6 Pytorch 和 Numpy 转换 
 * Torch -> NumPy:
 ```python
 a = torch.ones(5) # Torch Tensor
@@ -115,7 +120,7 @@ a = np.ones(5) # NumPy Array
 b = torch.from_numpy(a) # Torch Tensor
 ```
 
-### 2.1.5 在 CPU 和 GPU 之间移动数据
+### 2.1.7 在 CPU 和 GPU 之间移动数据
 ```python
 # move the tensor to GPU
 x = x.to("cuda")  # or x = x.cuda()
@@ -129,7 +134,7 @@ b = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
 # move the tensor to CPU
 x = x.to("cpu") # or x = x.cpu()
 ```
-### 2.1.6 其他
+### 2.1.8 其他
 * torchvision 由以下四部分组成：  
 torchvision.datasets， torchvision.models， torchvision.transforms， torchvision.utils
   * torchvision.transforms 包含很多类，其中 torchvision.transforms.Compose() 可以把多个步骤合在一起  
