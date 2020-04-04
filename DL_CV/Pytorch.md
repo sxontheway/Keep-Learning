@@ -80,11 +80,12 @@
   scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
   for epoch in range(100):
       scheduler.step()
-      optimizer.zero_grad() # optional
-      train(...)  
-      validate(...)
+      optimier.step()
+      optimizer.zero_grad()
+      (other training steps...)
+      (other validate steps...)
   ```
-
+  查看 `learning rate`: `print(optimizer.param_groups[0]['lr'])`
 * optimizer.zero_grad() 有什么用 ?  
   一般的训练方式是进来一个batch更新一次梯度，所以每次计算梯度前都需要用 optimizer.zero_grad() 手动将梯度清零。如果不手动清零，pytorch会自动对梯度进行累加。
   * 梯度累加可以模拟更大的batch size，在内存不够大的时候，是一种用更大batch size训练的trick，见 https://www.zhihu.com/question/303070254/answer/573037166  
