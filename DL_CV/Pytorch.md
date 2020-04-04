@@ -35,10 +35,11 @@
 
   with torch.no_grad():
       <code>
+      
   # and
-
+  
   torch.set_grad_enabled(False)
-  <code>
+      <code>
   torch.set_grad_enabled(True)   
 
   # 只是torch.set_grad_enabled()可以选择是开还是关梯度计算，
@@ -47,13 +48,13 @@
 
 
 * `torch.enable_grad()`: Enables gradient calculation, if it has been disabled via `no_grad()` or `set_grad_enabled(False)`.
-  ```
-  >>> x = torch.tensor([1], requires_grad=True)
-  >>> with torch.no_grad():
-  ...   with torch.enable_grad():
-  ...     y = x * 2
-  >>> y.requires_grad
-  True
+  ```python
+  x = torch.tensor([1], requires_grad=True)
+  with torch.no_grad():
+      with torch.enable_grad():
+      y = x * 2
+  y.requires_grad
+  # 输出 True
   ```
 
 * `model.eval()` 和 `torch.no_grad()` 可以一起使用：
@@ -70,6 +71,20 @@
   ```
 
 ### 2.1.4 model.zero_grad() 和 optimizer.zero_grad()
+* learning rate decay
+  > https://www.cnblogs.com/wanghui-garcia/p/10895397.html  
+
+  一般会用到`torch.optim.lr_scheduler.LambdaLR`， `torch.optim.lr_scheduler.StepLR`， `torch.optim.lr_scheduler.MultiStepLR`，使用格式为：
+  ```python
+  import torch.optim.lr_scheduler.StepLR
+  scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+  for epoch in range(100):
+      scheduler.step()
+      optimizer.zero_grad() # optional
+      train(...)  
+      validate(...)
+  ```
+
 * optimizer.zero_grad() 有什么用 ?  
   一般的训练方式是进来一个batch更新一次梯度，所以每次计算梯度前都需要用 optimizer.zero_grad() 手动将梯度清零。如果不手动清零，pytorch会自动对梯度进行累加。
   * 梯度累加可以模拟更大的batch size，在内存不够大的时候，是一种用更大batch size训练的trick，见 https://www.zhihu.com/question/303070254/answer/573037166  
