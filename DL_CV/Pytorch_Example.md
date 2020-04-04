@@ -1,3 +1,34 @@
+# Tensor Processing
+```python
+import torch
+x = torch.zeros((16, 10, 30, 30), dtype=torch.float)
+print(x.shape)
+
+a = torch.stack((x,x,x),1)  # stack是建立一个新的维度
+print(a.shape)
+
+b = torch.cat((x,x,x), dim=1)  # cat是在已有的维度上拼接
+print(b.shape)
+
+c = x.repeat(1,1,2,1,1)
+print(c.shape)
+
+d = torch.unsqueeze(x, 2)
+print(d.shape)
+
+e = torch.unsqueeze(x, 2).repeat(1,1,3,1,1)
+print(e.shape)
+```
+得到  
+torch.Size([16, 10, 30, 30])  
+torch.Size([16, 3, 10, 30, 30])  
+torch.Size([16, 30, 30, 30])  
+torch.Size([1, 16, 20, 30, 30])  
+torch.Size([16, 10, 1, 30, 30])  
+torch.Size([16, 10, 3, 30, 30])  
+
+<br>
+
 # Custom DataLoader Example
 见： https://pytorch.org/tutorials/beginner/data_loading_tutorial.html  
 https://zhuanlan.zhihu.com/p/30934236  
@@ -54,6 +85,8 @@ https://zhuanlan.zhihu.com/p/30934236
   
        return paths, imgs, targets
    ```
+
+<br>
 
 # Linear Regression Example
 > 这个例子是把所有训练数据一次性读到内存中了的  
