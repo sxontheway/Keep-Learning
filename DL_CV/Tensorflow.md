@@ -7,6 +7,23 @@
   https://blog.csdn.net/hq86937375/article/details/79696023
   * 解决方案：  
   从源码安装可解决这个问题，参见：https://github.com/lakshayg/tensorflow-build
+  * 验证是否安装成功:  
+  查看 cuDNN version：`cat /usr/local/cuda/include/cudnn.h | grep CUDNN_MAJOR -A 2`  
+  查看 CUDA version: `cat /usr/local/cuda/version.txt` 
+    ```python
+    import tensorflow as tf 
+    import os 
+
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # 屏蔽掉 info 等级的log
+    tf.test.is_gpu_available()
+    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+
+    a = tf.constant([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    b = tf.constant([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    c = tf.matmul(a, b)
+
+    print(c)
+    ```
 
 ## 1.2 前端Kares的安装
 * 为配合tensorflow， 使用python3: 
