@@ -10,16 +10,40 @@
 
 
 * python的and的返回值  
-  https://stackoverflow.com/questions/32192163/python-and-operator-on-two-boolean-lists-how  
-  x and y: 如果 x 为 False，返回 False，否则它返回 y 的计算值；  
-  只有`'', (), []`这种 empty sequence才是False，例如下面：`x and y`：因为 x 其实为 True， 所以直接输出 y
-  ```python
-  x = [True, True, False, False]
-  y = [False, True, True, Fasle]
-  print(x and y)
-  print(y and x)
+  * https://stackoverflow.com/questions/32192163/python-and-operator-on-two-boolean-lists-how  
+    x and y: 如果 x 为 False，返回 False，否则它返回 y 的计算值；  
+    只有`'', (), []`这种 empty sequence才是False，例如下面：`x and y`：因为 x 其实为 True， 所以直接输出 y
+    ```python
+    x = [True, True, False, False]
+    y = [False, True, True, Fasle]
+    print(x and y)
+    print(y and x)
 
-  >>> [False, True, False, True] 
-  >>> [True, False, False, True]
-  ```
-  要想按元素与运算，用 `np.logical_and(x,y)`或`[a and b for a, b in zip(x, y)]`
+    >>> [False, True, False, True] 
+    >>> [True, False, False, True]
+    ```
+    要想按元素与运算：
+    * `[a and b for a, b in zip(x, y)]`
+    * 将 list 转换为numpy array 然后用`&`或者`np.logical_and(x,y)`
+    
+      ```python
+      a = np.array([True, False])
+      b = np.array([False, True])
+      >>> array(False, False)
+      ```
+  * 在numpy, torch中查找属于一个区间的元素：
+    ```python
+    import numpy as np
+    a = np.array([[1,1],[2,2],[3,3],[4,4]])
+    a = a[a[:, 1]<3]  # 正确
+    a = a[1<a[:, 1]<3]  # 报错 The truth value of an array with more than one element is ambiguous.
+    a = a[(1<a[:, 1]) & (a[:, 1]<3)] # 正确，原因见上
+    a = a[np.where((1<a[:, 1]) & (a[:, 1]<3))]  # 正确
+
+    import torch
+    b = torch.from_numpy(a)
+    b = b[b[:, 1]<3]  # 正确
+    b = b[1<b[:, 1]<3]  # 报错 The truth value of an array with more than one element is ambiguous.
+    b = b[(1<b[:, 1]) & (b[:, 1]<3)] # 正确，原因见上
+    b = b[torch.where((1<b[:, 1]) & (b[:, 1]<3))]  # 正确
+    ```
