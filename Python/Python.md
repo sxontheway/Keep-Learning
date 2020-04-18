@@ -18,7 +18,7 @@
   pprint.pprint(sys.path)   # 输出一个换一行
   ```
   可查看环境变量，环境变量顺序对应于包的导入顺序
-* 假设虚拟环境路径为`~/venv`， python3虚拟环境中安装的包，还可以在`～/venv/lib/python3.5/`中找到，这些包只能在该虚拟环境下调用
+* 假设虚拟环境路径为`~/venv`， python3虚拟环境中安装的包，可以在`~/venv/lib/python3.5/`中找到，但这些包只能在该虚拟环境下调用
   * 例如要想在`jupytor-notebook`中能import在venv中安装的包，`jupytor-notebook`本身也需要安装在venv内
 
 ## 1.2 python虚拟环境
@@ -26,40 +26,41 @@
 
 * 虚拟环境(venv)工具，可以避免不同项目所需的python版本不同而引起的问题  
 
-___在默认情况下，所有安装在系统范围内的包对于venv都是可见的，在venv中安装的包，就只能在venv中用。 当没有在venv找到对应软件包时，还是会全局环境找。___ 例如对于Ubuntu16.04， python3的venv只代表优先使用python3， 在python3的包没找到的时候还是会找python2的包， 用venv可实现python2、 3的的混合编程。    
-这种行为可以被更改，在创建venv时增加`--no-site-packages`选项，venv就不会读取系统包，会一个完全独立和隔离的Python环境。  
-```bash
-# Install
-sudo pip3 install -U virtualenv
+    ___在默认情况下，所有安装在系统范围内的包对于venv都是可见的，在venv中安装的包，就只能在venv中用。 当没有在venv找到对应软件包时，还是会全局环境找。___ 例如对于Ubuntu16.04， python3的venv只代表优先使用python3， 在python3的包没找到的时候还是会找python2的包， 用venv可实现python2、 3的的混合编程。    
+    以上这种行为可以被更改：在创建venv时增加`--no-site-packages`选项，venv就不会读取系统包，会一个完全独立和隔离的Python环境。  
+    ```bash
+    # Install
+    sudo pip3 install -U virtualenv
 
-# Create a new virtual environment by choosing a Python interpreter and making a ./venv directory to hold it:
-virtualenv --system-site-packages -p python3 ./venv
+    # Create a new virtual environment by choosing a Python interpreter and making a ./venv directory to hold it:
+    virtualenv --system-site-packages -p python3 ./venv
 
-# Activate the virtual environment using a shell-specific command:
-source ./venv/bin/activate  
+    # Activate the virtual environment using a shell-specific command:
+    source ./venv/bin/activate  
 
-# Check the installation
-pip install --upgrade pip
-pip list
-python --version        # 显示3.x， 也即虚拟环境下只安装了python3
-python3 --version       # 显示3.x
-python2 --version       # 还是会显示2.x。 Python3虚拟环境没找到包，还是会去Python2的环境里面找
+    # Check the installation
+    pip install --upgrade pip
+    pip list
+    python --version        # 显示3.x， 也即虚拟环境下只安装了python3
+    python3 --version       # 显示3.x
+    python2 --version       # 还是会显示2.x。 Python3虚拟环境没找到包，还是会去Python2的环境里面找
 
-# Quit the vitual env
-deactivate              
-python --version        # 显示2.x
-```
+    # Quit the vitual env
+    deactivate              
+    python --version        # 显示2.x
+    ```
 
+* 对于python环境而言，`pip + venv` 比 `Anaconda` (https://blog.csdn.net/lwgkzl/article/details/89329383) 稳定，Anaconda出现一些奇奇怪怪的毛病
 
 ## 1.3 慎用相对路径
-在.py文件中，相对路径（./等）始终是相对於終端本身的，进行操作有机会报错。 例如在`jupyter-notebook`使用，显示`/home/alex/.local/lib/python3.5/site-packages`，这个是`jupyter-notebook`的安装目录。
+* 在.py文件中，相对路径（./等）始终是相对於終端本身的，进行操作有机会报错。 例如在`jupyter-notebook`使用，显示`/home/alex/.local/lib/python3.5/site-packages`，这个是`jupyter-notebook`的安装目录。
 解决方案参见： https://www.jianshu.com/p/76a3d317722c
-```python
-import os, sys
-print( os.path.split(os.path.realpath(sys.argv[0]))[0], os.path.dirname(__file__) )    # 这两个都是文件所在目录
-print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路径
-```
-> os.path.expanduser（～/Desktop/a.txt）可将路径转换为根目录下的绝对路径
+    ```python
+    import os, sys
+    print( os.path.split(os.path.realpath(sys.argv[0]))[0], os.path.dirname(__file__) )    # 这两个都是文件所在目录
+    print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路径
+    ```
+* `os.path.expanduser（～/Desktop/a.txt` 可将路径转换为根目录下的绝对路径
 
 ## 1.4 import
 ### 1.4.1 相对导入和绝对导入  

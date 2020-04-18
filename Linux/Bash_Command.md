@@ -15,6 +15,8 @@
     done
     ```
 
+<br>
+
 # 2. Bash命令
 1. `cat`：连接文件
     * `cat test.txt`：打印整个文件到屏幕
@@ -49,11 +51,11 @@
       ```
 1. `find`： 按照一定搜索条件搜索文件或目录，最基本的查找是按全名或部分名称查找
     * 语法：`find   path   -option   [   -print ]   [ -exec   -ok   command ]   {} \`  
-      例如：`sudo find / -iname "*opencv*"`
-1. `ln`:硬链接和软链接， 参见https://www.cnblogs.com/xiaochaohuashengmi/archive/2011/10/05/2199534.html
+      例如，在 `/` 路径下找名字带有opencv的文件和文件夹，忽略大小写：`sudo find / -iname "*opencv*"`
+1. `ln`：硬链接和软链接， 参见：https://www.cnblogs.com/xiaochaohuashengmi/archive/2011/10/05/2199534.html 
 1. `locate`：在数据库中查找，比find快（find是在硬盘中查找），这个数据库需要手动更新维护（见updateb）
 1. `grep`：Global Search Regular Expression and Print， 例如： `grep 'h.*p' /etc/passwd`  
-1. `sh`:使用bash这个shell来执行脚本（shell也就是解释器）
+1. `sh`：使用bash这个shell来执行脚本（shell也就是解释器）
     * `sh -c`让 bash 将一个字串作为完整的命令来执行，可以方便将 sudo 的影响范围扩展到整条命令
       ```bash
       echo "aaa" >> test.txt      # 成功执行
@@ -74,10 +76,10 @@
       * source filename：这个命令其实只是简单地读取脚本里面的语句依次在当前shell里面执行，没有建立新的子shell。那么文件脚本里面所有新建、改变变量的语句都会保存在当前shell里面。
   
 1. `source`：1）使刚修改的文档立即生效　　2）将一个文件的内容当成脚本执行(首先需要配置x权限)
-1. `tar`：
+1. `tar`： 解压: `tar -zxfv XXX.tar.gz` 
 1. `touch`：更新文件访问和修改时间或创建空文件
 1. `unset`：用于删除已定义的shell函数和shell变量(包含环境变量)
-1. `updateb`:用于创建或更新slocate/locate命令所必需的数据库文件，这个数据库中存放了系统中文件与目录的相关信息。 例如：
+1. `updateb`：用于创建或更新slocate/locate命令所必需的数据库文件，这个数据库中存放了系统中文件与目录的相关信息。 例如：
     ```bash
     sudo updateb  # 更新locate.db数据库
     locate eigen3  # 定位eigen3这个库
@@ -85,10 +87,12 @@
 1. `wget`：和curl功能相似，但更偏重于下载的功能
     * `wget -c http://cn.wordpress.org/wordpress-3.1-zh_CN.zip`：断点续传，下载到当前目录
 
+<br>
+
 # 3.Bash符号
 参见：https://www.cnblogs.com/balaamwe/archive/2012/03/15/2397998.html
 
-* 其中$()和``(反引号)作用相同，是把括号内命令的输出再作为命令执行
-* ${}括号中放的是变量，$()中放的是命令
+* 其中  `$() ` 和` `` `(反引号)作用相同，是把括号内命令的输出再作为命令执行
+* `${}`括号中放的是变量，`$()`中放的是命令
 
 

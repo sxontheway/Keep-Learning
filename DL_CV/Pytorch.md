@@ -1,11 +1,10 @@
-
----
-
 # 1. Pytorch的安装
 > 可考虑是否在虚拟环境中安装， 安装步骤见 https://pytorch.org/
 ### 1.1 CUDA，cuDNN 的区别？
+> 见 [CUDA Installation](../Hardware_Related/CUDA_Installation)
 * CUDA is a general purpose parallel computing **PLATFORM** and programming model that leverages the parallel compute engine in NVIDIA GPUs in a more efficient way on a CPU
 * cuDNN(CUDA Deep Neural Network library) is a **LIBRARY**
+
 
 ---
 <br><br>

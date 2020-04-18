@@ -7,6 +7,5 @@
 1. [Hardware](./Hardware_Related)
 1. [ROS](./ROS)
 1. [高翔 视觉SLAM14章](./SLAM14)
-1. [Paper Reading](./Paper_Reading)  
-1. [Resources](./Resources)
+1. [Research](./Research)
 1. [Miscellaneous](./Miscellaneous)

@@ -1,4 +1,3 @@
----
 # 1. mmWave的工作流程
 * 烧写CCS(Code Composer Studio) Project, 使SOP2=1
   * 如果要自己实现对mmWave Board的底层的编程，需要用Code Composer Studio
@@ -18,7 +17,7 @@
 * 用roslaunch运行，移除跳线帽SOP2=0
 > * 注意.cfg中的一些参数更改后，必须要按RST进行reboot（断电再开都不行），这些参数有dfeDataOutputMode，channelCfg，adcCfg，lowPower。详情见SDK User Guide。
 
-------
+
 <br><br>
 
 # 2. AWR1443 mmWave Demo 

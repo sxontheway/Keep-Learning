@@ -18,7 +18,7 @@
 > https://www.zhihu.com/question/64470274
 
 <p align="center" >
-	<img src="./Figure/lstm.jpg">
+	<img src="./pictures/lstm.jpg">
 </p>
 
 * A被称作cell，LSTM的`cell`在每个`time_step`是复用的

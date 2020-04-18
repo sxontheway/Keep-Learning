@@ -3,6 +3,8 @@ Lightsail是亚马逊提供的适用于个人的虚拟服务器，每月收取�
 详见 https://www.heartnn.com/2018/05/11/deploy-shadowsocks-on-amazon-lightsail/ 
 > 在不用了之后，为避免扣款，需要 1.删除实例 2.同时删除未附着实例的静态IP
 
+<br>
+
 # 2. 用虚拟机ssh登录Server
 这一步的目的是为了方便复制第3步的命令，详见 https://www.cnblogs.com/liubin0509/p/6211909.html
 * 给Server设置一个静态ip
@@ -11,6 +13,8 @@ Lightsail是亚马逊提供的适用于个人的虚拟服务器，每月收取�
 * 设置密钥权限为600，例如 `sudo chmod 600 ~/.ssh/this_is_a_key.pem`
 * 加入ssh agent，例如：`ssh-add this_is_a_key`
 * ssh连接，例如：`ssh ubuntu@52.199.223.188`  
+
+<br>
 
 # 3. 在Server上安装Shadowsocks
 详见 https://www.heartnn.com/2018/05/11/deploy-shadowsocks-on-amazon-lightsail/ 
@@ -47,6 +51,9 @@ chmod +x shadowsocks-all.sh
 # 如果提示没有wget，可以先执行apt install wget。安装时选择Shadowsocks-libev版，加密方式可以选择aes-256-gcm或xchacha20-ietf-poly1305。
 # 安装时最好安装simple-obfs，混淆选http还是tls可随意。(这里执行autoconf --version查询版本应该是没有问题的，所以可以正常安装。)
 ```
+
+<br>
+
 
 # 4. 使用Shadowsocks
 详见 https://ssr.tools/386  
