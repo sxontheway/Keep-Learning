@@ -31,8 +31,10 @@
   
 * PointRCNN: https://zhuanlan.zhihu.com/p/84335316
   * Stage 1
-    * 用了 PointNet++ 先逐点进行 segmentation（foreground or backgroung)：Focal Loss
-    * 用 Bin-based 3D Box Generation 生成 3d bbox proposal: Anchor-free
+    * 用了 PointNet++ 先逐点进行 segmentation（foreground or background)：Focal Loss
+    * Bin-based 3D Box Generation: Anchor-free  
+    对于每一个 foreground point，生成一个 3d box proposal；  
+    利用了PointNet++提取的特征，loss涉及object中心所在的bin
     * 用 NMS 剔除多的Proposal，进入bbox refinement阶段
   * Stage 2
     * 先在xyz轴上扩大每个Proposal（框住更大的体积）
@@ -43,5 +45,13 @@
   </p>
 # Radar 
 ## Mapping
-
+* See Through Smoke: Robust Indoor Mapping with Low-cost mmWave Radar_Mobisys20
+* Material-based Segmentation Mapping and Refinement via Millimeter-Wave Radar_Mobicom20
+* SuperRF: Enhanced 3D RF Representation Using StationaryLow-Cost mmWave Radar_EWSN20
+* High Resolution Millimeter Wave Imaging For Self-Driving Cars
 ## Detection
+* Semantic Segmentation on Radar Point Clouds_Fusion18
+* 2D Car Detection in Radar Data with PointNets_ITSC19
+* Deep Learning Based 3D Object Detection for Automotive Radar and Camera_EuroRadarConf19
+* Automotive Radar Dataset for Deep Learning Based 3D Object Detection_EuroRadarConf19
+* MRsense: Accurate 3D Bounding Box Estimation with Multi-Radars
