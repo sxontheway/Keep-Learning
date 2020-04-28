@@ -134,6 +134,20 @@ import numpy as np
 a = np.ones(5) # NumPy Array
 b = torch.from_numpy(a) # Torch Tensor
 ```
+* 图像从`cv2.imread()`的`numpy`转换为可输入网络的`tensor`：  
+cv2 numpy默认格式：`H*W*C, BGR`; torch tensor默认格式：`C*H*W, RGB`
+```python
+import cv2
+import torchvision.transforms
+image_np = cv2.imread("1.jpg")
+
+# Method 1
+image_tensor = transforms.Totensor()(image_np)
+
+# Method 2
+image_np = image_np[:, :, ::-1]
+image_tensor = image_np.transpose((1,2,0))
+```
 
 ### 2.1.7 在 CPU 和 GPU 之间移动数据
 ```python
