@@ -39,13 +39,29 @@
     * 对于留下的预测框进行解码，根据先验框得到真实的位置（解码后一般还需要做clip，防止预测框位置超出图片）
     * 根据置信度进行降序排列，然后仅保留top-k（如400）个预测框
     * 进行NMS
-* Yolov3：https://blog.csdn.net/leviopku/article/details/82660381  
-    * Yolov3中，对于coco数据集，最后每个anchor对应`80+4+1=85`个浮点数（80个物体类，4个位置参数，1个对于这个预测的confidence）  
-    ssd也是85个，但是是：80个物体类 + 4个位置参数 + 1个背景类
-    * Yolov3和ssd不一样的地方：Loss计算上，yolov3用80个logistic二分类代替ssd中的softmax，因为可能一个人既可能是people，又可能是women，也即一个box可以含有多个标签（Yolov2也是用的softmax loss）  
-    * Yolov3在Inference时：
-        * 先滤掉confidence小于某个阈值的box
-        * 按类NMS
+    
+# Yolo 细节
+## Training
+> https://zhuanlan.zhihu.com/p/50595699  
+* NMS在training时没有用到，NMS只在inference时使用
+* loss = bbox loss + confidence loss + class loss
+   * 假定一幅图的目标个数为20，YOLOv3的作法是为20个目标找到`13*13*3`个格子中的20格，来安放ground truth，然后把其余格子全部置0。这20个格子被称为正样本
+   * `bbox loss`和`class loss`都只对正样本进行计算
+   * confidence loss
+      * 计算`confidence loss`时，对于正样本（即该格子有目标），计交叉熵。因为对于有目标的格子，如果预测有目标的可能性低，即输出值的`P_object`小，不正常，需要作惩罚。
+      * 对于负样本（即该格子没有目标），只有`bbox`与`ground truth`的IOU小于阈值`ignore threshold`（通常为0.5），才计交叉熵。因为对于没目标的格子，如果预测出有目标的可能性高，即输出值的`P_object`高，这有可能是正常的，因为目标的中心点不在这个格子，可能在附近的格子，是否需要惩罚要视情况而定。
+         * 如果IOU小于阈值，说明附近的格子没有目标，`P_object`高不正常，需要惩罚，即参与计算交叉熵。
+         * 如果IOU大于阈值，说明附近的格子有目标，`P_object`高正常，不需要处罚，即计算交叉熵时忽略
+
+## Inference
+> https://blog.csdn.net/leviopku/article/details/82660381  
+
+ * Yolov3中，对于coco数据集，最后每个anchor对应`80+4+1=85`个浮点数（80个物体类，4个位置参数，1个对于这个预测的confidence）  
+ ssd也是85个，但是是：80个物体类 + 4个位置参数 + 1个背景类
+ * Yolov3和ssd不一样的地方：Loss计算上，yolov3用80个logistic二分类代替ssd中的softmax，因为可能一个人既可能是people，又可能是women，也即一个box可以含有多个标签（Yolov2也是用的softmax loss）  
+ * Yolov3在Inference时：
+     * 先滤掉confidence小于某个阈值的box
+     * 按类NMS
 <br><br>
 
 # Model Complexity Analysis
