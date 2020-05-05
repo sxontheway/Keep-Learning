@@ -10,7 +10,7 @@ print(a.shape)
 b = torch.cat((x,x,x), dim=1)  # cat是在已有的维度上拼接
 print(b.shape)
 
-k = x.expand(2,3,-1,-1,-1,-1)  # 只能将大小为1的扩展到更大尺寸
+k = x.expand(2,3,-1,-1,-1,-1)  # 只能将大小为1维度的扩展到更大尺寸
 # k = x.expand(2,3,-1,20,-1,-1)  # 会报错
 print(k.shape)
 
