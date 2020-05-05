@@ -1,7 +1,7 @@
 # Tensor Processing
 ```python
 import torch
-x = torch.zeros((16, 10, 30, 30), dtype=torch.float)
+x = torch.zeros((16,10,30,30), dtype=torch.float)
 print(x.shape)
 
 a = torch.stack((x,x,x),1)  # stack是建立一个新的维度
@@ -10,7 +10,11 @@ print(a.shape)
 b = torch.cat((x,x,x), dim=1)  # cat是在已有的维度上拼接
 print(b.shape)
 
-c = x.repeat(1,1,2,1,1)
+k = x.expand(2,3,-1,-1,-1,-1)  # 只能将大小为1的扩展到更大尺寸
+# k = x.expand(2,3,-1,20,-1,-1)  # 会报错
+print(k.shape)
+
+c = x.repeat(2,3,1,2,1,1)  # 可以repeat任意维度，新的维度默认加在前面
 print(c.shape)
 
 d = torch.unsqueeze(x, 2)
@@ -23,7 +27,8 @@ print(e.shape)
 torch.Size([16, 10, 30, 30])  
 torch.Size([16, 3, 10, 30, 30])  
 torch.Size([16, 30, 30, 30])  
-torch.Size([1, 16, 20, 30, 30])  
+torch.Size([2, 3, 16, 10, 30, 30])  
+torch.Size([2, 3, 16, 20, 30, 30])  
 torch.Size([16, 10, 1, 30, 30])  
 torch.Size([16, 10, 3, 30, 30])  
 
