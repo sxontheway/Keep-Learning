@@ -62,6 +62,212 @@
  * Yolov3在Inference时：
      * 先滤掉confidence小于某个阈值的box
      * 按类NMS
+
+<br><br>
+
+# Detection 的AP, mAP计算
+* NMS：对 batch 进行NMS，得到outputs
+* `get_batch_statistics(outputs, targets, iou_threshold)`: 得到 batch_metrics：(true_positives, pred_scores, pred_labels)  
+    * 对于 outputs 中的每一个 box: 在 targets 中找，有无 ground truth box (未与其他detected box 未匹配过的) 与其 IoU 大于 iou_threshold
+    * 如果有 就是 true positive， 如果没有就是 false positive 
+* 将所有 batch 的 batch_metrics concat 起来，得到 `(tp, conf, pred_cls)`
+* `ap_per_class(tp, conf, pred_cls, target_cls)`: 
+    * tp: True positives, e.g. array([0., 1., 1.]), 3 predicted bboxs
+    * conf: Objectness value from 0-1, e.g. tensor([0.8247, 0.3907, 0.6466])  
+    * pred_cls: Predicted object classes, e.g. tensor([1., 0., 18.])   
+    * target_cls: True object classes, e.g. tensor([1., 2., 18.])  
+    * 计算 average precision
+        * 对所有框按 confidence 排序
+        * 依次计算 confidence 前1,2,3,4...的框的 p, r，得到 precision-recall 曲线
+        * pr 曲线的包络线的面积作为 ap
+
+
+```python
+def get_batch_statistics(outputs, targets, iou_threshold):
+""" 
+Compute true positives, predicted scores and predicted labels per sample 
+
+Argus:
+---
+outputs: tensor with size (batch_size, n, 7)   
+* [x1, y1, x2, y2, obj_conf, obj_score, class_pred]
+* (x1, y1, x2, y2) is scaled to opt.img_size 
+
+targets: tensor with size (m, 6)   
+* [sample_i, class, x_center, y_center, w, h]  
+* (x_center, y_center, w, h) is scaled to (0, 1)
+
+Return:
+---
+* [[true_positives, pred_scores, pred_labels], [], ...]
+
+"""
+    batch_metrics = []
+    
+    # iter for each image, sample_i is the idx of the image in a batch
+    for sample_i in range(len(outputs)):
+
+        if outputs[sample_i] is None:
+            continue
+
+        output = outputs[sample_i]
+        pred_boxes = output[:, :4]
+        pred_scores = output[:, 4]
+        pred_labels = output[:, -1]
+
+        true_positives = np.zeros(pred_boxes.shape[0])
+
+        annotations = targets[targets[:, 0] == sample_i][:, 1:]
+        target_labels = annotations[:, 0] if len(annotations) else []
+        if len(annotations):
+            detected_boxes = []
+            target_boxes = annotations[:, 1:]
+
+            # iter for every detected box
+            for pred_i, (pred_box, pred_label) in enumerate(zip(pred_boxes, pred_labels)):
+
+                # If all targets are found, break
+                if len(detected_boxes) == len(annotations):
+                    break
+
+                # Ignore if label is not one of the target labels
+                if pred_label not in target_labels:
+                    continue
+
+                iou, box_index = bbox_iou(pred_box.unsqueeze(0), target_boxes).max(0)
+                if iou >= iou_threshold and box_index not in detected_boxes:
+                    true_positives[pred_i] = 1
+                    detected_boxes += [box_index]
+        batch_metrics.append([true_positives, pred_scores, pred_labels])
+    return batch_metrics
+
+
+def ap_per_class(tp, conf, pred_cls, target_cls):
+    """ Compute the average precision, given the recall and precision curves.  
+    Source: https://github.com/rafaelpadilla/Object-Detection-Metrics. 
+
+    # Arguments 
+        tp: True positives (list), e.g. array([0., 1., 1.]), 3 predicted bboxs
+        conf: Objectness value from 0-1 (list), e.g. tensor([0.8247, 0.3907, 0.6466])  
+        pred_cls: Predicted object classes (list), e.g. tensor([1., 0., 18.])   
+        target_cls: True object classes (list), e.g. tensor([1., 2., 18.])  
+    # Returns  
+        The average precision as computed in py-faster-rcnn.
+    """
+
+    # Sort by objectness
+    i = np.argsort(-conf)
+    tp, conf, pred_cls = tp[i], conf[i], pred_cls[i]
+
+    # Find unique classes
+    unique_classes = np.unique(target_cls)
+
+    # Create Precision-Recall curve and compute AP for each class
+    ap, p, r = [], [], []
+    for c in tqdm.tqdm(unique_classes, desc="Computing AP"):
+        i = (pred_cls == c)     # only keep class c for predicted bboxs
+        n_p = i.sum()  # Number of predicted objects
+        n_gt = (target_cls == c).sum()  # Number of ground truth objects
+
+        if n_p == 0 and n_gt == 0:
+            continue
+        elif n_p == 0 or n_gt == 0:
+            ap.append(0)
+            r.append(0)
+            p.append(0)
+        else:
+            # Accumulate FPs and TPs
+            fpc = (1 - tp[i]).cumsum()
+            tpc = (tp[i]).cumsum()
+
+            # Recall
+            recall_curve = tpc / (n_gt + 1e-16)
+            r.append(recall_curve[-1])
+
+            # Precision
+            precision_curve = tpc / (tpc + fpc)
+            p.append(precision_curve[-1])
+
+            # AP from recall-precision curve
+            ap.append(compute_ap(recall_curve, precision_curve))
+
+    # Compute F1 score (harmonic mean of precision and recall)
+    p, r, ap = np.array(p), np.array(r), np.array(ap)
+    f1 = 2 * p * r / (p + r + 1e-16)
+
+    return p, r, ap, f1, unique_classes.astype("int32")
+
+
+def compute_ap(recall, precision):
+    """ Compute the average precision, given the recall and precision curves.
+    Code originally from https://github.com/rbgirshick/py-faster-rcnn.
+
+    # Arguments
+        recall:    The recall curve (list).
+        precision: The precision curve (list).
+    # Returns
+        The average precision as computed in py-faster-rcnn.
+    """
+    # correct AP calculation
+    # first append sentinel values at the end
+    mrec = np.concatenate(([0.0], recall, [1.0]))
+    mpre = np.concatenate(([0.0], precision, [0.0]))
+
+    # compute the precision envelope
+    for i in range(mpre.size - 1, 0, -1):
+        mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+
+    # to calculate area under PR curve, look for points
+    # where X axis (recall) changes value
+    i = np.where(mrec[1:] != mrec[:-1])[0]
+
+    # and sum (\Delta recall) * prec
+    ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+    return ap
+
+
+if __name__ == "__main__": 
+
+    ...
+
+    sample_metrics = [] 
+    labels = []
+
+    for batch_i, (_, imgs, targets) in enumerate(dataloader)
+        ...
+
+        # Extract class labels
+        labels += targets[:, 1].tolist()
+
+        # Rescale target
+        targets[:, 2:] = xywh2xyxy(targets[:, 2:])
+        targets[:, 2:] *= img_size
+
+        imgs = Variable(imgs.type(Tensor), requires_grad=False)
+        with torch.no_grad():
+            outputs = model(imgs)
+            outputs = non_max_suppression(
+                outputs, conf_thres=conf_thres, nms_thres=nms_thres
+            )
+
+        # Get sample statistics
+        sample_metrics += get_batch_statistics(outputs, targets, iou_threshold=iou_thres)
+        ...
+
+    true_positives, pred_scores, pred_labels = [
+        np.concatenate(x, 0) for x in list(zip(*sample_metrics))
+        ]
+
+    precision, recall, AP, f1, ap_class = ap_per_class(
+        true_positives, pred_scores, pred_labels, labels
+        )
+
+```
+
+
+
+
+
 <br><br>
 
 # Model Complexity Analysis
