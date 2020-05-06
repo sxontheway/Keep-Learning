@@ -39,7 +39,9 @@
     * 对于留下的预测框进行解码，根据先验框得到真实的位置（解码后一般还需要做clip，防止预测框位置超出图片）
     * 根据置信度进行降序排列，然后仅保留top-k（如400）个预测框
     * 进行NMS
-    
+        
+<br><br>
+
 # Yolo 细节
 ## Training
 > https://zhuanlan.zhihu.com/p/50595699  
@@ -66,6 +68,7 @@
 <br><br>
 
 # Detection 的AP, mAP计算
+步骤：
 * NMS：对 batch 进行NMS，得到outputs
 * `get_batch_statistics(outputs, targets, iou_threshold)`: 得到 batch_metrics：(true_positives, pred_scores, pred_labels)  
     * 对于 outputs 中的每一个 box: 在 targets 中找，有无 ground truth box (未与其他detected box 未匹配过的) 与其 IoU 大于 iou_threshold
