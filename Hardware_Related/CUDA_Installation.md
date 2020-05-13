@@ -78,7 +78,7 @@ Tensorflow可能会提示warning，说TensorRT未安装，如果不用的话不�
 * 提前改变user目录的所有者： 
     ```bash
     su root
-    chowm -R alex /home/alex
+    chown -R alex /home/alex
     ls -l
     ```
 
