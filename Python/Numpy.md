@@ -28,23 +28,35 @@ python3 -m pip install --user numpy scipy matplotlib ipython jupyter pandas symp
     ```
     > zip的用法： http://www.runoob.com/python3/python3-func-zip.html
 * list 和 array  
-    简单来说，np.array支持比list更多的索引方式，在numpy中使用更方便
-    ```python
-    # 创建长度为定值的空二维列表
-    empty_list = [[]]*10
+    * 简单来说，np.array支持比list更多的索引方式，在numpy中使用更方便
+        ```python
+        # 创建长度为定值的空二维列表
+        empty_list = [[]]*10
 
-    # 用python创建二维列表，type(a1)得到list
-    a1 = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
-    b = a1[:, 1]  # 报错
-    c = np.array(a1)[；， 1] # 正确
+        # 用python创建二维列表，type(a1)得到list
+        a1 = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
+        b = a1[:, 1]  # 报错
+        c = np.array(a1)[；， 1] # 正确
 
-    # 用numpy创建二维数组，type(a2)得到numpy.ndarray
-    a2 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
+        # 用numpy创建二维数组，type(a2)得到numpy.ndarray
+        a2 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
 
-    # 列表与数组的相互转换
-    a3 = a2.tolist()
-    a3 = np.array(a1)
-    ```
+        # 列表与数组的相互转换
+        a3 = a2.tolist()
+        a3 = np.array(a1)
+        ```
+    * Python append()与NumPy append() 的效率区别
+        > https://www.codelast.com/%E5%8E%9F%E5%88%9B-python%E7%9A%84list-append%E6%AF%94np-append%E6%9B%B4%E5%BF%AB/
+ 
+        为了计算高效，一个NumPy array在底层是存储在一块连续的内存区域里，所以`np.append()` 不是 in-place 的，它会分配一块新的内存，再把数据copy到里面去。  
+        相比之下，Python的list则对应的是不连续的内存区域，append起来速度就快得多。在list.append完成之后再转成NumPy array，只会发生一次 分配新内存→拷贝数据 的操作，速度自然就快得多了。
+        ```python
+        a = []
+        a.append([1,2,3])
+
+        b = np.empty([0,3], dtype=int)
+        b1 = np.append(b,[[1,2,3]], axis=0)
+        ```
 * array 和 mat  
     Numpy中,mat必须是2维的，但是array可以是多维的（1D，2D，3D····ND），mat相对于array的一个优势是可用 \* 直接进行矩阵乘法运算
     ```python
