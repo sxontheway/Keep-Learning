@@ -87,7 +87,7 @@
 <br>
 
 ## 1.3 ROS的命名空间
-ROS下有4类命名空间： base, global, relatove, private
+ROS下有4类命名空间： base, global, relative, private
 
 | 类型 | 格式 | 
 | :----- |:----:| 
@@ -159,7 +159,7 @@ if __name__ == "__main__":
 ```
 ### 1.4.2 在callback func中调用 matplotlib 实时绘图的问题
 * 问题起源：   
-想在 callback 函数中用 matplotlib 画实时更新的图（图的数据由 msg 得到，没触发一次 callback 更新一次）
+想在 callback 函数中用 matplotlib 画实时更新的图（图的数据由 msg 得到，每触发一次 callback 更新一次）
 * 常规想法：  
 用`plt.ion()`, 见：https://github.com/xianhu/LearnPython/blob/master/python_visual_animation.py 
   ```python

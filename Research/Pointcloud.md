@@ -26,7 +26,7 @@
   * 对 a subset of segmented point cloud 进行 3D bbox regression：Pointnet(Feature Extractor) + FC(Head)  
   （类比 Faster-RCNN 的 bbox regression）
   <p align="center" >
-	<img src="/Research/pictures/fpointnet.jpg" width="800">
+	<img src="./pictures/fpointnet.jpg" width="800">
   </p>
   
 * PointRCNN: https://zhuanlan.zhihu.com/p/84335316
@@ -41,7 +41,7 @@
     * concat之前的 Semantic feature 和新得到的 local feature 
     * PointNet++ 进行 regression
   <p align="center" >
-	<img src="/Research/pictures/pointrcnn.jpg" width="800">
+	<img src="./pictures/pointrcnn.jpg" width="800">
   </p>
 # Radar 
 ## Mapping

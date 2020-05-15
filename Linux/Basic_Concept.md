@@ -136,21 +136,21 @@ sudo systemctl start network.service
   * 用 Gparted Partition Editor 等分区软件将 swap 分区暂时移到末尾，方便凑成连续分区以扩容。
   * 将 swap 分区修改后(例如将其分区号从 sda2 修改为 sda3 之类的)，虽然在`sudo fdisk /dev/sda`中显示有 swap 分区，但开机极慢。且需要在 Bios 中选 boot 模式，选 advanced options for ubuntu，再选第一个才能缓慢开机。  
   这是因为 swap 分区并没有真正地被系统识别，需修改UUID，参考 http://www.linuxdiyf.com/linux/20747.html
-```
-①在Extend分区划出一块Logical分区
-②sudo fdisk -l 查看分区设备号，这里我的是/dev/sda7
-③sudo mkswap /dev/sda7 将sda7转为swap分区格式
-④sudo swapon /dev/sda7
+    ```
+    ①在Extend分区划出一块Logical分区
+    ②sudo fdisk -l 查看分区设备号，这里我的是/dev/sda7
+    ③sudo mkswap /dev/sda7 将sda7转为swap分区格式
+    ④sudo swapon /dev/sda7
 
-进行完上述操作之后reboot后用free命令查看，swap显示仍旧为0，这是因为/etc/fstab 里的值并没有更新
-①sudo blkid -t TYPE=swap 查看swap的Label（UUID）
-②vim /etc/fstab 修改swap的Label即可
-③重启
+    进行完上述操作之后reboot后用free命令查看，swap显示仍旧为0，这是因为/etc/fstab 里的值并没有更新
+    ①sudo blkid -t TYPE=swap 查看swap的Label（UUID）
+    ②vim /etc/fstab 修改swap的Label即可
+    ③重启
 
-最后，可以修改swappiness的值，内存比较大的情况下，建议修改为10
-①sudo vim /proc/sys/vm/swappiness 将其改为10
-②sudo vim /etc/sysctl.conf 最后加上一行vm.swappiness=10
-```
+    最后，可以修改swappiness的值，内存比较大的情况下，建议修改为10
+    ①sudo vim /proc/sys/vm/swappiness 将其改为10
+    ②sudo vim /etc/sysctl.conf 最后加上一行vm.swappiness=10
+    ```
   * 参数 swappiness 来控制物理内存和虚拟内存的比例，默认值为60，意思是说在内存使用40%的情况下就使用 swap 空间。如果为10 ，也即物理内存使用90%时候再用虚拟内存。为0则，优先使用物理内存。  
   具体值需要依据内存大小而定，内存很大（例如32g时），可以优先使用物理内存。用`cat /proc/sys/vm/swappiness` 查看当前 swappiness 数值。
 
