@@ -267,8 +267,85 @@ if __name__ == "__main__":
 
 ```
 
+<br><br>
 
+# RCNN 细节
+## Faster-RCNN
+> https://zhuanlan.zhihu.com/p/32404424  
 
+* RPN
+    * RPN的输出
+        * anchor: ~20k，(H/16)*(W/16)*9
+        * 选取为前景概率较大的12k
+        * NMS: ~7K
+        * Top 2k/ 300/ 100  
+        训练时，RPN输出2k个RoIs  
+        推理时300个（源代码）或 100个（提速降Recall）
+
+    * 训练样本：从20k anchors -> 256 training samples
+        * 对于每一个 gt_bbox，选择和 IoU 最高的 anchor 作为正样本
+        * 对于剩下的 anchor，从中选择和任意一个和 `gt_bbox IoU > 0.7` 的作为正样本，正样本的数目不超过128个
+        * 随机选择和 `gt_bbox IoU < 0.3` 的 anchor 作为负样本，负样本和正样本的总数为256
+
+    * 训练loss
+        * RPN 分类损失：anchor是否为前景（二分类）
+        * RPN 位置回归损失：只对正样本计算损失
+* Detection head
+    * 结构：  
+    `7*7*512 -> 4096 -> 4096 -> (21, 84)`  
+    21：20个类加背景类；84：21个类，每个类都有4个位置参数
+    * 训练样本：从RPN产生的2k RoIs -> 128 RoIs
+        * RoIs 和 gt_bboxes 的 IoU 大于0.5的，选择一些（比如32个）
+        * 选择 RoIs 和 gt_bboxes 的IoU小于等于0（或者0.1）的，选择一些（比如 128-32=96个）作为负样本
+    * 训练Loss
+        * 对于分类问题，采用交叉熵损失，利用长度为21的向量  
+        * 对于位置的回归损失，采用Smooth_L1Loss, 只对正样本进行计算。而且是只对正样本中的这个类别4个参数计算损失。例如：如果一个RoI是负样本，84维向量不参与L1_Loss计算；如果这个RoI是正样本，属于`label K`，那么它的第 `(K×4, K×4+1, K×4+2, K×4+3)` 这4个数参与计算损失，其余的不参与。
+
+## R-FCN
+> https://zhuanlan.zhihu.com/p/30867916
+
+* 主要思想  
+Faster-RCNN 效率低的一个主要原因是，Detection head 的 fc layers 部分要被重复300次；R-FCN 将 RoI-wise 的 fc layers 替换成简单的 average pooling（图中的voting）
+    <p align="center" >
+        <img src="./pictures/r-fcn.png", width='800'>
+    </p>
+
+* 细节  
+    * k*k 是每个 RoI 被划分成多少个区域，也即 RoI pooling 后的尺寸；c 是类别数
+    * position-sensitive feature map：`#channel  = k*k*(c+1)`
+    * position-sensitive-RoI-pooling：对于每个 RoI 得到一个`k*k*(c+1)`的feature map。之后对每层的 `k*k` 直接计算平均 (average pooling)，得到 `1*(1+c)` 的vector，用softmax函数直接得出RoI属于每个类别的概率。
+    * 上面是针对分类问题，对于边框回归问题同理，只不过 position-sensitive feature map 的 channel 数量为 `k*k*4`
+
+## Light-head RCNN
+> https://arxiv.org/pdf/1711.07264.pdf  
+> https://zhuanlan.zhihu.com/p/106019344  
+* 主要思想
+    * Faster-RCNN 的 detection head，有两个4096的fc layers，太过沉重，但是这种 RoI-wise 的 DNN 确实效果好
+    * R-FCN 利用一个 global feature map，每个 RoI 都在这个 global feature map 上裁剪，然后只用进行 average pooling。RoI-wise 的操作很快，但是 global feature map 的 channel 数量过多，并且效果不如 Faster-RCNN （简化了 RoI-wise 的操作）
+    * Light-head RCNN 中实践了两种想法：
+        * Thin global feature map  
+        将 R-FCN 中 `3969=81*7*7` 个 channel 减少到`490=10*7*7`个，也即每个小区域对应10个channel。Position-senstive RoI pooling之后，对于每个RoI，得到`k*k*10`的feature map，后面接全连接层：`k*k*10 -> 2048 -> (c+1, 4)`，其中`c+1`为类别，4为4个位置参数。
+
+            <p align="center" >
+                <img src="./pictures/light-head.png", width='800'>
+            </p>
+
+        * Large separable convolution  
+        将 `k*k` 卷积变为 `(1*k, k*1)+(k*1, 1*k)`，其中`+`代表element-wise summation。文章中`k=15`，大的卷积核使得感受野更大，有利于RoI pooling捕获全局信息。
+
+<br><br>
+
+# 减小conv layer计算量方法
+> 见 ShuffleNet v2
+* group-wise + point-wise/ channel-shuffling
+    * `depth-wise conv`其实是 `group-wise` 在 `group_size = 1` 时的特例
+    * `point-wise conv`也即1*1卷积
+* 将`k*k`的卷积层拆分成`(1*k, k*1)`的
+* shuffleNet v2中的几个结论
+    * conv layer输入卷积核数量和输出相等时， MAC 操作最少
+    * group-wise 会增大 MAC
+    * elemenet-wise flops小，但速度慢
+    * 网络分支越少速度越快，并行度越好
 
 
 <br><br>
@@ -295,7 +372,7 @@ if __name__ == "__main__":
 > Resnet: https://arxiv.org/pdf/1512.03385.pdf  
 > Darknet: https://pjreddie.com/media/files/papers/YOLOv3.pdf  
 
-* Resnet (Input suze 224*224) -- not consider the constant 2
+* Resnet (Input size 224*224) -- not consider the constant 2
     <p align="center" >
         <img src="./pictures/resnet.png">
     </p>
@@ -357,7 +434,7 @@ if __name__ == "__main__":
     |Yolov3 tiny|coco, 416*416|5.6|
 
     * Faster-RCNN(1242*375): FC layers which deal with those 300 region proposals cost most  
-    --- Heavy head，see __[Light-Head R-CNN: In Defense of Two-Stage Object Detector](https://arxiv.org/abs/1711.07264)__
+    --- Heavy head，see __[Light-Head R-CNN: In Defense of Two-Stage Object Detector](https://arxiv.org/abs/1711.07264)__ and R-FCN
         * ResNet50: 77 GFLOPS
         * Others: 177 GFLOPS
     * Yolov3(416*416): backbone cost most
