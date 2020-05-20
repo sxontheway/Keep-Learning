@@ -305,7 +305,7 @@ if __name__ == "__main__":
 > https://zhuanlan.zhihu.com/p/30867916
 
 * 主要思想  
-Faster-RCNN 效率低的一个主要原因是，Detection head 的 fc layers 部分要被重复300次；R-FCN 将 RoI-wise 的 fc layers 替换成简单的 average pooling（图中的voting）
+Faster-RCNN 效率低的一个主要原因是，Detection head 的 fc layers 部分要被重复300次；R-FCN 将 RoI-wise 的 fc layers 替换成简单的vote (用average pooling实现)
     <p align="center" >
         <img src="./pictures/r-fcn.png", width='800'>
     </p>
@@ -313,7 +313,8 @@ Faster-RCNN 效率低的一个主要原因是，Detection head 的 fc layers 部
 * 细节  
     * k*k 是每个 RoI 被划分成多少个区域，也即 RoI pooling 后的尺寸；c 是类别数
     * position-sensitive feature map：`#channel  = k*k*(c+1)`
-    * position-sensitive-RoI-pooling：对于每个 RoI 得到一个`k*k*(c+1)`的feature map。之后对每层的 `k*k` 直接计算平均 (average pooling)，得到 `1*(1+c)` 的vector，用softmax函数直接得出RoI属于每个类别的概率。
+    * position-sensitive-RoI-pooling：对于每个 RoI 得到一个`k*k*(c+1)`的feature map。这里对于每个channel的pooling用的是average pooling (不同于Faster-RCNN中的RoI pooling用的是max pooling)
+    * vote: 对每层的 `k*k` 进行 average pooling，得到 `1*(1+c)` 的vector，用softmax函数直接得出RoI属于每个类别的概率。
     * 上面是针对分类问题，对于边框回归问题同理，只不过 position-sensitive feature map 的 channel 数量为 `k*k*4`
 
 ## Light-head RCNN
@@ -323,15 +324,27 @@ Faster-RCNN 效率低的一个主要原因是，Detection head 的 fc layers 部
     * Faster-RCNN 的 detection head，有两个4096的fc layers，太过沉重，但是这种 RoI-wise 的 DNN 确实效果好
     * R-FCN 利用一个 global feature map，每个 RoI 都在这个 global feature map 上裁剪，然后只用进行 average pooling。RoI-wise 的操作很快，但是 global feature map 的 channel 数量过多，并且效果不如 Faster-RCNN （简化了 RoI-wise 的操作）
     * Light-head RCNN 中实践了两种想法：
+        <p align="center" >
+            <img src="./pictures/light-head.png", width='800'>
+        </p>
+
         * Thin global feature map  
         将 R-FCN 中 `3969=81*7*7` 个 channel 减少到`490=10*7*7`个，也即每个小区域对应10个channel。Position-senstive RoI pooling之后，对于每个RoI，得到`k*k*10`的feature map，后面接全连接层：`k*k*10 -> 2048 -> (c+1, 4)`，其中`c+1`为类别，4为4个位置参数。
 
-            <p align="center" >
-                <img src="./pictures/light-head.png", width='800'>
-            </p>
-
         * Large separable convolution  
         将 `k*k` 卷积变为 `(1*k, k*1)+(k*1, 1*k)`，其中`+`代表element-wise summation。文章中`k=15`，大的卷积核使得感受野更大，有利于RoI pooling捕获全局信息。
+
+## Couple Net
+<p align="center" >
+    <img src="./pictures/couplenet.png", height='250'>
+    <img src="./pictures/couplenet1.png", height='250'>
+</p>
+
+* R-FCN 中的 position-sensitive scores map 的某一层代表的是一每个位置上有多大可能出现某个类的某个部位。经过 PSRoI pooling 之后，得到的 `k*k` 的 map 每一个像素的值代表：RoI的相应部位上（例如top-left）有多大可能出现某个类物体的相应部位（例如top-left）
+* Faster-RCNN 用的 RoI pooling 或 SPP (spatial pyramid pooling) 利用到了整个 RoI 的全局信息
+* Couple Net 同时融合了局部信息和全局信息
+    * (a)中，脸被裁剪了，所以 global confidence 分数不高；但是 local part confidence 有一些地方分数很高。此时 Local FCN 起主要作用。
+    * (b)中，因为桌子腿下面空了很大部分，所以局部信息中这些部分分数很低，但是因为 bbox 很贴合桌子，global confidence 会较高。此时 global FCN 起主要作用。 
 
 <br><br>
 
