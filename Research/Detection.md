@@ -273,16 +273,16 @@ if __name__ == "__main__":
 ## Faster-RCNN
 > https://zhuanlan.zhihu.com/p/32404424  
 
-* RPN
-    * RPN的输出
+* RPN: 
+    * RPN的输出: 从 ~20k anchors -> 2k/300 RoIs
         * anchor: ~20k，(H/16)*(W/16)*9
-        * 选取为前景概率较大的12k
-        * NMS: ~7K
-        * Top 2k/ 300/ 100  
-        训练时，RPN输出2k个RoIs  
-        推理时300个（源代码）或 100个（提速降Recall）
+        * 选取为前景概率较大的 12k (for training)/6k (for inference)，得到regressed bboxes
+        * 进行NMS
+        * 从 NMS 之后的结果中选取 top 2k/ 300   
+        For detection head training，RPN 输出2k个RoIs    
+        For inference, RPN 输出 300个或100个（提速降Recall）RoIs  
 
-    * 训练样本：从20k anchors -> 256 training samples
+    * 训练样本：从 ~20k anchors -> 256 training samples
         * 对于每一个 gt_bbox，选择和 IoU 最高的 anchor 作为正样本
         * 对于剩下的 anchor，从中选择和任意一个和 `gt_bbox IoU > 0.7` 的作为正样本，正样本的数目不超过128个
         * 随机选择和 `gt_bbox IoU < 0.3` 的 anchor 作为负样本，负样本和正样本的总数为256
