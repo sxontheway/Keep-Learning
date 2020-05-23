@@ -1,3 +1,11 @@
+# Pytorch Cookbock
+* Cookbook
+https://zhuanlan.zhihu.com/p/59205847  
+* Python 使用和高性能技巧总结
+https://zhuanlan.zhihu.com/p/48293468  
+
+<br>
+
 # Tensor Processing Example
 ```python
 import torch

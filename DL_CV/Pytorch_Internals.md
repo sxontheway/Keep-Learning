@@ -1,11 +1,3 @@
-# Pytorch Cookbock
-* Cookbook
-https://zhuanlan.zhihu.com/p/59205847  
-* Python 使用和高性能技巧总结
-https://zhuanlan.zhihu.com/p/48293468  
-
-<br>
-
 # pytorch多gpu并行训练  
 > https://zhuanlan.zhihu.com/p/86441879  
 > https://zhuanlan.zhihu.com/p/95700549  
@@ -67,14 +59,29 @@ https://zhuanlan.zhihu.com/p/48293468
 
 千呼万唤始出来。PyTorch1.0发布了，这样业界部署的工作流程可以变成这样：
 
-* 论文发布->PyTorch开源代码(或者自己实现)->训练模型->导出模型->载入模型(C++/Python/其他框架/其他硬件平台)
+> 论文发布->PyTorch开源代码(或者自己实现)->训练模型->导出模型->载入模型(C++/Python/其他框架/其他硬件平台)
 
 PyTorch1.0后，可以通过两种方式，分别是Tracing和Script，将一个Python代码转化为TorchScript代码，继而导出相应的模型可以继续被优化，同时被C++所调用，最终实现对生产环境下的支持（考虑到多线程执行和性能原因，一般Python代码并不适合做部署）
 
-### Tracing
+* Tracing  
 Tracing方式对于含有if和for-loop的场景失效，需要用script方式
 
-### Script
+* Script  
 https://zhpmatrix.github.io/2019/03/09/torch-jit-pytorch/   
+
+
+
+## Dataloader
+* Dataloader 数据装载阻塞的问题: https://bbs.cvmart.net/topics/2066  
+    <p align="center" >
+        <img src="https://pic1.zhimg.com/v2-447240774bd6f083807cc33b2a7b01c4_r.jpg", width='800'>
+    </p>
+
+    * 一个 worker 独立的处理一个 batch，而不是多个 worker 同时处理一个 batch
+    * dataloader **不是** 等所有worker数据取完才进行下一批次的数据读取，worker 之间并没有同步
+    * 输出的数据必须保持顺序性：主线程（进行反front/back propagation）按照`idx=0, 1, 2, 3...`依次处理 worker 产生的 batch
+* 用 GPU 来完成 dataloader 中的 transform:   
+https://zhuanlan.zhihu.com/p/77633542  
+https://github.com/pytorch/pytorch/issues/31359  
 
 ## APEX
