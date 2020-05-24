@@ -565,7 +565,7 @@ def add(a, b):
 if __name__ == "__main__":
     add(3, "hello")
 ```
-简单来说，就是将`@checkParams`写在`add(a,b)`定义上面，等效于`add = checkParams(add)`
+简单来说，就是将`@checkParams`写在`add(a,b)`定义上面，等效于`add = checkParams(add)`，也即在不改变 add 函数本身的情况下，为它加了额外的功能。
 
 ### 3.5.4 用类写一个多重的，带参数的装饰器
 ```python
@@ -586,12 +586,12 @@ if __name__ == "__main__":
     print(hello("Chen"))
 ```
 上面的两个装饰器等价于:
-```
+```python
 def hello(name):
     return name
     
 if __name__ == "__main__":
-    hello = add_prefix("dear ")( add_prefix("Prof.")(hello) )
+    hello = add_prefix("dear ")(add_prefix("Prof.")(hello))
     print(hello("Chen"))
 ```
 
