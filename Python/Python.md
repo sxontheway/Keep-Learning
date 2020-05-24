@@ -4,13 +4,14 @@
 * 其中pip和pip3主要是python版本的区别，下表只以`pip`为例。   
   * `pip3`时，将路径中的`python2.7`换成`python3.5`即可。   
   * `dist-packages`是从包管理器安装的python包的路径； `site-packages`是从第三方库安装的的python包的路径
+  * 可用 `pip show` 查看
 
    | 命令 | python包安装路径 | 说明 |
    | :------------ |:---------------|:---|
    | sudo apt-get install | /usr/lib/python2.7/dist-packages |apt-get install必须要sudo|
-   | sudo pip install | /usr/local/lib/python2.7/dist-packages |用sudo可能会报错：cannot import name 'main'|
-   | pip install | ～/.local/lib/python2.7/dist-packages |可能会报错： Permission denied|
-   | pip install --user| ～/.local/lib/python2.7/dist-packages |--user 使包安装在当前用户文件夹下|
+   | sudo pip install | /usr/local/lib/python2.7/site-packages |用sudo可能会报错：cannot import name 'main'|
+   | pip install | ～/.local/lib/python2.7/site-packages |可能会报错： Permission denied|
+   | pip install --user| ～/.local/lib/python2.7/site-packages |--user 使包安装在当前用户文件夹下|
 
 * 在.py中输入
   ```python
@@ -53,14 +54,28 @@
 * 对于python环境而言，`pip + venv` 比 `Anaconda` (https://blog.csdn.net/lwgkzl/article/details/89329383) 稳定，Anaconda出现一些奇奇怪怪的毛病
 
 ## 1.3 慎用相对路径
-* 在.py文件中，相对路径（./等）始终是相对於終端本身的，进行操作有机会报错。 例如在`jupyter-notebook`使用，显示`/home/alex/.local/lib/python3.5/site-packages`，这个是`jupyter-notebook`的安装目录。
-解决方案参见： https://www.jianshu.com/p/76a3d317722c
+* 在.py文件中，相对路径（./等）始终是相对于终端位置本身的，例如：
+    ```bash
+    cd /home/Desktop
+    python3 /home/alex/t.py
+    ```
+    在`/home/alex/t.py`中用相对路径，那么系统会在`/home/Desktop`中找，而不是`/home/alex`中找。这和我们的所设想的不同。
+
+* 解决方案：获取该脚本的绝对路径->得到文件夹->join文件夹和目标文件相对路径，得到绝对路径，见 https://www.jianshu.com/p/76a3d317722c
     ```python
     import os, sys
-    print( os.path.split(os.path.realpath(sys.argv[0]))[0], os.path.dirname(__file__) )    # 这两个都是文件所在目录
-    print('realpath', os.path.realpath(sys.argv[0]))      # 文件的绝对路径
+
+    # 从命令行的输入参数 (/home/alex/t.py) 获取目录的绝对路劲
+    print('realpath', os.path.realpath(sys.argv[0]))  
+    # 分割得到文件夹名
+    print(os.path.split(os.path.realpath(sys.argv[0]))[0])
+
+    # 用__file__得到绝对路径
+    print(os.path.realpath(__file__))
+    # 得到相对于命令行目录的文件夹路径    
+    print(os.path.dirname(__file__))
     ```
-* `os.path.expanduser（～/Desktop/a.txt` 可将路径转换为根目录下的绝对路径
+* `os.path.expanduser(~/Desktop/a.txt)` 可将用户目录下的路径转换为根目录下的路径
 
 ## 1.4 import
 ### 1.4.1 相对导入和绝对导入  
@@ -73,7 +88,7 @@
 | :------------ |:---------------|:---|
 | 格式 | `from .A import B` 或 `from ..A import B`。其中`.`代表当前模块，`..`代表上层模块，依次类推（或需要配合`python -m`使用)|`import A.B` 或 `from A import B`|
 | 优点 | 相对导入可以避免硬编码，更改包名后，代码仍然可以运行，可维护好 | 可读性好。绝对导入可以避免与标准库命名的冲突，实际上也不推荐自定义模块与标准库命令相同。|
-| 以哪个目录为参考目录 | import语句所在的文件，其所属package的目录 |当前工作目录（例如执行命令 `python3 a.py`时，文件`a.py`所在的目录）|
+| 以哪个目录为参考目录 | import语句所在的文件，其所属package的目录 |当前工作目录（例如在命令行输入 `python3 a.py`时，文件`a.py`所在的目录）|
 |要求| 必须要在package内，所谓的package，就是包含 `__init__.py` 文件的目录 | 有没有package都可以使用|
 
 
@@ -81,9 +96,9 @@
 python在import时，可以按三种方式找：  
 * 按绝对导入方式查找包
 * 有 package 时，按相对导入方式查找包
-* 在 python 安装路径的 lib 库中（例如`/usr/lib/python3.X`）  
+* 到 `sys.path` 变量给出的目录列表中查找，例如`/usr/lib/python3.X`等
 
-### 1.4.2 python import 的例子
+### 1.4.3 python import 的例子
 
 ```
 -- src
@@ -99,7 +114,7 @@ python在import时，可以按三种方式找：
 * 使用绝对导入：`from utils.utils import *`，使用`from utils import *` 是行不通的，因为没有`/src/utils.py`) 
 * 使用相对导入：`from .utils import *`
 
-### 1.4.3 其他
+### 1.4.4 其他
 * import 其他文件夹下的module  
   > http://www.361way.com/python-import-dif-dir-module/4064.html  
   > https://medium.com/@alan81920/python-import-%E7%B0%A1%E6%98%93%E6%95%99%E5%AD%B8-c98e8e2553d3 
@@ -108,7 +123,7 @@ python在import时，可以按三种方式找：
     ```
     -- src
         |-- __init__.py
-        |-- main.py: from pkg_a.a import all
+        |-- main.py: from a.a import all
         |-- a
             |-- __init__.py
             |-- a.py
@@ -125,6 +140,15 @@ python在import时，可以按三种方式找：
     from test.test import *
     ```
     直接使用 `from ..test.test import *` 会导致报错：`attempted relative import beyond top-level package`。是因为`src`本身这个 package 并没有被记录下来，见：https://stackoverflow.com/questions/30669474/beyond-top-level-package-error-in-relative-import
+
+* python -m 参数  
+像运行脚本一样运行模块，有以下两种用途：https://a7744hsc.github.io/python/2018/05/03/Run-python-script.html  
+    * 更方便地运行库模块  
+    例如： `python -m http.server` 等效于运行 `python3 /usr/lib64/python3.6/http/server.py`   
+    因为 `sys.path` 中包含 `/usr/lib64/python3.6`，所以 python 可以定位到 `python3 /usr/lib64/python3.6/http/server.py` 这个文件（见1.4.2中 python import 的顺序）
+    * 解决上面的从 `a.py` import `test.py` 的问题  
+    通过 `python -m` 执行一个脚本时，会将当前路径加入到系统路径中；而使用 `python xxx.py` 执行脚本，则会将脚本所在文件夹加入到系统路径中。
+    继续上面一节的例子，若要想执行 `a.py`（假如a.py中有 main 函数），只用 `python -m a.a` 即可，因为用了 `-m` 会自动把 `''`（也即 `./src`）加入 `sys.path`
 
 * \_\_all__ 和 import * 
   ```python
@@ -171,7 +195,7 @@ test(1,2,3,d='4',e=5)
 每个python模块（python文件）都包含一些内置的变量，其中：
 * `'__main__'`等于当前执行文件的名称（包含后缀.py)  
 * `__name__`
-    * 当运行模块被执行的时候，`__name__`等于文件名（包含后缀.py）
+    * 当.py文件被直接运行的时候，`__name__`等于该文件名（包含后缀.py）
     * 当作为模块被import到其他文件中时，则`__name__`等于模块名称（不包含后缀.py）
     
 所以，当.py文件被直接运行时，`if __name__ == '__main__'`为真；当.py文件被作为模块导入其他文件时，`if __name__ == '__main__'`为假。
@@ -192,7 +216,8 @@ a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
 ## 1.9 异常处理
 > 见： https://blog.csdn.net/u012609509/article/details/72911564  
 
-`with` 和 `try except`功能不同，with语句只是帮忙关闭没有释放的资源，并且抛出异常，但是后面的语句是不能执行的。为了即能够输出我们自定义的错误信息，又能不影响后面代码的执行，必须还得使用`try except`语句
+`with` 和 `try except`功能不同，with语句只是帮忙关闭没有释放的资源，并且抛出异常，但是后面的语句是不能执行的。  
+`with` 语句通常只使用欧冠语与系统资源或执行环境相关的对象。为了即能够输出我们自定义的错误信息，又能不影响后面代码的执行，还得必须使用`try except`语句
 
 * with
     ```python
@@ -200,25 +225,39 @@ a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
         do_something()
     ```
 
-    * 紧跟 with 后面的语句 clause 被求值后，其返回值是一个对象，称它为A。该对象的`–enter–()`方法被调用，`–enter–()`方法的返回值将被赋值给as后面的变量 B
-    * 当 `do_something()` 全部被执行完之后，将调用 A 的`–exit–()`方法，其会自动释放资源。
-    * 在 with 后面的代码块抛出异常时，`exit()`方法也被执行。 
+    * 首先，clause 会被求值，返回一个对象，称它为A。该对象的`__enter__()`方法被调用，`__enter__()`方法的返回值将被赋值给as后面的变量 B
+    * 当 `do_something()` 全部被执行完之后，将调用 A 的`__exit__()`方法，其会自动释放资源。
+    * 在 with 后面的代码块 (clause 或 do_something())抛出异常时，`__exit()__`方法也被执行，帮忙释放资源 
 
 * try except
-    > https://stackoverflow.com/questions/18675863/load-data-from-python-pickle-file-in-a-loop  
+    > https://stackoverflow.com/questions/18675863/load-data-from-python-pickle-file-in-a-loop
+    
+    如果 try 中出现 Error，控制权将被传递给相应的 except 代码块中的代码（如果有的话）。异常处理完毕后，程序将继续执行紧跟在最后一个 except 代码块后面的语句，而不会返回到发生异常的位置。例如下面的代码中，如果 try 中出现 EOFError，将会执行 except 中的代码。 
     ```python
-    # 不用担心pkl.load()已经读取完毕报错
     import pickle as pkl
+
+    # 不用担心 pkl.load() 已经读取完毕报错
     def pickleLoader(pklFile):
         try:
             while True:
                 yield pkl.load(pklFile)
-        except EOFError:
-            pass
+        except EOFError as e:
+            print(e)
 
     with open(filename) as f:
         for event in pickleLoader(f):
             do_something()
+    ```
+
+* raise  
+raise 用于手工引发异常
+    ```python
+    try:
+        raise EOFError("no more content")
+    except EOFError as e:
+        print(type(e), e)
+
+    # 输出 <class 'EOFError'> no more content
     ```
 
 
@@ -226,6 +265,7 @@ a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
 <br>
 
 # 2. 方法
+> 用`dir()`函数可以查看对象上可用的方法
 ## 2.1 super()和__call__()方法
 > https://www.zhihu.com/question/20040039
 * super(): 使用继承时，基类的函数不会自动被调用。需要手动调用，例如调用基类的构造函数：`super().__init__()`  
@@ -237,50 +277,58 @@ a = [x+3 if x<0 else x for x in a]  # 得到[2, 2, 3, -1, 5]
             A.__init__(self)
             B.__init__(self)
         ```
-    * `self` 是首先调用自身的方法如果自身没有再去父类中，`super` 是直接从父类中找方法
-* \_\_call__()： 如果在创建class的时候写了`__call__()`方法，那么该class实例化出实例后，实例名()就是调用`__call__()`方法。`__call__()`方法使实例能够像函数一样被调用。
-```python
-# Python2 代码
-class Person(object):
-    def __init__(self, name, gender):
-        self.name = name
-        self.gender = gender
-    def __call__(self, friend):  
-        print 'My name is %s...' % self.name
-        print 'My friend is %s...' % friend
+    * `self` 是首先调用自身的方法，如果自身没有再去父类中，`super` 是直接从父类中找方法
+* \_\_call__()： 如果在创建class的时候写了`__call__()`方法，那么该class实例化出实例后，`实例名()`就是调用`__call__()`方法。`__call__()`方法使实例能够像函数一样被调用。
+    ```python
+    # Python2 代码
+    class Person(object):
+        def __init__(self, name, gender):
+            self.name = name
+            self.gender = gender
+        def __call__(self, friend):  
+            print 'My name is %s' % self.name
+            print 'My friend is %s' % friend
 
-# 定义Student类时，只需要把额外的属性加上，例如score：
-class Student(Person):
-    def __init__(self, name, gender, score):
-        super(Student, self).__init__(name, gender)  # 若不写这一句，子类将缺失name和gender属性
-        self.score = score
+    # 定义Student类时，只需要把额外的属性加上，例如score：
+    class Student(Person):
+        def __init__(self, name, gender, score):
+            super(Student, self).__init__(name, gender)  # 若不写这一句，子类将缺失name和gender属性
+            self.score = score
 
-p = Person('Bob', 'male')
-p('Tim')        # 调用了__call__方法
-# 输出结果：
-# My name is Bob...
-# My friend is Tim...
-```
+    p = Person('Bob', 'male')
+    p('Tim')        # 调用了__call__方法
+
+    # 输出结果：
+    # My name is Bob
+    # My friend is Tim
+    ```
 
 ## 2.2 enumerate()方法
-对于一个可遍历的对象（如# 分别用 loc[0][0], loc[0][1] 获取第一个在第一、第二维上的位置列表、字符串），enumerate()方法将其组成一个索引序列，利用它可以同时获得索引和值。
+对于一个可遍历的对象，numerate()方法将其组成一个索引序列，利用它可以同时获得索引和值。
 ```python
-list1 = ["a", "b", "c"]
-for index, item in enumerate(list1, 1):    # 第二个参数表明从1开始索引
+list1 = list("abc")
+for index, item in enumerate(list1, 3):    # 第二个参数表明从index从3开始
 print index, item
+
 # 输出结果
-# 1 a
-# 2 b
-# 3 c
+# 3 a
+# 4 b
+# 5 c
+```
+对于字典，获取键值对：
+```python
+for key,values in  dict.items():
+    print key,values
 ```
 ## 2.3 一些处理文本的方法
 |方法|用途|
 | :------------ | :-----|
 |split()|将字符串按空格分割，返回分割后的列表|
 |lstrip(), rstrip()|去掉左右空格|
-|join()|`str = "-"; seq = ("a", "b", "c"); print(str.join(seq));`>>>`a-b-c`|
-|repr()|输入为对象，返回一个对象供解释器读取的 string 格式|
-|str.format()|使字符串格式化，例如`{1} {0} {1}".format("hello", "world")`>>>`'world hello world'`|
+|join()|`str = "-"; seq = ("a", "b", "c"); print(str.join(seq))`，得到`a-b-c`|
+|repr()|输入为对象，返回一个对象的 string 格式，见 https://www.jianshu.com/p/2a41315ca47e|
+|str.format()|使字符串格式化，例如`"{1}, {0}, {1}".format("hello", "world")`>>>`'world, hello, world'`|
+|f"{ }"|f-string，在 python3.6 中才引入，见 https://blog.csdn.net/sunxb10/article/details/81036693|
 
 ---
 <br>
@@ -305,32 +353,50 @@ a, b, c = 1, 2, "john"
 
 * 生成器是什么？  
 
-    ***任何使用了yield的函数都称为生成器，调用生成器函数将创建一个对象，该对象有一个`__next__()`方法。***    
+    **任何使用了 yield 的函数都称为生成器，调用生成器函数将创建一个对象，该对象有一个 `__next__()` 方法** (python3 中是 __next__()，python2 中是 next())   
     
-    例如下面的函数spam（）是一个生成器，对spam（）的调用不会执行函数里面的语句，而只能获得一个生成器对象（generator object）。这个对象包含了函数的原始代码和函数调用的状态，其中函数状态包括函数中变量值以及当前的执行点。  
-    
-    ***函数遇见yield语句后会暂停，返回当前的值并储存函数的调用状态。当再次调用`_next__()`，从函数上次停止的状态继续执行，直到再次遇见yield语句***。但一般不直接调用`__next__()`方法，而是用for循环进行迭代
-  ```python
-  def countdown(n):
-      print("count down!")
-      while n > 0:
-          yield n   # 函数暂停、返回当前值、存储函数调用状态
-          n -= 1
-          
-  # 用__next__()方法
-  gen = countdown(5); gen   # 输出<generator object countdown at 0x.......>
-  gen.__next__()  
-  gen.__next__()    
+    例如下面的函数 `countdown()` 是一个生成器，对 `countdown()` 的调用不会执行函数里面的语句，而只能获得一个生成器对象 (也即代码中的 gen)。这个对象包含了函数的原始代码和函数调用的状态，其中函数状态包括函数中变量值以及当前的执行点。  
+    ```python
+    def countdown(n):   # 生成器
+        print("count down!")
+        while n > 0:
+            yield n   # 函数暂停、返回当前值、存储函数调用状态
+            n -= 1
+            
+    gen = countdown(5)  # 生成器对象
+    print(gen)   # 输出<generator object countdown at 0x.......>
 
-  # 用for循环
-  for i in countdown(5):
-      print(i)
-  ```
+    # 用__next__()方法
+    gen.__next__()  # or next(gen)
+    gen.__next__()    
+
+    # 用for循环
+    for i in countdown(5):
+        print(i)
+
+    # 会打印
+    # count down!
+    # 5 4 3 2 1
+    ```    
+    **`__next__()`调用使得生成器函数一直运行，知道遇见 yield 语句后会暂停、返回当前的值、并储存函数的调用状态。当再次调用 `_next__()` 时，函数将从上次停止的状态开始继续执行，直到再次遇见yield语句**。但一般不直接调用`__next__()`方法，而是用for循环进行迭代
+
+* 协程：用于编写生产者-消费者并发程序  
+包含将 yield 语句作为输入的函数叫做协程
+    ```python
+    def print_line():   # 协程
+        while True:
+            line = yield
+            print(line)
+    
+    printer = print_line()
+    printer.__next__()  # 向前执行到第一个yield语句，使协程准备好
+    printer.send("Hello world")
+    ```
 
 * 和列表之间的转换
   ```python
   # 列表
-  [ x ** 3 for x in range(5)]
+  [x ** 3 for x in range(5)]
   >>> [0, 1, 8, 27, 64]
 
   # 生成器
@@ -338,32 +404,35 @@ a, b, c = 1, 2, "john"
   >>>  <generator object <genexpr> at 0x000000000315F678>
 
   # 两者之间转换
-  list( (x ** 3 for x in range(5)) )
+  list((x ** 3 for x in range(5)))
   ```
 
-### 3.2.2 迭代器与可迭代对象(Iterable vs. Iterator)
-参见： https://www.cnblogs.com/wj-1314/p/8490822.html
-* 可直接作用于for循环的对象统称为可迭代对象 --- Iterable  
-含有`__next__()`方法的对象都是一个迭代器，所以上文说的**生成器是一种特殊的迭代器** --- Iterator
-* list， tuple， dict， str等都是Iterable对象， 但不是Iterator
+### 3.2.2 迭代器与可迭代对象 (Iterator vs. Iterable)
+> https://www.cnblogs.com/wj-1314/p/8490822.html
+* `可迭代对象` 包含 `迭代器` 包含 `生成器`
+    * Iterable: 含有`__iter__()`方法的对象都是可迭代对象。可直接作用于 for 循环，包含迭代器，列表，字典，字符串等
+    * Iterator：含有`__iter__()`和`__next__()`方法的对象都是迭代器，所以上文说的**生成器对象是一种特殊的迭代器**
+* list, tuple, dict, str 等都是Iterable对象, 但不是Iterator
 * 可用`isinstance()`可判断对象是否Iterable或是否是Iterator
-```python
-from collections import Iterable
-from collections import Iterator
+    ```python
+    from collections import Iterable
+    from collections import Iterator
 
-isinstance((x for x in range(10)), Iterable)
-isinstance([], Iterable)
+    isinstance((x for x in range(10)), Iterable) # True
+    isinstance([], Iterable) # True
 
-isinstance((x for x in range(10)), Iterator)
-isinstance([], Iterator)
-```
-* 可用iter()函数把list、dict、str等Iterable对象变成Iterator
-```python
-isinstance(iter([]), Iterator)
-isinstance(iter('abc'), Iterator)
-```
+    isinstance((x for x in range(10)), Iterator) # True 
+    isinstance([], Iterator) # False
+    ```
+* 可用`iter()`函数把list、dict、str等Iterable对象变成Iterator
+    ```python
+    isinstance(iter([]), Iterator)
+    isinstance(iter('abc'), Iterator)
+    ```
+* 一个对象实现了`__getitem__()`方法也可以通过`iter()`函数转成`Iterator`，即也可以在for循环中使用，但它本身不是一个可迭代对象：https://juejin.im/post/5ccafbf5e51d453a3a0acb42  
+* Pytorch 中的 dataloader   
+dataloader 是一个 `torch.utils.data.dataloader.DataLoader` 对象，是 iterable 的，但不是一个 iterator。要获取单一batch，可用 `next(iter())`，`iter()`的作用是将 dataloader 先变成一个迭代器。
 
-<br>
 
 ## 3.3 parser
 test.py文件的书写：
@@ -372,16 +441,16 @@ test.py文件的书写：
 import argparse
 
 if __name__ = "__main__":
-    parser = argparse
+    parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, default="data/model_epoch46.chkpt",
         help="directory to model")
     parser.add_argument("--dataset_dir", type=str, default="/data/test.p",
         help="directory to dataset?")     
 
-    args = parser.parse_args()
+    opt = parser.parse_args()
 
-    model_dir = args.model_dir   
-    dataset_dir = args.dataset_dir
+    model_dir = opt.model_dir   
+    dataset_dir = opt.dataset_dir
 ```
 命令行中用法： `python3 test.py --model_dir=data/model_epoch01.chkpt`  
 
@@ -398,22 +467,22 @@ if __name__ = "__main__":
         def main(self):
             local_var = 2           # 类的成员变量不会和同名局部变量冲突
             self.local_var = 4;    
+
+            global global_var   # 在函数中使用全局变量，没有global关键词会print报错
             print(global_var, local_var, self.global_var, self.local_var)
-            global global_var       # 提示warning，提醒用户全局变量可能被修改。没有global关键词会报错
-            global_var = 5          # 在函数中修改全局变量
+            global_var = 5 
 
     if __name__ == '__main__':
         global_var = 1              # if不改变作用域，所以是全局变量
         test().main()               # 或 s = test(); s.main() 但test.main()会报错，因为并没有先初始化类
-        
-    print(global_var)               # 此处v是全局变量
-    # print(local_var) 会报错
+        print(global_var)               # 此处是全局变量
+        # print(local_var) 会报错
 
-    # 输出结果分别为1 2 3 4 5
+    # 输出结果分别为 1 2 3 4 5
     ```
 * global和nonlocal关键字的使用: https://blog.csdn.net/youngbit007/article/details/64905070
-  * python变量查找法则：LEGB（见闭包一节）。  
-  * global关键字用于在函数或其他局部作用域中使用全局变量。但是如果不修改全局变量也可以不使用global关键字，直接使用即可（例如print，例子见上面)。  
+  * python变量查找法则：LEGB（见闭包一节）
+  * 如果内部函数有引用外部函数的同名变量或者全局变量，并且对这个变量有修改，那么python会认为它是一个局部变量；global关键字用于在函数或其他局部作用域中使用全局变量  
   * nonlocal关键字用来在函数或其他作用域中使用外层 **(非全局)** 变量
     ```python
     def funx():
@@ -425,18 +494,18 @@ if __name__ = "__main__":
         return funy
 
     if __name__ == "__main__":
-        a=funx()
+        a = funx()
         print(a())
     ```
 
-<br>
+
 
 ## 3.5 闭包，装饰器，语法糖
 参见 https://www.zhihu.com/question/25950466/answer/31731502
 ### 3.5.1 闭包
 > 所谓闭包，就是将组成函数的语句和这些语句的执行环境打包在一起时，得到的对象
 ```python
-#foo.py
+# foo.py
 filename = "foo.py"
 
 def call_fun(f):
