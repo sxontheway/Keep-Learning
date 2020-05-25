@@ -11,6 +11,19 @@
 <br>
 
 # Pytorch Internals
+## Folders
+* `torch/`：包含导入和使用的实际Python模块。Python代码，很容易上手调试。
+
+* `torch/csrc/`：它实现了在Python和C++之间进行转换的绑定代码，以及一些非常重要的PyTorch功能，如autograd引擎和JIT编译器。它还包含C++前台代码。
+    * `torch._C` 模块在 `torch/csrc/Module.cpp` 中定义。这个模块被称为是一个扩展模块（一个用C实现的Python模块），它允许我们定义新的内建对象类型（例如：Tensor）并调用 C/C++ 函数。
+
+* `aten/`：“A Tensor Library”的缩写（由Zachary DeVito创造），是一个实现Tensors操作的C++库。存放一些内核代码存在的地方，尽量不要在那里花太多时间。
+
+* `c10/`：这是一个双关语。C代表Caffe，10既是二级制的2 (Caffe2)，也是十进制的10（英文Ten，同时也是Tensor的前半部分）。包含PyTorch的核心抽象，包括Tensor和Storage数据结构的实际实现。
+
+<br>
+
+# Pytorch Features
 > https://speakerdeck.com/perone/pytorch-under-the-hood?slide=21
 
 ## Tensors
@@ -74,7 +87,7 @@ https://zhpmatrix.github.io/2019/03/09/torch-jit-pytorch/
 ## Dataloader
 * Dataloader 数据装载阻塞的问题: https://bbs.cvmart.net/topics/2066  
     <p align="center" >
-        <img src="https://pic1.zhimg.com/v2-447240774bd6f083807cc33b2a7b01c4_r.jpg", width='800'>
+        <img src="pictures/dataloader.jpg", width='800'>
     </p>
 
     * 一个 worker 独立的处理一个 batch，而不是多个 worker 同时处理一个 batch
