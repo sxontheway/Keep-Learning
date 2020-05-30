@@ -124,32 +124,37 @@
 |维度变换|x = y.view(-1,10)|
 |去掉个数为1的维度|x = y.squeeze()|
 
-### 2.1.6 Pytorch 和 Numpy 转换 
+### 2.1.6 Tensor 和 Numpy 转换 
+Tensor与numpy对象共享内存，但numpy只支持CPU，所以他们在CPU之间切换很快。但也意味着其中一个变化了，另外一个也会变。
+* tensor 和 python 对象转换：  
+`tensor.tolist()`：多个元素的tensor  
+`tensor.item()`：只含一个元素的tensor
+
 * Torch -> NumPy:
-```python
-a = torch.ones(5) # Torch Tensor
-b = a.numpy() # NumPy Array
-```
+  ```python
+  a = torch.ones(5) # Torch Tensor
+  b = a.numpy() # NumPy Array
+  ```
 * Numpy -> Torch:
-```python
-import numpy as np
-a = np.ones(5) # NumPy Array
-b = torch.from_numpy(a) # Torch Tensor
-```
+  ```python
+  import numpy as np
+  a = np.ones(5) # NumPy Array
+  b = torch.from_numpy(a) # Torch Tensor
+  ```
 * 图像从`cv2.imread()`的`numpy`转换为可输入网络的`tensor`：  
 cv2 numpy默认格式：`H*W*C, BGR`; torch tensor默认格式：`C*H*W, RGB`
-```python
-import cv2
-import torchvision.transforms
-image_np = cv2.imread("1.jpg")
+  ```python
+  import cv2
+  import torchvision.transforms
+  image_np = cv2.imread("1.jpg")
 
-# Method 1
-image_tensor = transforms.Totensor()(image_np)
+  # Method 1
+  image_tensor = transforms.Totensor()(image_np)
 
-# Method 2
-image_np = image_np[:, :, ::-1]
-image_tensor = image_np.transpose((1,2,0))
-```
+  # Method 2
+  image_np = image_np[:, :, ::-1]
+  image_tensor = image_np.transpose((1,2,0))
+  ```
 
 ### 2.1.7 在 CPU 和 GPU 之间移动数据
 ```python
@@ -165,12 +170,96 @@ b = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
 # move the tensor to CPU
 x = x.to("cpu") # or x = x.cpu()
 ```
-### 2.1.8 其他
+
+### 2.1.8 .detach(), .detach_() 和 .data 区别
+> https://www.cnblogs.com/wanghui-garcia/p/10677071.html  
+> https://zhuanlan.zhihu.com/p/83329768  
+
+* .detach() 和 .detach_()  
+detach_() 是对 Variable 本身的更改，detach() 则是生成了一个新的 Variable
+* .detach() 和 .data 相同点：  
+  * requires_grad 都为 false，即使之后重新将它的requires_grad置为true，它也不会具有梯度grad
+  * 都返回一个从当前计算图中分离下来的，新的Variable。但是仍指向原变量的存放位置，也即和原变量共享一块内存
+
+* .detach() 和 .data 不同点：  
+  * `.detach()`之后修改会被autograd追踪，保证了只要在backward过程中没有报错，那么梯度的计算就是正确的
+  * `.data`之后的修改不会被autograd追踪，可能会产生错误的梯度，**所以 .data 不够安全**，用 `x.detach()` 更好
+
+    .detach() 之后不进行修改：
+    ```python
+    import torch
+
+    a = torch.tensor([1, 2, 3.], requires_grad=True)
+    out = a.sigmoid()
+    c = out.detach()
+    
+    # 这时候没有对c进行更改，所以并不会影响backward()
+    out.sum().backward()
+    ```
+
+    .detach() 之后进行in-place修改：
+    ```python
+    import torch
+
+    a = torch.tensor([1, 2, 3.], requires_grad=True)
+    out = a.sigmoid()
+    c = out.detach()
+
+    c.zero_()
+    print(c)  # tensor([0., 0., 0.])
+    print(out)  # tensor([0., 0., 0.], grad_fn=<SigmoidBackward>)
+    out.sum().backward()  # 报错
+    ```
+
+    .data 之后进行修改
+    ```python
+    import torch
+
+    a = torch.tensor([1, 2, 3.], requires_grad=True)
+    out = a.sigmoid()
+    c = out.data
+
+    # 会发现c的修改同时也会影响out的值
+    c.zero_()
+    print(c, out)
+
+    # 不同之处在于.data的修改不会被autograd追踪，这样当进行backward()时它不会报错，会得到一个错误的backward值
+    out.sum().backward()
+    print(a.grad) # tensor([0., 0., 0.])
+    ```
+
+### 2.1.9 hook
+> https://zhuanlan.zhihu.com/p/75054200  
+
+pytorch 中，对于中间变量（由别的变量计算得到的变量），一旦完成了反向传播，它就会被释放掉以节约内存。利用hook，我们不必改变网络输入输出的结构，就可方便地获取、改变网络中间层变量的梯度  
+使用方式： `y.register_hook(fn)`，其中自定义函数`fn(grad)`返回Tensor或没有返回值
+```python
+import torch
+from torch.autograd import Variable
+
+grad_list = []
+
+def print_grad(grad):
+    grad_list.append(grad)
+
+x = Variable(torch.randn(2, 1), requires_grad=True)
+y = x + 2
+z = torch.mean(torch.pow(y, 2))
+lr = 1e-3
+y.register_hook(print_grad)   # 得到梯度
+z.backward()
+
+print(x.grad, grad_list)  # 输出一样的数值，x和y梯度相同
+```
+
+
+### 2.1.10 其他
 * torchvision 由以下四部分组成：  
-torchvision.datasets， torchvision.models， torchvision.transforms， torchvision.utils
+  torchvision.datasets， torchvision.models， torchvision.transforms， torchvision.utils  
+    > 见 https://pytorch.org/docs/master/torchvision/transforms.html?highlight=torchvision%20transforms  
+
   * torchvision.transforms 包含很多类，其中 torchvision.transforms.Compose() 可以把多个步骤合在一起  
   例如 torchvision.transforms.Compose(\[transforms.CenterCrop(10), transforms.ToTensor()])
- > 见 https://pytorch.org/docs/master/torchvision/transforms.html?highlight=torchvision%20transforms
 
 * In PyTorch, every method that ends with an underscore (_) makes changes in-place, meaning, they will modify the underlying variable.
 
@@ -249,156 +338,155 @@ https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
 ## 2.3 A Toy Example of Back Propagation
 > Only need to define the forward function, and the backward function is automatically defined.
 * Define the network (step 1)
-```python
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+  ```python
+  import torch
+  import torch.nn as nn
+  import torch.nn.functional as F
 
-class Net(nn.Module):
-  def __init__(self):
-    super(Net, self).__init__()
-    self.conv1 = nn.Conv2d(1, 6, 5)
-    self.conv2 = nn.Conv2d(6, 16, 5)
-    self.fc1 = nn.Linear(16 * 5 * 5, 120)
-    self.fc2 = nn.Linear(120, 84)
-    self.fc3 = nn.Linear(84, 10)
-    
-  def forward(self, x):
-    x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
-    x = F.max_pool2d(F.relu(self.conv2(x)), 2)
-    x = x.view(-1, 16 * 5 * 5)
-    x = F.relu(self.fc1(x))
-    x = F.relu(self.fc2(x))
-    x = self.fc3(x)
-return x
+  class Net(nn.Module):
+    def __init__(self):
+      super(Net, self).__init__()
+      self.conv1 = nn.Conv2d(1, 6, 5)
+      self.conv2 = nn.Conv2d(6, 16, 5)
+      self.fc1 = nn.Linear(16 * 5 * 5, 120)
+      self.fc2 = nn.Linear(120, 84)
+      self.fc3 = nn.Linear(84, 10)
+      
+    def forward(self, x):
+      x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
+      x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+      x = x.view(-1, 16 * 5 * 5)
+      x = F.relu(self.fc1(x))
+      x = F.relu(self.fc2(x))
+      x = self.fc3(x)
+  return x
 
-net = Net()
-```
+  net = Net()
+  ```
 
 * Process inputs (step 2)
-```python
-input = torch.randn(1, 1, 32, 32)
-out = net(input)
-```
+  ```python
+  input = torch.randn(1, 1, 32, 32)
+  out = net(input)
+  ```
 
 * Compute the loss (step 3)
-```python
-output = net(input)
-target = torch.randn(10) # a dummy target, for example
-target = target.view(1, -1) # reshape the dimension with -1 inferred from other dimensions (10/1=10, the same shape with input)
-criterion = nn.MSELoss()
-loss = criterion(output, target)
-```
+  ```python
+  output = net(input)
+  target = torch.randn(10) # a dummy target, for example
+  target = target.view(1, -1) # reshape the dimension with -1 inferred from other dimensions (10/1=10, the same shape with input)
+  criterion = nn.MSELoss()
+  loss = criterion(output, target)
+  ```
 
 * Backprop and update the weights (step 4)
-```python
-import torch.optim as optim
-optimizer = optim.SGD(net.parameters(), lr=0.01)    # optimizer obtains the references of parameters
+  ```python
+  import torch.optim as optim
+  optimizer = optim.SGD(net.parameters(), lr=0.01)    # optimizer obtains the references of parameters
 
-optimizer.zero_grad()     # zero the gradient buffers
-loss.backward()       # calculate the gradients of parameters
-optimizer.step()    # Does the update
-```
+  optimizer.zero_grad()     # zero the gradient buffers
+  loss.backward()       # calculate the gradients of parameters
+  optimizer.step()    # Does the update
+  ```
 <br>
 
 ## 2.4 Steps to Train a Classifier
 * Load the dataset (step 1)
-```python
-import torch
-import torchvision
-import torchvision.transforms as transforms
+  ```python
+  import torch
+  import torchvision
+  import torchvision.transforms as transforms
 
-transform = transforms.Compose( [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))] )
+  transform = transforms.Compose( [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))] )
 
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
+  trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+  trainloader = torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
 
-testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=4, shuffle=False, num_workers=2)
-```
+  testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+  testloader = torch.utils.data.DataLoader(testset, batch_size=4, shuffle=False, num_workers=2)
+  ```
 
 * Define the network. Same as before. (step 2)
-```python
-import torch.nn as nn
-import torch.nn.functional as F
+  ```python
+  import torch.nn as nn
+  import torch.nn.functional as F
 
-class Net(nn.Module):
-  def __init__(self):
-    super(Net, self).__init__()
-    self.conv1 = nn.Conv2d(1, 6, 5)
-    self.conv2 = nn.Conv2d(6, 16, 5)
-    self.fc1 = nn.Linear(16 * 5 * 5, 120)
-    self.fc2 = nn.Linear(120, 84)
-    self.fc3 = nn.Linear(84, 10)
-    
-  def forward(self, x):
-    x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
-    x = F.max_pool2d(F.relu(self.conv2(x)), 2)
-    x = x.view(-1, 16 * 5 * 5)
-    x = F.relu(self.fc1(x))
-    x = F.relu(self.fc2(x))
-    x = self.fc3(x)
-    return x
-    
-net = Net()
-
-```
+  class Net(nn.Module):
+    def __init__(self):
+      super(Net, self).__init__()
+      self.conv1 = nn.Conv2d(1, 6, 5)
+      self.conv2 = nn.Conv2d(6, 16, 5)
+      self.fc1 = nn.Linear(16 * 5 * 5, 120)
+      self.fc2 = nn.Linear(120, 84)
+      self.fc3 = nn.Linear(84, 10)
+      
+    def forward(self, x):
+      x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
+      x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+      x = x.view(-1, 16 * 5 * 5)
+      x = F.relu(self.fc1(x))
+      x = F.relu(self.fc2(x))
+      x = self.fc3(x)
+      return x
+      
+  net = Net()
+  ```
 * Define the loss function and optimizer. Same as before. (step 3)
-```python
-import torch.optim as optim
+  ```python
+  import torch.optim as optim
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-```
+  criterion = nn.CrossEntropyLoss()
+  optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+  ```
 
 * Train the network (step 4)
-```python
-for epoch in range(2): # loop over the dataset multiple times
+  ```python
+  for epoch in range(2): # loop over the dataset multiple times
 
-  running_loss = 0.0
-  for i, data in enumerate(trainloader, 0):
-  
-  # get the inputs
-  inputs, labels = data
-  
-  # zero the parameter gradients
-  optimizer.zero_grad()
-  
-  # forward + backward + optimize
-  outputs = net(inputs)
-  loss = criterion(outputs, labels)
-  loss.backward()
-  optimizer.step()
-  
-  # print statistics
-  running_loss += loss.item()
-  if i % 2000 == 1999: # print every 2000 mini-batches
-    print('[%d, %5d] loss: %.3f' %(epoch + 1, i + 1, running_loss / 2000))
     running_loss = 0.0
-```
+    for i, data in enumerate(trainloader, 0):
+    
+    # get the inputs
+    inputs, labels = data
+    
+    # zero the parameter gradients
+    optimizer.zero_grad()
+    
+    # forward + backward + optimize
+    outputs = net(inputs)
+    loss = criterion(outputs, labels)
+    loss.backward()
+    optimizer.step()
+    
+    # print statistics
+    running_loss += loss.item()
+    if i % 2000 == 1999: # print every 2000 mini-batches
+      print('[%d, %5d] loss: %.3f' %(epoch + 1, i + 1, running_loss / 2000))
+      running_loss = 0.0
+  ```
 
 * Test the network (step 5)
-```python
-correct = 0
-total = 0
-with torch.no_grad():          # 因为Pytorch会自动计算梯度，但这里明确告诉它不用计算梯度了
-  for data in testloader:
-    images, labels = data
-    outputs = net(images)      # 这里output是torch.autograd.Variable的类型
-    _, predicted = torch.max(outputs.data, 1)     # output.data才是tensor格式，1代表在哪个维度求最大值
-    total += labels.size(0)    # labels.size()=1
-    correct += (predicted == labels).sum().item()    
-  
-print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
-```
+  ```python
+  correct = 0
+  total = 0
+  with torch.no_grad():          # 因为Pytorch会自动计算梯度，但这里明确告诉它不用计算梯度了
+    for data in testloader:
+      images, labels = data
+      outputs = net(images)      # 这里output是torch.autograd.Variable的类型
+      _, predicted = torch.max(outputs.data, 1)     # output.data才是tensor格式，1代表在哪个维度求最大值
+      total += labels.size(0)    # labels.size()=1
+      correct += (predicted == labels).sum().item()    
+    
+  print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+  ```
 
 * Options: Train on GPU/GPUs
-```python
-# training on the first cuda device
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net.to(device)
-inputs, labels = inputs.to(device), labels.to(device)
-```
+  ```python
+  # training on the first cuda device
+  device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+  net.to(device)
+  inputs, labels = inputs.to(device), labels.to(device)
+  ```
 > 用多个GPU：`net = nn.DataParallel(net)`
 
 > 参考:  
