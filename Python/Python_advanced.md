@@ -17,6 +17,7 @@ if __name__ == '__main__':
 * Pool.apply_async  
 `Pool.apply_async`: the Pool of worker processe to perform many function calls asynchronously    
 不保证输入输出顺序对应，下面的代码可能输出：[1, 0, 4, 9, 25, 16, 49, 36, 81, 64]
+
     ```python
     from multiprocessing import Pool
 
@@ -100,7 +101,8 @@ if __name__ == '__main__':
     > Pool + starmap + Manager: https://blog.csdn.net/HappyRocking/article/details/83856489
 
     * 以下代码用 Pool 实现了用进程池管理多个进程，用 Manager 实现了多个进程之间的数据共享，用 starmap 将函数分配给多个进程执行（并支持传任意多参数）
-    * 以下代码每次运行可能产生不同的输出，因为没有对共享区做互斥处理。例如两个进程，一个进程加3，一个进程加4，如果他们同时读取到`d['count']=3`。考虑到 `dic['count'] += c` 操作是要先算出 `dic['count'] + c` 再赋值给 `dic['count']`，如果加3的进程晚于加4的进程完成，这时就会出现少加4的情况。
+    * 以下代码每次运行可能产生不同的输出，因为没有对共享区做互斥处理。例如两个进程，一个进程加3，一个进程加4，如果他们同时读取到`d['count']=3`。考虑到 `dic['count'] += c` 操作是要先算出 `dic['count'] + c` 再赋值给 `dic['count']`，如果加3的进程晚于加4的进程完成，这时就会出现少加4的情况
+    * 需要有处理代码段处理**孤儿进程**：孤儿进程指的是在其父进程执行完成或被终止 后仍继续运行的一类进程。例如主进程被`ctrl+c`终止了，但子进程还在运行，可能会造成内存消耗。下面代码用 `try except` 处理了这个问题。
 
     ```python
     from multiprocessing import Pool, Manager
@@ -110,17 +112,20 @@ if __name__ == '__main__':
         dic['count'] += c
 
     if __name__=="__main__":
-        d = Manager().dict()    # 进程间共享的字典
-        d['count'] = 0
+        try:
+            d = Manager().dict()    # 进程间共享的字典
+            d['count'] = 0
 
-        # 参数是一个可迭代对象
-        args = [(d,1), (d,2), (d,3), (d,4), (d,5)]  
-        pool = Pool(5)
-        pool.starmap(func, args)
-        
-        pool.close()    # 关闭进程池，使其不再接受新的任务
-        pool.join()     # 主进程阻塞直到所有子进程执行完毕，需要在pool.close()之后调用
-        print(f'dic={d}')
+            # 参数是一个可迭代对象
+            args = [(d,1), (d,2), (d,3), (d,4), (d,5)]  
+            pool = Pool(5)
+            pool.starmap(func, args)
+            
+            pool.close()    # 关闭进程池，使其不再接受新的任务
+            pool.join()     # 主进程阻塞直到所有子进程执行完毕，需要在pool.close()之后调用
+            print(f'dic={d}')
+        except:
+            pool.terminate()
     ```
 
 <br>
