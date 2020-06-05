@@ -1,9 +1,18 @@
 * Ubuntu 命令
-   * `uname -a`: 输出操作系统信息  
+   * `uname -a`: 输出操作系统信息 
+
    * `lsb_release -a`：查看Ubuntu版本  
+
    * `df -lh`:查看存储  
-   * `sudo dmidecode`:查看硬件配置，最常用的选项就是用`-t`来限定关键字，例如 `bios, system, baseboard, chassis, processor, memory, cache, connector, slot`  
-   * `nvidia-smi`, `htop`, `nvtop`, `jtop`：不同平台下的资源monitor  
+
+   * `sudo dmidecode`: 查看硬件配置，最常用的选项就是用`-t`来限定关键字，例如 `bios, system, baseboard, chassis, processor, memory, cache, connector, slot`  
+
+   * `nvidia-smi`, `htop`, `nvtop`, `jtop`： 不同平台下的资源monitor 
+
+   * 查看在GPU上的所有进程： `fuser -v /dev/nvidia*`
+
+   * 批量清理GPU中的残留进程（例如孤儿进程）： `sudo fuser -v /dev/nvidia* |awk '{for(i=1;i<=NF;i++)print "kill -9 " $i;}' | sudo sh`
+
 
 <br>
 

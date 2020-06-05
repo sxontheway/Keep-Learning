@@ -20,7 +20,7 @@
 * torch.nn 是里面包含的是，torch.nn.functional 里面包含的是函数。  
 * 如果我们只保留nn.functional下的函数的话，在训练或者使用时，我们就要手动去维护weight, bias, stride这些中间量的值，这显然是给用户带来了不便。  
 * 而如果我们只保留nn下的类的话，其实就牺牲了一部分灵活性，因为做一些简单的计算都需要创造一个类，这也与PyTorch的风格不符。
-> 见 https://www.zhihu.com/question/66782101/answer/246341271
+  > 见 https://www.zhihu.com/question/66782101/answer/246341271
 
 ### 2.1.3  torch.no_grad(),  torch.set_grad_enabled(), torch.enable_grad() 和 model.eval()
 >见 https://www.cnblogs.com/guoyaohua/p/8724433.html
@@ -72,21 +72,8 @@
   ```
 
 ### 2.1.4 model.zero_grad() 和 optimizer.zero_grad()
-* learning rate decay
-  > https://www.cnblogs.com/wanghui-garcia/p/10895397.html  
+> https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
 
-  一般会用到`torch.optim.lr_scheduler.LambdaLR`， `torch.optim.lr_scheduler.StepLR`， `torch.optim.lr_scheduler.MultiStepLR`，使用格式为：
-  ```python
-  import torch.optim.lr_scheduler.StepLR
-  scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
-  for epoch in range(100):
-      scheduler.step()
-      optimier.step()
-      optimizer.zero_grad()
-      (other training steps...)
-      (other validate steps...)
-  ```
-  查看 `learning rate`: `print(optimizer.param_groups[0]['lr'])`
 * optimizer.zero_grad() 有什么用 ?  
   一般的训练方式是进来一个batch更新一次梯度，所以每次计算梯度前都需要用 optimizer.zero_grad() 手动将梯度清零。如果不手动清零，pytorch会自动对梯度进行累加。
   * 梯度累加可以模拟更大的batch size，在内存不够大的时候，是一种用更大batch size训练的trick，见 https://www.zhihu.com/question/303070254/answer/573037166  
@@ -109,69 +96,27 @@
       # 使用d(l1)/d(x)+d(l2)/d(x)进行优化
       optmizer.step()
     ```
-
 * model.zero_grad() 和 optimizer.zero_grad() 的区别  
 当`optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)`时，二者等效，其中SGD也可以换成其他优化器例如Adam。当一个model中用了多个optimizer时，model.zero_grad() 是将所有梯度清零，optimizer.zero_grad() 是清零一个optimizer
 
-### 2.1.5 矩阵操作
-|用途|命令|
-| :------------ | :-----|
-|创建随机数矩阵|x = torch.rand(5, 3)|
-|创建正态分布随机数矩阵|x = torch.randn(2,4)| 
-|创建空矩阵|x = torch.empty(5, 3)|
-|创建零矩阵并指定类型|x = torch.zeros(5, 3, dtype=torch.long)|
-|直接指定元素值|x = torch.tensor([5.5, 0.02])|
-|维度变换|x = y.view(-1,10)|
-|去掉个数为1的维度|x = y.squeeze()|
+### 2.1.5 learning rate decay
+  > https://www.cnblogs.com/wanghui-garcia/p/10895397.html  
 
-### 2.1.6 Tensor 和 Numpy 转换 
-Tensor与numpy对象共享内存，但numpy只支持CPU，所以他们在CPU之间切换很快。但也意味着其中一个变化了，另外一个也会变。
-* tensor 和 python 对象转换：  
-`tensor.tolist()`：多个元素的tensor  
-`tensor.item()`：只含一个元素的tensor
-
-* Torch -> NumPy:
+  一般会用到`torch.optim.lr_scheduler.LambdaLR`， `torch.optim.lr_scheduler.StepLR`， `torch.optim.lr_scheduler.MultiStepLR`，使用格式为：
   ```python
-  a = torch.ones(5) # Torch Tensor
-  b = a.numpy() # NumPy Array
+  import torch.optim.lr_scheduler.StepLR
+  scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+  for epoch in range(100):
+      scheduler.step()
+      optimier.step()
+      optimizer.zero_grad()
+      (other training steps...)
+      (other validate steps...)
   ```
-* Numpy -> Torch:
-  ```python
-  import numpy as np
-  a = np.ones(5) # NumPy Array
-  b = torch.from_numpy(a) # Torch Tensor
-  ```
-* 图像从`cv2.imread()`的`numpy`转换为可输入网络的`tensor`：  
-cv2 numpy默认格式：`H*W*C, BGR`; torch tensor默认格式：`C*H*W, RGB`
-  ```python
-  import cv2
-  import torchvision.transforms
-  image_np = cv2.imread("1.jpg")
+  查看 `learning rate`: `print(optimizer.param_groups[0]['lr'])`
 
-  # Method 1
-  image_tensor = transforms.Totensor()(image_np)
 
-  # Method 2
-  image_np = image_np[:, :, ::-1]
-  image_tensor = image_np.transpose((1,2,0))
-  ```
-
-### 2.1.7 在 CPU 和 GPU 之间移动数据
-```python
-# move the tensor to GPU
-x = x.to("cuda")  # or x = x.cuda()
-
-# directly create a tensor on GPU
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-torch.manual_seed(42)
-a = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
-b = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
-
-# move the tensor to CPU
-x = x.to("cpu") # or x = x.cpu()
-```
-
-### 2.1.8 .detach(), .detach_() 和 .data 区别
+### 2.1.6 .detach(), .detach_() 和 .data 区别
 > https://www.cnblogs.com/wanghui-garcia/p/10677071.html  
 > https://zhuanlan.zhihu.com/p/83329768  
 
@@ -228,32 +173,23 @@ detach_() 是对 Variable 本身的更改，detach() 则是生成了一个新的
     print(a.grad) # tensor([0., 0., 0.])
     ```
 
-### 2.1.9 hook
+### 2.1.7 hook
 > https://zhuanlan.zhihu.com/p/75054200  
 
 pytorch 中，对于中间变量（由别的变量计算得到的变量），一旦完成了反向传播，它就会被释放掉以节约内存。利用hook，我们不必改变网络输入输出的结构，就可方便地获取、改变网络中间层变量的梯度  
 使用方式： `y.register_hook(fn)`，其中自定义函数`fn(grad)`返回Tensor或没有返回值
 ```python
-import torch
-from torch.autograd import Variable
+def save_grad():
+    def hook(grad):
+        print(grad)
+    return hook
 
-grad_list = []
-
-def print_grad(grad):
-    grad_list.append(grad)
-
-x = Variable(torch.randn(2, 1), requires_grad=True)
-y = x + 2
-z = torch.mean(torch.pow(y, 2))
-lr = 1e-3
-y.register_hook(print_grad)   # 得到梯度
-z.backward()
-
-print(x.grad, grad_list)  # 输出一样的数值，x和y梯度相同
+# register gradient hook for tensor y
+if y.requires_grad == True:
+    y.register_hook(save_grad())
 ```
 
-
-### 2.1.10 其他
+### 2.1.8 其他
 * torchvision 由以下四部分组成：  
   torchvision.datasets， torchvision.models， torchvision.transforms， torchvision.utils  
     > 见 https://pytorch.org/docs/master/torchvision/transforms.html?highlight=torchvision%20transforms  
@@ -308,13 +244,10 @@ tensor(23.1667, grad_fn=<MeanBackward1>)
   * x.grad 是求得的梯度
   * x.requires_grad 表示该变量是否需要autograd
   * y.grad_fn 记录了该变量求导应该用的function。 例如y由加法得到， y.grad_fn = \<AddBackward0\>; z由乘法得到， y.grad_fn = \<MulBackward0\> 
-> 参见：   
-https://pytorch.org/tutorials/beginner/pytorch_with_examples.html,  
-https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
 
-### 2.2.2 tensor其他操作
-* tensor能像numpy array一样进行索引
-* max 操作
+### 2.2.2 tensor的操作
+tensor 能像 numpy array 一样进行索引
+* max 操作  
   `.max(k)`表示求第k维的最大值，对于二维tensor，求列最大 k = 0，行最大 k = 1
   ```python
   import torch
@@ -332,11 +265,78 @@ https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
   torch.return_types.max(values=tensor([[2], [4], [6]]), indices=tensor([[1], [1], [1]])) 
   ```
 
+* 矩阵操作
 
-<br>
+  |用途|命令|
+  | :------------ | :-----|
+  |创建随机数矩阵|x = torch.rand(5, 3)|
+  |创建正态分布随机数矩阵|x = torch.randn(2,4)| 
+  |创建空矩阵|x = torch.empty(5, 3)|
+  |创建零矩阵并指定类型|x = torch.zeros(5, 3, dtype=torch.long)|
+  |直接指定元素值|x = torch.tensor([5.5, 0.02])|
+  |维度变换|x = y.view(-1,10)|
+  |去掉个数为1的维度|x = y.squeeze()|
+  |one-hot encoding/decoding|pytorch.scatter_(), pytorch.gather()|
 
-## 2.3 A Toy Example of Back Propagation
-> Only need to define the forward function, and the backward function is automatically defined.
+### 2.2.3 Tensor 和 Numpy 转换 
+Tensor与numpy对象共享内存，但numpy只支持CPU，所以他们在CPU之间切换很快。但也意味着其中一个变化了，另外一个也会变。
+* tensor 和 python 对象转换：  
+`tensor.tolist()`：多个元素的tensor  
+`tensor.item()`：只含一个元素的tensor
+
+* Torch -> NumPy:
+  ```python
+  a = torch.ones(5) # Torch Tensor
+  b = a.numpy() # NumPy Array
+  ```
+* Numpy -> Torch:
+  ```python
+  import numpy as np
+  a = np.ones(5) # NumPy Array
+  b = torch.from_numpy(a) # Torch Tensor
+  ```
+* 图像从`cv2.imread()`的`numpy`转换为可输入网络的`tensor`：  
+cv2 numpy默认格式：`H*W*C, BGR`; torch tensor默认格式：`C*H*W, RGB`
+  ```python
+  import cv2
+  import torchvision.transforms
+  image_np = cv2.imread("1.jpg")
+
+  # Method 1
+  image_tensor = transforms.Totensor()(image_np)
+
+  # Method 2
+  image_np = image_np[:, :, ::-1]
+  image_tensor = image_np.transpose((1,2,0))
+  ```
+
+### 2.2.4 在 CPU 和 GPU 之间移动数据
+```python
+# move the tensor to GPU
+x = x.to("cuda")  # or x = x.cuda()
+
+# directly create a tensor on GPU
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+torch.manual_seed(42)
+a = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
+b = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
+
+# move the tensor to CPU
+x = x.to("cpu") # or x = x.cpu()
+```
+
+---
+<br><br>
+
+# 3. 代码分析
+> 参考:  
+> https://github.com/pytorch/tutorials  
+> https://github.com/pytorch/examples  
+> http://pytorch.org/docs/  
+> https://discuss.pytorch.org/
+
+## 3.1 A Toy Example of Back Propagation
+Only need to define the forward function, and the backward function is automatically defined.
 * Define the network (step 1)
   ```python
   import torch
@@ -388,9 +388,10 @@ https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
   loss.backward()       # calculate the gradients of parameters
   optimizer.step()    # Does the update
   ```
+
 <br>
 
-## 2.4 Steps to Train a Classifier
+## 3.2 Steps to Train a Classifier
 * Load the dataset (step 1)
   ```python
   import torch
@@ -481,25 +482,17 @@ https://pytorch.org/tutorials/beginner/former_torchies/autograd_tutorial.html
   ```
 
 * Options: Train on GPU/GPUs
+  > 用多个GPU：`net = nn.DataParallel(net)`
   ```python
   # training on the first cuda device
   device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
   net.to(device)
   inputs, labels = inputs.to(device), labels.to(device)
   ```
-> 用多个GPU：`net = nn.DataParallel(net)`
 
-> 参考:  
-> https://github.com/pytorch/tutorials  
-> https://github.com/pytorch/examples  
-> http://pytorch.org/docs/  
-> https://discuss.pytorch.org/
+<br>
 
----
-<br><br>
-
-# 3. 代码分析
-## 3.1 Yolov3的实现摘要
+## 3.3 Yolov3的实现摘要
 ```python
 import torch.nn as nn
 import torch.nn.functional as F 
