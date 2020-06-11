@@ -121,79 +121,95 @@ string &operator+(const string& A,const string& B) //C++
 
 三、图片链接及表格
 =======
-1.图片（**有感叹号**）
->基本格式(其中alt和title都可以省略)：  
->>`![Alt](URL Title)`
+1. 图片（**有感叹号**）
+	>基本格式(其中alt和title都可以省略)：  
+	>>`![Alt](URL Title)`
 
-其中，`Title`表示鼠标悬停在图片时的显示文本(注意这里要加引号)。  
-`URL`为图片地址，例如http://www.baidu.com/img/bdlogo.gif 。如果是本repository内的内容，可使用相对路径。  
-`Alt`为图片加载失败时候，替换的文本。例如：  
-输入`![baidu](http://www.baidu.com/img/bdlogo.gif "百度logo") `得到：  
-![baidu](http://www.baidu.com/img/bdlogo.gif "百度logo")
+	其中，`Title`表示鼠标悬停在图片时的显示文本(注意这里要加引号)。  
+	`URL`为图片地址，例如http://www.baidu.com/img/bdlogo.gif 。如果是本repository内的内容，可使用相对路径。  
+	`Alt`为图片加载失败时候，替换的文本。例如：  
+	输入`![baidu](http://www.baidu.com/img/bdlogo.gif "百度logo") `得到：  
+	![baidu](http://www.baidu.com/img/bdlogo.gif "百度logo")
 
-2.另一种链接图片的方式
-```
-<p align="center" >
-	<img src="http://www.baidu.com/img/bdlogo.gif" width="200" height="100">
-</p>
-```
-以上输入得到：
-<p align="center" >
-	<img src="http://www.baidu.com/img/bdlogo.gif" width="200" height="100">
-</p>
+1. 另一种链接图片的方式  
+	一张图
+	```
+	<p align="center" >
+		<img src="http://www.baidu.com/img/bdlogo.gif" width="200" height="100">
+	</p>
+	```
 
-3.链接（**没有感叹号**）  
->`[Alt](URL Title)`
+	<p align="center" >
+		<img src="http://www.baidu.com/img/bdlogo.gif" width="200" height="100">
+	</p>
 
-此时`URL`链接到一个网址。`Alt`为显示的东西，不一定是一个文本，也可以是一个图片。例如输入：  
-`[![Udacity](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)`  
-得到：  
-[![Udacity](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)<br><br>
+	或多张图并排：
+	```
+	<center class="half">
+		<img  src="http://www.baidu.com/img/bdlogo.gif" width=300>
+		<img  src="http://www.baidu.com/img/bdlogo.gif" width=300>
+	</center>
+	```
+	<center class="half">
+		<img  src="http://www.baidu.com/img/bdlogo.gif" width=300>
+		<img  src="http://www.baidu.com/img/bdlogo.gif" width=300>
+	</center>
 
-4.另一种链接方式。  
-例如，先在文末定义 `[zhihu]:https://www.zhihu.com "知乎官网"`，再输入`[Github][Github]`，得到：
->[Github][Github]
-<br>
 
-5.锚点(可用于页内跳转，构成目录）
-```
-基本语法：[Alt](#Tiltle)
-其中Alt为要显示的东西， Title为本文件的某个标题
-```
-Title中的英文字母都被转化为小写字母了，例如输入：
-```
-[README](#readme)<br>
-[一级标题](#一级标题)
-```
-可得到：  
-[README](#readme)<br>
-[一级标题](#一级标题)
->具体的Title该怎么写，可以将鼠标移到标题上（有#，##，###等前缀的是标题），参照屏幕下方出现的URL即可。
-<br>
+1. 链接（**没有感叹号**）  
+	>`[Alt](URL Title)`
 
-6.表格  
-基本格式(表格开始和结束之前都要有回车):
+	此时`URL`链接到一个网址。`Alt`为显示的东西，不一定是一个文本，也可以是一个图片。例如输入：  
+	`[![Udacity](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)`  
+	得到：  
+	[![Udacity](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)<br><br>
 
-| 表头1  | 表头2|
-| ---------- | -----------|
-| 表格单元   | 表格单元   |
-| 表格单元   | 表格单元   |
+1. 另一种链接方式。  
+	例如，先在文末定义 `[zhihu]:https://www.zhihu.com "知乎官网"`，再输入`[Github][Github]`，得到：
 
-对齐：
+	>[Github][Github]
+	<br>
 
-| 左对齐 | 居中  | 右对齐 |
-| :------------ |:---------------:| -----:|
-| col 3 is      | some wordy text | $1600 |
-| col 2 is      | centered        |   $12 |
-| zebra stripes | are neat        |    $1 |
+1. 锚点(可用于页内跳转，构成目录）
+	```
+	基本语法：[Alt](#Tiltle)
+	其中Alt为要显示的东西， Title为本文件的某个标题
+	```
+	Title中的英文字母都被转化为小写字母了，例如输入：
+	```
+	[README](#readme)<br>
+	[一级标题](#一级标题)
+	```
+	可得到：  
+	[README](#readme)<br>
+	[一级标题](#一级标题)
+	>具体的Title该怎么写，可以将鼠标移到标题上（有#，##，###等前缀的是标题），参照屏幕下方出现的URL即可。
+	<br>
 
-<br>
+1. 表格  
+	基本格式(表格开始和结束之前都要有回车):
 
-7.diff语法  
-其语法与代码块类似，只是在三个反引号后面写diff：
-```diff
-+ 鸟宿池边树
-- 僧推月下门
-```
-----------
-[Github]:https://www.github.com "知乎官网"
+	| 表头1  | 表头2|
+	| ---------- | -----------|
+	| 表格单元   | 表格单元   |
+	| 表格单元   | 表格单元   |
+
+	对齐：
+
+	| 左对齐 | 居中  | 右对齐 |
+	| :------------ |:---------------:| -----:|
+	| col 3 is      | some wordy text | $1600 |
+	| col 2 is      | centered        |   $12 |
+	| zebra stripes | are neat        |    $1 |
+
+	<br>
+
+1. diff语法  
+	其语法与代码块类似，只是在三个反引号后面写diff：
+	```diff
+	+ 鸟宿池边树
+	- 僧推月下门
+	```
+	----------
+	
+	[Github]:https://www.github.com "我的github"
