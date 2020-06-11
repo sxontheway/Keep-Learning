@@ -91,6 +91,14 @@
 | 以哪个目录为参考目录 | import语句所在的文件，其所属package的目录 |当前工作目录（例如在命令行输入 `python3 a.py`时，文件`a.py`所在的目录）|
 |要求| 必须要在package内，所谓的package，就是包含 `__init__.py` 文件的目录 | 有没有package都可以使用|
 
+* package 内 `__init__.py` 文件的作用  
+  通常`__init__.py`文件为空，但是我们还可以为它增加其他的功能。我们在导入一个包时，实际上是导入了它的`__init__.py文件`。这样我们可以在`__init__.py`文件中批量导入我们所需要的模块，而不再需要一个一个的导入。例如有如下文件结构：
+  ```
+  |-- pack_a
+      |-- __init__.py：from .functions import f_a, f_b
+      |-- functions.py：定义了 f_a, f_b
+  ```
+  那么想要使用`f_a`和`f_b`，只用 `from pack_a import f_a, f_b`，而不需要`from pack_a.functions import f_a, f_b`
 
 ### 1.4.2 python import 的规则
 python在import时，可以按三种方式找：  
