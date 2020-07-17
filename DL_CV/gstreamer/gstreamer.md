@@ -1,3 +1,9 @@
+## Efficient Video Processingon Embedded GPU
+https://gstconf.ubicast.tv/protected/videos/v12586e9bc53dgvct23vir6pu9al37/attachments/213356.pdf
+
+---
+<br>
+
 ## 色彩编码
 色彩编码大体上分为YUV和BGR两类，一般来说YUV类多用于传输，因为其所需的带宽比BGR编码的小。并且不需要三个通道同时传输，只有Y通道就能还原图像，只不过是黑白的 
 
