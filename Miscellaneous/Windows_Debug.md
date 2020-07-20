@@ -7,6 +7,7 @@
 
 * Windows + VSCode + latex
     * 下载textlive，特别需要注意的一点是：`需要用管理员权限安装`，否则会报错
+    * 用Texlive，file 'slashbox.sty' not found：https://blog.csdn.net/u010801696/article/details/79410545  
 
 * Windows挂VPN并开热点
     * change adapter options -> 找到VPN那个connection -> properties -> sharing -> Allows sharing 并选择开热点对应那个connection
