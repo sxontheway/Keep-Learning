@@ -1,3 +1,12 @@
+* `cv2.rectangle(), cv2.circle()`等不显示：https://blog.csdn.net/qq_36679208/article/details/103006091#_1
+  ```
+  #opencv读入的图像是BGR,要转化为RGB
+  image = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
+  #不要用下面的
+  inp = img[:, :, [2, 1, 0]]  # BGR2RGB
+  ```
+  
+
 * Yolov3中，当 gradient_accumulations=1时，会出现网络没有进行训练的情况
   ```python
   if batches_done % opt.gradient_accumulations:
