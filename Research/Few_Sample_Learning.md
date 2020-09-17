@@ -42,7 +42,7 @@
 * MAML：设初始模型为 M0，先在 support set 上迭代一次，进行一次BP，得到 M1。M1再在 query set 迭代一次，算出梯度，最终用梯度对 M0 进行更新得到 M'，这就完成了在一个 training task 上的学习。MAML解决的问题，本质上是使得网络在所有 training task 的 query set 上的loss之和最小化。参考: https://zhuanlan.zhihu.com/p/72920138 
 
 * 为什么 few-shot learning 经常和 meta learning 一起被提起？  
-Meta-learning 是 Few-shot learning 的一种训练策略。 Meta-learning 的目标是使得网络能够快速有效地学习到新东西，也及使网络有很好的学习能力，而这种能力正是 few-shot 中所需要的。
+Meta-learning 是解决 Few-shot 问题的一种训练策略。 Meta-learning 的目标是使得网络能够快速有效地学习到新东西，也及使网络有很好的学习能力，而这种能力正是 few-shot 中所需要的。
 
 
 <br>
