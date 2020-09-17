@@ -43,7 +43,7 @@
 
 * 普通的learning，上图所有的方框步骤都是人指定的。Meta-learning就是把某些红框中的步骤留给模型自己学。任何一个红框改变，那么得到的learning Algorithm都是不同的，例如使用不同的初始化参数 `θ^0`，就得到了不同的learning algorithm。
 
-* meta-learning 的目的是使得网络具有 learn-to-learn 能力的一类方法的统称。广义上来讲，NAS（对象是网络结构），AutoML（对象是超参数）都属于 meta-learning。在 few-shot 中，meta-learning 一般用于寻找一个好的初始化权重，有了这个权重，用少量数据就能训练得比较好，例如 `MAML，Reptile` 两篇
+* meta-learning 的目的是使得网络具有 learn-to-learn 能力的一类方法的统称。广义上来讲，NAS（对象是网络结构），AutoML（对象是超参数）都属于 meta-learning。在 few-shot 中，meta-learning 一般用于寻找一个好的初始化权重，有了这个权重，用少量数据就能训练得比较好，例如 `MAML，Reptile` 两篇（这两篇文章讲的是 meta-learning 的一种通用的训练策略，而不局限于某个应用，例如object detection）
 
 * MAML：
     > https://zhuanlan.zhihu.com/p/72920138
@@ -59,7 +59,7 @@
 * Reptile
     > https://zhuanlan.zhihu.com/p/239929601
 
-    * MAML 中 training tasks 是分为 support set 和 query set，Reptile 不用分了
+    * MAML 中 training tasks 是分为 support set 和 query set，Reptile 没有分（__实际上 meta-learning 不一定要分 support set 和 query set ！！__）
     * 对于每个 training task，MAML 和 Reptile 都只走一步，但是方向不一样
 
     <p align="center" >
@@ -80,10 +80,16 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 <img src="./pictures/imprinting.png" width="600">
 </p>
 
+训练步骤：
+* 用 existing classes 的大量数据训练 base classifier
+* 用 novel classes 的 low-shot 数据进行 imprinting
+* （optional）用 low-shot 数据进行 finetune
+
+其他：
 * 文中解释了：（FC layer + softmax classifier） 和 （triplet-based embedding training + Nearest Neighbor）两种方法原理上是相通的
 * 灵魂性的句子： Intuitively, one can think of the imprinting operation as
 remembering the semantic embeddings of low-shot examples as the templates for new classes
-* 实验表明，这种方法甚至无需在 low-shot examples 上 finetune，即可达到较好效果
+* 本文严格意义上，算是 meta-learning 和 metric-learning 的融合。相比于普通 CNN 分类器唯一的不同就是，矩阵 W 的初始化是由 imprinting 完成的。实验表明，imprinting 甚至无需在 low-shot examples 上 finetune，也可达到较好效果
 
 ## Few-Shot Attention RPN
 > Few-Shot Attention RPN: https://openaccess.thecvf.com/content_CVPR_2020/papers/Fan_Few-Shot_Object_Detection_With_Attention-RPN_and_Multi-Relation_Detector_CVPR_2020_paper.pdf
@@ -92,7 +98,15 @@ remembering the semantic embeddings of low-shot examples as the templates for ne
 <img src="./pictures/attention_rpn.png" width="600">
 </p>
 
-* 在 training task 上训练时，有两个loss，一个是match loss，另一个box regression loss （training task 和 test task 类别无交集）
-* 在 test 之前可在 support set 上进行 finetine（因为根据定义：test task 中，query set 和 support set 类别是相同的，且具有相似分布），并有两种方式进行inference：
-    * Support image 和 query image 一起输入网络（需要运行两个branch），最后 match 的分数可作为置信度
-    * 将 support images 对应的绿色 feature maps 存成离线的（提供大量prior），inference时就只用运行下面的branch即可
+Training：
+* 一个 training task 是一个 episode（可理解为传统训练方法中的一个batch）：有两个loss，一个是match loss，另一个box regression loss （training task 和 test task 类别无交集） 
+
+Fintuning（optional）：
+* 在 test 之前可在 test task 的 support set 上进行 finetine（因为根据定义：test task 中，query set 和 support set 类别是相同的，且具有相似分布），
+
+Inference（有两种方式进行）：
+* support image 和 query image 一起输入网络（需要运行两个branch），最后 match 的分数可作为置信度
+* 将 support images 对应的绿色 feature maps 存成离线的（提供大量prior），inference时就只用运行下面的branch即可
+
+其他：  
+* 严格意义上讲，本文算是 metric-learning， 和 meta-learning 关系不太大
