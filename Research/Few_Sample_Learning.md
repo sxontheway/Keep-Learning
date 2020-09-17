@@ -89,7 +89,7 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 * 文中解释了：（FC layer + softmax classifier） 和 （triplet-based embedding training + Nearest Neighbor）两种方法原理上是相通的
 * 灵魂性的句子： Intuitively, one can think of the imprinting operation as
 remembering the semantic embeddings of low-shot examples as the templates for new classes
-* 本文严格意义上，算是 meta-learning 和 metric-learning 的融合。相比于普通 CNN 分类器唯一的不同就是，矩阵 W 的初始化是由 imprinting 完成的。实验表明，imprinting 甚至无需在 low-shot examples 上 finetune，也可达到较好效果
+* 严格意义上，本文运用了 metric-learning 的思想，并将它巧妙地融合在了FC层权重初始化之中，本文和 meta-learning 关系不大。本文相比于普通 CNN 分类器唯一的不同就是，矩阵 W 的初始化是由 imprinting 完成的。实验表明，imprinting 甚至无需在 low-shot examples 上 finetune，也可达到较好效果
 
 ## Few-Shot Attention RPN
 > Few-Shot Attention RPN: https://openaccess.thecvf.com/content_CVPR_2020/papers/Fan_Few-Shot_Object_Detection_With_Attention-RPN_and_Multi-Relation_Detector_CVPR_2020_paper.pdf
@@ -109,4 +109,7 @@ Inference（有两种方式进行）：
 * 将 support images 对应的绿色 feature maps 存成离线的（提供大量prior），inference时就只用运行下面的branch即可
 
 其他：  
-* 严格意义上讲，本文算是 metric-learning， 和 meta-learning 关系不太大
+* 严格意义上讲，本文用 Siamese CNN 完成了 metric-learning， 并运用了 meta-learning 的训练方式
+    <p align="center" >
+    <img src="./pictures/meta-learn.png" width="600">
+    </p>
