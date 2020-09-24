@@ -1,3 +1,9 @@
+# CUDA 的内部工作原理:为什么能加速
+> https://www.jianshu.com/p/34a504af8d51
+
+
+<br>
+
 # Installation
 > https://blog.csdn.net/wanzhen4330/article/details/81699769  
 
