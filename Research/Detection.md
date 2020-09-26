@@ -42,7 +42,7 @@
         
 <br><br>
 
-# Yolo 细节
+# Yolo v3 细节
 ## Training
 > https://zhuanlan.zhihu.com/p/50595699  
 * NMS在training时没有用到，NMS只在inference时使用
@@ -60,7 +60,7 @@
 
  * Yolov3中，对于coco数据集，最后每个anchor对应`80+4+1=85`个浮点数（80个物体类，4个位置参数，1个对于这个预测的confidence）  
  ssd也是85个，但是是：80个物体类 + 4个位置参数 + 1个背景类
- * Yolov3和ssd不一样的地方：Loss计算上，yolov3用80个logistic二分类代替ssd中的softmax，因为可能一个人既可能是people，又可能是women，也即一个box可以含有多个标签（Yolov2也是用的softmax loss）  
+ * Yolov3和ssd不一样的地方：Loss计算上，yolov3用c+1个logistic二分类代替ssd中的softmax，因为可能一个人既可能是people，又可能是women，也即一个box可以含有多个标签（Yolov2也是用的softmax loss）。相比较下，ssd的confidence普遍偏小，因为类别之间是互斥的，c+1个加起来为1。  
  * Yolov3在Inference时：
      * 先滤掉confidence小于某个阈值的box
      * 按类NMS
