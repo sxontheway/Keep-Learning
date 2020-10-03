@@ -8,5 +8,5 @@
 1. [ROS](./ROS)
 1. [高翔 视觉SLAM14章](./SLAM14)
 1. [Research](./Research)
-1. [Finance](./Finance)
+1. [Stock](./Stock)
 1. [Miscellaneous](./Miscellaneous)

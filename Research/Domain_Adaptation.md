@@ -45,8 +45,8 @@ Let's divide the methods in domain adaptation using number of networks:
 * Meta-learning 也有很多用途，few-shot learning 只是其中一个应用  
     * Meta-learning 解决的目标是 Learning to learn，输入和输出数据可以完全是异构的。例如人即便没有见过斑马，仅仅借助文字信号输入就可以识别斑马：身上有类似斑马线的纹路，并且长相很像马的动物是斑马。
 * 一个典型的 Few-shot detection 问题：  
-    * 给定COCO数据集为source domain，PASCAL VOC数据集为target domain
-
+    * COCO数据集共80个类，分为两部分60类和20类。假设60类有充足的label，20类只有few-shot label，怎样在20类上获得好的检测结果
+    
 <br><br>
 
 # 正负样本均衡 
