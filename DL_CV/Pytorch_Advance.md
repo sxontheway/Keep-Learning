@@ -1,10 +1,18 @@
 # pytorch多gpu并行训练  
+> https://zhuanlan.zhihu.com/p/105755472
 > https://zhuanlan.zhihu.com/p/86441879  
 > https://zhuanlan.zhihu.com/p/95700549  
 > https://zhuanlan.zhihu.com/p/68717029   
 
-`python -m torch.distributed.launch main.py`
-* 按模块启动：https://www.cnblogs.com/xueweihan/p/5118222.html
+Use single-machine multi-GPU `DataParallel`, if there are multiple GPUs on the server, and you would like to speed up training with the minimum code change.
+
+Use single-machine multi-GPU `DistributedDataParallel`, if you would like to further speed up training and are willing to write a little more code to set it up.
+
+Use multi-machine `DistributedDataParallel` and the launching script, if the application needs to scale across machine boundaries.
+
+* `python -m torch.distributed.launch main.py`
+    > 按模块启动：https://www.cnblogs.com/xueweihan/p/5118222.html
+    
     * 直接启动 `python xxx.py` 是把 `xxx.py` 文件所在的目录放到了sys.path属性中
     * 按模块启动 `python -m xxx.py` 是把你输入命令的目录（也就是当前路径），放到了sys.path属性中  
 

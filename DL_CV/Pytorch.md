@@ -116,79 +116,71 @@
   查看 `learning rate`: `print(optimizer.param_groups[0]['lr'])`
 
 
-### 2.1.6 .detach(), .detach_() 和 .data 区别
-> https://www.cnblogs.com/wanghui-garcia/p/10677071.html  
-> https://zhuanlan.zhihu.com/p/83329768  
 
-* .detach() 和 .detach_()  
-detach_() 是对 Variable 本身的更改，detach() 则是生成了一个新的 Variable
-* .detach() 和 .data 相同点：  
-  * requires_grad 都为 false，即使之后重新将它的requires_grad置为true，它也不会具有梯度grad
-  * 都返回一个从当前计算图中分离下来的，新的Variable。但是仍指向原变量的存放位置，也即和原变量共享一块内存
-
-* .detach() 和 .data 不同点：  
-  * `.detach()`之后修改会被autograd追踪，保证了只要在backward过程中没有报错，那么梯度的计算就是正确的
-  * `.data`之后的修改不会被autograd追踪，可能会产生错误的梯度，**所以 .data 不够安全**，用 `x.detach()` 更好
-
-    .detach() 之后不进行修改：
-    ```python
-    import torch
-
-    a = torch.tensor([1, 2, 3.], requires_grad=True)
-    out = a.sigmoid()
-    c = out.detach()
-    
-    # 这时候没有对c进行更改，所以并不会影响backward()
-    out.sum().backward()
-    ```
-
-    .detach() 之后进行in-place修改：
-    ```python
-    import torch
-
-    a = torch.tensor([1, 2, 3.], requires_grad=True)
-    out = a.sigmoid()
-    c = out.detach()
-
-    c.zero_()
-    print(c)  # tensor([0., 0., 0.])
-    print(out)  # tensor([0., 0., 0.], grad_fn=<SigmoidBackward>)
-    out.sum().backward()  # 报错
-    ```
-
-    .data 之后进行修改
-    ```python
-    import torch
-
-    a = torch.tensor([1, 2, 3.], requires_grad=True)
-    out = a.sigmoid()
-    c = out.data
-
-    # 会发现c的修改同时也会影响out的值
-    c.zero_()
-    print(c, out)
-
-    # 不同之处在于.data的修改不会被autograd追踪，这样当进行backward()时它不会报错，会得到一个错误的backward值
-    out.sum().backward()
-    print(a.grad) # tensor([0., 0., 0.])
-    ```
-
-### 2.1.7 hook
+### 2.1.6 hook
 > https://zhuanlan.zhihu.com/p/75054200  
 
-pytorch 中，对于中间变量（由别的变量计算得到的变量），一旦完成了反向传播，它就会被释放掉以节约内存。利用hook，我们不必改变网络输入输出的结构，就可方便地获取、改变网络中间层变量的梯度  
-使用方式： `y.register_hook(fn)`，其中自定义函数`fn(grad)`返回Tensor或没有返回值
-```python
-def save_grad():
-    def hook(grad):
-        print(grad)
-    return hook
+pytorch 中，对于中间变量（由别的变量计算得到的变量）/ Module，一旦完成了反向传播，它就会被释放掉以节约内存。利用hook，我们不必改变网络输入输出的结构，就可方便地获取、改变网络中间层变量的梯度  
+* Hook for Tensors：`z.register_hook(hook_fn)`  
+  使用方式： `y.register_hook(fn)`，其中自定义函数`fn(grad)`返回Tensor或没有返回值
+  ```python
+  def save_grad():
+      def hook(grad):
+          print(grad)
+      return hook
 
-# register gradient hook for tensor y
-if y.requires_grad == True:
-    y.register_hook(save_grad())
+  # register gradient hook for tensor y
+  if y.requires_grad == True:
+      y.register_hook(save_grad())
+  ```
+* Hook for Modules：
+  * `module.register_forward_hook(hook_fn)`：获取前向传播时，module的输入输出
+  * `module.register_backward_hook(hook_fn)`：执行反向传播时，module前后的梯度
+  * `module.register_forward_pre_hook(hook_fn)`：获取前向传播执行前的hook，在 `torch.nn.utils.prune` 会用到，见 https://pytorch.org/tutorials/intermediate/pruning_tutorial.html 
+
+  使用方法：编写 `hook_fn` 函数（包含打印或保存等操作）-> 注册hook -> 执行前向/方向传播
+
+### 2.1.7 nn.Module 
+一个Net，也就是继承自`nn.Module`的类，当实例化后，本质上就是维护了以下8个字典(OrderedDict)，在上面和本小节都有介绍:
 ```
+_parameters
+_buffers
+_backward_hooks
+_forward_hooks
+_forward_pre_hooks
+_state_dict_hooks
+_load_state_dict_pre_hooks
+_modules
+```
+> https://www.jianshu.com/p/a4c745b6ea9b
+* `model.modules()`：返回Generator，广度优先遍历模型所有子层  
+  ```python
+  for x in model.modules()：
+  ```
+* `model.named_modules()`：返回Generator，比 `model.modules()` 多返回了每个module的名字  
+  ```python
+  for name, layer in model.named_modules():
+      if isinstance(layer, nn.Conv2d):
+  ```
+* `model.children()`：返回Generator，只遍历model的子层（子层的子层不遍历了）
+* `model.named_children()`：返回Generator， 比`model.children()` 多返回了每个child的名字  
+* `model.parameters()`：返回Generator，迭代地返回所有参数，一般用于给optimizer传递参数
+* `model.named_parameters()`：返回Generator，比`model.parameters()` 多返回了每个参数的名字，weights和bias也加以了区分
+* `model.state_dict()`：返回OrderDict，一般用于模型保存  
+  ```python
+  for k,v in model.state_dict():
+  ```
+* `model.buffers()`：返回OrderDict。反向传播不需要被optimizer更新的参数（和parameter正好相反），称之为buffer，用于存一些不变的模型参数（例如存BN的mean，存pruning时的mask） 
+  ```python
+  bn = nn.BatchNorm1d(2)
+  input = torch.tensor(torch.rand(3, 2), requires_grad=True)
+  output = bn(input)
+  print(bn._buffers)
+  
+  # 输出 OrderedDict([('running_mean', tensor([0.0525, 0.0584])), ('running_var', tensor([0.9177, 0.9140])), ('num_batches_tracked', tensor(1))])
+  ```
 
+> 注意： `len([x for x in model.modules()])` 会比 `len([[x for x in model.parameters()])` 大，因为前者遍历了 a hierarchy of model（包含中间节点），后者只遍历了 model graph 的叶节点
 ### 2.1.8 其他
 * torchvision 由以下四部分组成：  
   torchvision.datasets， torchvision.models， torchvision.transforms， torchvision.utils  
@@ -201,7 +193,7 @@ if y.requires_grad == True:
 
 <br>
 
-## 2.2 Tensor是什么
+## 2.2 Tensor相关
 ### 2.2.1 一个例子
 ```python
 import torch
@@ -325,6 +317,62 @@ b = torch.randn(1, requires_grad=True, dtype=torch.float, device=device)
 x = x.to("cpu") # or x = x.cpu()
 ```
 
+### 2.2.5 `.detach()`, `.detach_()` 和 `.data` 区别
+> https://www.cnblogs.com/wanghui-garcia/p/10677071.html  
+> https://zhuanlan.zhihu.com/p/83329768  
+
+* .detach() 和 .detach_()  
+detach_() 是对 Variable 本身的更改，detach() 则是生成了一个新的 Variable
+* .detach() 和 .data 相同点：  
+  * requires_grad 都为 false，即使之后重新将它的requires_grad置为true，它也不会具有梯度grad
+  * 都返回一个从当前计算图中分离下来的，新的Variable。但是仍指向原变量的存放位置，也即和原变量共享一块内存
+
+* .detach() 和 .data 不同点：  
+  * `.detach()`之后修改会被autograd追踪，保证了只要在backward过程中没有报错，那么梯度的计算就是正确的
+  * `.data`之后的修改不会被autograd追踪，可能会产生错误的梯度，**所以 .data 不够安全**，用 `x.detach()` 更好
+
+    .detach() 之后不进行修改：
+    ```python
+    import torch
+
+    a = torch.tensor([1, 2, 3.], requires_grad=True)
+    out = a.sigmoid()
+    c = out.detach()
+    
+    # 这时候没有对c进行更改，所以并不会影响backward()
+    out.sum().backward()
+    ```
+
+    .detach() 之后进行in-place修改：
+    ```python
+    import torch
+
+    a = torch.tensor([1, 2, 3.], requires_grad=True)
+    out = a.sigmoid()
+    c = out.detach()
+
+    c.zero_()
+    print(c)  # tensor([0., 0., 0.])
+    print(out)  # tensor([0., 0., 0.], grad_fn=<SigmoidBackward>)
+    out.sum().backward()  # 报错
+    ```
+
+    .data 之后进行修改
+    ```python
+    import torch
+
+    a = torch.tensor([1, 2, 3.], requires_grad=True)
+    out = a.sigmoid()
+    c = out.data
+
+    # 会发现c的修改同时也会影响out的值
+    c.zero_()
+    print(c, out)
+
+    # 不同之处在于.data的修改不会被autograd追踪，这样当进行backward()时它不会报错，会得到一个错误的backward值
+    out.sum().backward()
+    print(a.grad) # tensor([0., 0., 0.])
+    ```
 ---
 <br><br>
 
