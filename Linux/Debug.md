@@ -1,3 +1,4 @@
+# 整理
 * Ubuntu 命令
    * `uname -a`: 输出操作系统信息 
 
@@ -99,3 +100,60 @@
       -- train.py
       ```
       在`train.py`中`from utils.utils. import *`，但 import 的所有 functions 都不能 peek definition，是因为文件夹名称重复了、或文件夹名称和文件名称重复了，vscode不知道去找哪一个。
+
+<br>
+
+# 记一次服务器修复
+## 起因
+> https://juejin.im/entry/6844903765321973768  
+
+想在Centos 7.2.1511的系统上装联邦学习的库 Pysyft。但是Centos的GLIBC是2.17的，Pysyft要求2.18的GLIBC，于是网上找了一个升级脚本：https://blog.csdn.net/wiborgite/article/details/87707938  
+   ```bash
+   curl -O http://ftp.gnu.org/gnu/glibc/glibc-2.18.tar.gz
+   tar zxf glibc-2.18.tar.gz 
+   cd glibc-2.18/
+   mkdir build
+   cd build/   
+   ../configure --prefix=/usr
+   make -j2    # 编译
+   make install   # 安装
+   ```
+
+## 现象
+在`make install`运行时报错（虽然后来在虚拟机上用上述脚本，顺利升级），之后`ls`等命令失效，ssh连不上。到机房插上显示屏后，输入user name不跳转到输密码界面，无奈重启，重启以后无法登录，显示 kernel panic
+
+## 原因
+由于并没有手动删除任何软链接和原有的动态库文件，所以原有的`2.17`版本的文件都还在，于是分析是软链接出错：本来该指向`XXX-2.17.so`的动态库指向了`XXX-2.18.so`，但是由于install失败了，这些`XXX-2.18.so`的动态库其实是损坏的。
+
+## 解决方案
+* 到主机机房，用u盘制作相同操作系统的系统盘（CentOS-7-x86_64-Everything-1511），按F11（每个机器可能不同） -> troubleshooting -> 进入rescue模式。相当于把原来的系统挂载到救援系统的`/mnt/sysimage/`目录下
+* 查看出错的软链接
+   ```bash
+   cd /lib64   
+   ls -l /lib64/ | grep 2.17.so
+   ls -l /lib64/ | grep 2.18.so
+   ```
+* 修复那20来个软链接
+   > https://www.cnblogs.com/barneywill/p/10315603.html 
+   
+   例如：`ln -snf ld-2.17.so ld-linux-x86-64.so.2`
+
+
+## 其他未尝试的方案
+> https://www.ancii.com/apbjqqpl/ 
+
+重新通过rpm安装glibc等: `rpm -Uvh --root=/mnt/sysimage/ --force glibc-2.17-105.el7.x86_64.rpm`
+
+## Lessons
+* 遇到这种问题，如果不能物理地接触主机（只能远程），那一定不要断开ssh，不要退出root权限（su命令也失效）
+* `libc.so.6`是c运行时库，几乎所有程序都依赖c运行时库。程序启动和运行时，是根据libc.so.6 软链接找到glibc库。删除libc.so.6将导致系统的几乎所有程序不能工作，
+* 命令
+   * 打印动态库的依赖关系：例如`ldd /bin/ls`，`ldd /bin/pwd`.在实际linux开发与调试中，我们有时候需要对可执行bin移植，如果有动态链接的库，那么直接把bin移植过去，是无法直接运行的。我们需要把对应的依赖的动态库也一起移植，ldd命令就很方便的帮助我们查看，哪些依赖的动态库需要一起移植
+   * `find`命令：`find ./ -name "*.jpg"`，查找本目录下所有jpg文件
+   * `LD_PRELOAD` 的作用：是个环境变量，用于动态库的加载，它在动态库加载的中优先级最高。例如`LD_PRELOAD=/lib64/libc-2.17.so ln -snf /lib64/libc-2.17.so /lib64/libc.so.6`，可以在`libc.so.6`指向`libc-2.17.so`的软链接被误删除之后（几乎所有命令都无法执行时），重新建立软链接
+   * `chroot /mnt/sysimage`，一个切换根目录的命令，在rescue时，可以直接从u盘系统切换到原系统上干活
+* 查看版本
+   * 查看Linux内核版本：`cat /proc/version `
+   * 查看系统版本：`lsb_release -a`
+   * 查看系统支持的glibc版本：`strings /lib64/libc.so.6 | grep GLIBC_`
+   * 查看`libc.so.6`当前指向的版本：`ls -al /lib64/libc.so.6`
