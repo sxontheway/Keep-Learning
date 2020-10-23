@@ -74,3 +74,7 @@ def plot_radar_heatmap(self, points, img_size, bboxes, save_path):
     fig.savefig(save_path)  # to save figure, use fig.savefig()  
     plt.close('all')
 ```
+
+## 其他
+* 查看 matplotlib 默认颜色循环：
+`print(plt.rcParams['axes.prop_cycle'].by_key()['color'])`
