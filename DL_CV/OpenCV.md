@@ -96,3 +96,9 @@ public:
     // no new extra fields
 };
 ```
+
+------
+<br><br>
+
+# 3. 实践：用OpenCV读取多个读取多个IP摄像头的视频流
+> https://zhuanlan.zhihu.com/p/38136322  
