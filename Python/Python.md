@@ -545,18 +545,18 @@ if __name__ == "__main__":
 下面的例子，用闭包的性质为add函数添加了新的功能：
 ```python
 def checkParams(fn):
-    def wrapper(a, b):
+    def my_wrapper(a, b):
         if isinstance(a, (int, float)) and isinstance(b, (int, float)):
             return fn(a,b)  # 解释器按照LEGB法则找到fn，也即add函数对象的一个引用
         print("type incompatible")
         return
-    return wrapper
+    return my_wrapper
 
 def add(a, b):
     return a+b
 
 if __name__ == "__main__":
-    add = checkParams(add)  # 返回的是一个wrapper这个函数的闭包
+    add = checkParams(add)  # 返回的是一个 my_wrapper 这个函数的闭包
     add(3, "hello")
 ```
 
@@ -573,9 +573,25 @@ def add(a, b):
 if __name__ == "__main__":
     add(3, "hello")
 ```
-简单来说，就是将`@checkParams`写在`add(a,b)`定义上面，等效于`add = checkParams(add)`，也即在不改变 add 函数本身的情况下，为它加了额外的功能。
+简单来说，就是将`@checkParams`写在`add(a,b)`定义上面，等效于`add = checkParams(add)`，也即在不改变 add 函数本身的情况下，为它加了额外的功能
 
-### 3.5.4 用类写一个多重的，带参数的装饰器
+### 3.5.4 `@functools.wraps()`
+在这里就有一个问题，被修饰器修饰过的函数还是以前的函数吗？答案是不是的，它会带有wrapper属性：
+```python
+print(add)  # 输出 <function checkParams.<locals>.my_wrapper at 0x7fca8c79c8c8>
+print(add.__name__) # 输出 my_wrapper
+```
+为了消除装饰器对原函数造成的影响，即对原函数的相关属性进行拷贝，达到装饰器不修改原函数的目的，可以用 `@functools.wraps(fn)`，此时再 `print(add.__name__)` 就会输出 `add` 而不是 `my_wrapper`了
+```python
+def checkParams(fn):
+    @functools.wraps(fn)
+    def my_wrapper(a, b):
+        ...
+    return my_wrapper
+```
+
+
+### 3.5.5 用类写一个多重的，带参数的装饰器
 ```python
 class add_prefix(object):
     def __init__(self, word):
