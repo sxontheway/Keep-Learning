@@ -101,6 +101,29 @@
       ```
       在`train.py`中`from utils.utils. import *`，但 import 的所有 functions 都不能 peek definition，是因为文件夹名称重复了、或文件夹名称和文件名称重复了，vscode不知道去找哪一个。
 
+   * 使用 VSCode Debug 模式
+      * 不能识别相对路径，需要在 `launch.json` 中配置工作目录
+      * arguement 参数也需要在 `launch.json` 中进行输入
+      ```json
+      {
+         "version": "0.2.0",
+         "configurations": [
+            {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd":"/home/xian/repos_FL/Few-shot_FL",
+            "args": [
+                  "--num_sample=5",
+                  "--test_novel_only",
+                  "--gpu=0"]
+            }
+         ]
+      }
+      ```
+
 <br>
 
 # 记一次服务器修复
