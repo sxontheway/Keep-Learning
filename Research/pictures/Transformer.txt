@@ -1,0 +1,16 @@
+https://zhuanlan.zhihu.com/p/80986272
+
+tranformer 替代 lstm / rnn
+
+主要解决：
+数据并行的问题，一次可以输入多个单词，而不像lstm/rnn需要一个接一个
+transfer learning的问题，lstm几乎不支持transfer learning，transformer可以
+
+注意：
+encoder可以并行计算，一次性全部encoding出来，但decoder不是一次把所有序列解出来的，而是像rnn一样一个一个解出来的，因为要用上一个位置的输入当作attention的query
+
+
+
+lstm is still good when
+sequence too long, transformer is O(N^2)
+数据集本身比较小，transform要训练好所需要的数据量比较大

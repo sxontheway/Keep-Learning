@@ -26,9 +26,9 @@
 
 ## Deterministic Methods
 ### Data Augmentation
-* 利用 auxiliary dataset `D_A` 使得 Gan 能够扩充 `D_T` 的数据 
+* 利用 auxiliary dataset `D_A` 使得 GAN 能够扩充 `D_T` 的数据 
 ### Metric Learning
-* 利用 auxiliary dataset `D_A` 训练一个网络，输入是 `x_i`，`x_j` （例如两张图），输出是他们之间的 distance。被称作 metric learning 的原因是因为这个网络要学习的是一个metric，来判断两个输入之间的distance。
+* 利用 auxiliary dataset `D_A` 训练一个网络，输入是 `x_i`，`x_j` （例如两张图），输出是他们之间的 distance。被称作 metric learning 的原因是因为这个网络能自动学习一个 metric 来衡量两个 embedding 之间的 distance
 * 用 `D_A` 训练后，可在 `D_T` 上 finetune。inference 阶段：将输入数据和 `D_T` 中同类别的数据进行比较，计算 distance，从而完成分类。
 ### Meta-Learning
 <center class="half">
@@ -42,10 +42,11 @@
 Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他方法（例如data augmentation）一起使用来解决 few-shot 问题。 Meta-learning 的目标是使网络 learn-to-learn，而这种能力正是 few-shot 中所需要的
 
 * Meta-Learning 主要方法
-    * Learn-to-Measure：Matching Net (NIPS'16)/ Relation Net (CVPR'18)，主要思想，学到一个metric的度量网络（与metric learning的区别之处在于：Learn-to-Measure Method adopts a meta learning policy to learn the similarity metric that is expected to be transferable across different tasks）
+    * Learn-to-Measure (L2M)：The L2M approaches inherit the main idea of metric learning in essence, but they are different from the metric learning based FSL approaches in the implementation level: the L2M approaches adopt the meta learning policy to learn the similarity metric that is expected to be transferrable across different tasks. L2M has always been an important branch of meta learning based FSL approaches. 代表性的文章：`Matching Net，Relation Net，Prototypical Network，Imprinting`
+
     * Learn-to-Finetune：MAML，Reptile（这两篇文章讲的是用 meta-learning 用于寻找一个好的初始化权重，是通用的训练策略，而不局限于某个应用，例如object detection）
 
-    * Learn-to-Parameterize: 直接让一个 meta-learner 生成 base learner 所需要的权重，本文不展开了
+    * Learn-to-Parameterize: 直接让一个 meta-learner 生成 base learner 所需要的权重，当网络比较复杂时不太现实，本文不展开了
 
 <br>
 
@@ -84,7 +85,7 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 * （optional）用 low-shot 数据进行 finetune
 
 其他：
-* 文中解释了：（FC layer + softmax classifier） 和 （triplet-based embedding training + Nearest Neighbor）两种方法原理上是相通的
+* 文中的贡献：解释了（FC layer + softmax classifier） 和 （triplet-based embedding training + Nearest Neighbor）两种方法原理上是相通的，将 metric learning 的思想巧妙地融入 FC 层
 * 灵魂性的句子： Intuitively, one can think of the imprinting operation as
 remembering the semantic embeddings of low-shot examples as the templates for new classes
 * 严格意义上，本文运用了 metric-learning 的思想，并将它巧妙地融合在了FC层权重初始化之中，本文和 meta-learning 关系不大。本文相比于普通 CNN 分类器唯一的不同就是，矩阵 W 的初始化是由 imprinting 完成的。实验表明，imprinting 甚至无需在 low-shot examples 上 finetune，也可达到较好效果
@@ -95,11 +96,11 @@ remembering the semantic embeddings of low-shot examples as the templates for ne
 > Few-Shot Attention RPN: https://openaccess.thecvf.com/content_CVPR_2020/papers/Fan_Few-Shot_Object_Detection_With_Attention-RPN_and_Multi-Relation_Detector_CVPR_2020_paper.pdf
 
 <p align="center" >
-<img src="./pictures/attention_rpn.png" width="600">
+<img src="./pictures/attention_rpn.png" width="900">
 </p>
 
 Training：
-* 一个 training task 是一个 episode（可理解为传统训练方法中的一个batch）：有两个loss，一个是match loss，另一个box regression loss （training task 和 test task 类别无交集） 
+* 一个 training task 是一个 episode（包含 support image 和 query image）：有两个loss，一个是match loss，另一个box regression loss （training task 和 test task 类别无交集） 
 
 Fintuning（optional）：
 * 在 test 之前可在 test task 的 support set 上进行 finetine（因为根据定义：test task 中，query set 和 support set 类别是相同的，且具有相似分布），
@@ -109,7 +110,7 @@ Inference（有两种方式进行）：
 * 将 support images 对应的绿色 feature maps 存成离线的（提供大量prior），inference时就只用运行下面的branch即可
 
 其他：  
-* 严格意义上讲，本文用 Siamese CNN 完成了 metric-learning， 并运用了 meta-learning 的训练方式
+* 严格意义上讲，本文运用了 meta-learning 的训练方式（将数据分成 episode，但和MAML没有关系），用 Siamese CNN 完成了特征提取，用Multi-Relation Head 完成了 metric-learning
     <p align="center" >
     <img src="./pictures/meta-learn.png" width="600">
     </p>
