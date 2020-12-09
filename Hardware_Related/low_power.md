@@ -39,8 +39,8 @@
 我的是 a02 (核心板) + devkit (无emmc，系统全部运行在sd卡上)，参见：
 https://blog.csdn.net/u013673476/article/details/104794955  
 https://docs.nvidia.com/sdk-manager/system-requirements/index.html  
-所以 .dts, .dtb相关文件前缀应该是 `tegra210-p3448-0000-p3449-0000-a02`，flash时的.conf配置文件应该是：`jetson-nano-qspi-sd.conf`
-
+所以 .dts, .dtb相关文件前缀应该是 `tegra210-p3448-0000-p3449-0000-a02`，其中 p3448-0000 是 module（核心板），p3449-0000是board（拓展板）  
+flash时的.conf配置文件应该是：`jetson-nano-qspi-sd.conf`  
 
 ---
 
