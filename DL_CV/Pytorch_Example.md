@@ -98,7 +98,8 @@ https://zhuanlan.zhihu.com/p/30934236
   
        return paths, imgs, targets
    ```
-
+* dataloader 输出的数据都是默认在 CPU 上，如果要用 GPU 训练，需要手动移到 GPU 上。用 `dali` 模块，可以将一些预处理也放在 GPU 上
+ 
 <br>
 
 # Linear Regression Example

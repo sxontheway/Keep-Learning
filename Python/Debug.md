@@ -1,11 +1,34 @@
-* `cv2.rectangle(), cv2.circle()`等不显示：https://blog.csdn.net/qq_36679208/article/details/103006091#_1
-  ```
-  #opencv读入的图像是BGR,要转化为RGB
+> 本文记录代码实现过程中遇到的各种奇怪的 bug 及解决方案
+
+---
+<br>
+
+* PIL image shape 是 `W*H`，numpy 存图片是 `H*W`，输入CNN的tensor是 `C*H*W`
+
+<br>
+
+* 画 2d histogram
+  * 用 `np.histgram2d` + `plt.show()`
+  * 固定 colorbar 的 scale
+    ```python
+    imshow(my_array, vmin=0, vmax=1)
+    plt.colorbar()
+    ```
+  * `plt` 中画图是以左下角为零点，img 一般以左上角为零点，可用 `plt.gca().invert_yaxis()` 解决
+
+<br>
+
+* `cv2.rectangle(), cv2.circle()` 等代码不显示：https://blog.csdn.net/qq_36679208/article/details/103006091#_1  
+opencv读入的图像是BGR，要转化为RGB，可以有如下两种实现，但第二种会导致 `cv2.rectangle()` 等命令不显示：
+
+  ```python
+  # 用这个
   image = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
-  #不要用下面的
+
+  # 不要用这个
   inp = img[:, :, [2, 1, 0]]  # BGR2RGB
   ```
-  
+<br>
 
 * Yolov3中，当 gradient_accumulations=1时，会出现网络没有进行训练的情况
   ```python
@@ -13,7 +36,7 @@
      optimizer.step()
      optimizer.zero_grad()
   ```
-  将if语句其改为`batches_done % opt.gradient_accumulations==0`
+  将 if 语句其改为`batches_done % opt.gradient_accumulations==0`
 
 <br>
 
@@ -31,26 +54,30 @@
 
 <br>
 
-* python的and的返回值  
+* python中的bool类型  
+  * `[tensor(False), tensor(True)]` 和 `[False, True]` 不一样， 不能作为mask
   * https://stackoverflow.com/questions/32192163/python-and-operator-on-two-boolean-lists-how  
     x and y: 如果 x 为 False，返回 False，否则它返回 y 的计算值；  
     只有`'', (), []`这种 empty sequence才是False，例如下面：`x and y`：因为 x 其实为 True， 所以直接输出 y
     ```python
     x = [True, True, False, False]
-    y = [False, True, True, Fasle]
+    y = [False, True, True, False]
     print(x and y)
     print(y and x)
 
-    >>> [False, True, False, True] 
-    >>> [True, False, False, True]
+    >>> [False, True, True, False]
+    >>> [True, True, False, False]
     ```
-    要想按元素与运算：
+    要想按元素与运算（两种方法）：
     * `[a and b for a, b in zip(x, y)]`
-    * 将 list 转换为numpy array 然后用`&`或者`np.logical_and(x,y)`
+    * 将 list 转换为numpy array 然后用 `&` 或者 `np.logical_and(x,y)`
     
       ```python
       a = np.array([True, False])
       b = np.array([False, True])
+      print(a & b)
+      print(np.logical_and(a, b))
+
       >>> array(False, False)
       ```
   * 在numpy, torch中查找属于一个区间的元素：
@@ -69,3 +96,5 @@
     b = b[(1<b[:, 1]) & (b[:, 1]<3)] # 正确，原因见上
     b = b[torch.where((1<b[:, 1]) & (b[:, 1]<3))]  # 正确
     ```
+
+<br>

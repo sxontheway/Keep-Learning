@@ -123,6 +123,7 @@
          ]
       }
       ```
+      * Vscode remote 意外断开，关闭程序：https://debug.fanzheng.org/post/vscode-remote-env-loading.html  
 
 <br>
 

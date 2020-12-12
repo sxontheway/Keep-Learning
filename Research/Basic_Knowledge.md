@@ -16,6 +16,10 @@
     * 对于 Logistic Loss Function: 最小化Loss Function = 最大化二项分布的对数似然函数 = 最大化二项分布的似然函数
     * 同理，对于Cross Entropy: 最小化Loss Function = 最大化多项分布的对数似然函数
 
+* focal loss
+    > 	https://www.cnblogs.com/leebxo/p/11291140.html  
+        https://www.cnblogs.com/ymjyqsx/p/9508664.html
+
 <br>
 
 ## 关于 One-hot Coding
@@ -66,8 +70,6 @@ Encoder
 	<img src="./pictures/encoder2.png"  width="400">
     </p>
 
-
-
 ### 一些对比：
 * 数据集本身比较小，Transform 要训练好所需要的数据量比较大，这时用 train from scratch LSTM 也比较好
 * 数据并行的问题，一次可以输入多个单词，而不像 LSTM/RNN 需要一个接一个
@@ -78,3 +80,15 @@ Encoder
     </p>
 
 * LSTM is still good when sequence too long, transformer is O(N^2)
+
+<br>
+
+## 知识蒸馏
+* 几个要点：soft label，temperature scaling（注意前面有 \tau ^ 2），两种 loss
+
+    Hinton 提出知识蒸馏基于这样一个观察：一个训练好的模型在测试时，给出的预测结果并不是 one-hot 形式（某一类为1，其余类全0）的，对于某一张测试图像，即使模型分类正确，在错误的类别上模型仍然会给出一些值较小但非零的概率  
+    Hinton 认为这些小而非零的值包含类与类之间的相似度关系，例如输入一张狗的图像，模型可能在狗的类别上给出 0.7 的概率，而在猫和狼的类别上给出 0.1 的概率，这种类间关系是模型在训练过程中基于数据集自动学会的，能够提供比人工标注的 one-hot 标签更丰富的信息，用一个训好的大模型的输出来监督另一个小模型，其结果比只用人工标签 （hard label）更好
+
+    <p align="center" >
+	<img src="./pictures/kd.png"  width="600">
+    </p>

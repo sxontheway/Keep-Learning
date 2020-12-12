@@ -141,46 +141,58 @@ pytorch 中，对于中间变量（由别的变量计算得到的变量）/ Modu
   使用方法：编写 `hook_fn` 函数（包含打印或保存等操作）-> 注册hook -> 执行前向/方向传播
 
 ### 2.1.7 nn.Module 
-一个Net，也就是继承自`nn.Module`的类，当实例化后，本质上就是维护了以下8个字典(OrderedDict)，在上面和本小节都有介绍:
-```
-_parameters
-_buffers
-_backward_hooks
-_forward_hooks
-_forward_pre_hooks
-_state_dict_hooks
-_load_state_dict_pre_hooks
-_modules
-```
-> https://www.jianshu.com/p/a4c745b6ea9b
-* `model.modules()`：返回Generator，广度优先遍历模型所有子层  
-  ```python
-  for x in model.modules()：
-  ```
-* `model.named_modules()`：返回Generator，比 `model.modules()` 多返回了每个module的名字  
-  ```python
-  for name, layer in model.named_modules():
-      if isinstance(layer, nn.Conv2d):
-  ```
-* `model.children()`：返回Generator，只遍历model的子层（子层的子层不遍历了）
-* `model.named_children()`：返回Generator， 比`model.children()` 多返回了每个child的名字  
-* `model.parameters()`：返回Generator，迭代地返回所有参数，一般用于给optimizer传递参数
-* `model.named_parameters()`：返回Generator，比`model.parameters()` 多返回了每个参数的名字，weights和bias也加以了区分
-* `model.state_dict()`：返回OrderDict，一般用于模型保存  
-  ```python
-  for k,v in model.state_dict():
-  ```
-* `model.buffers()`：返回OrderDict。反向传播不需要被optimizer更新的参数（和parameter正好相反），称之为buffer，用于存一些不变的模型参数（例如存BN的mean，存pruning时的mask） 
-  ```python
-  bn = nn.BatchNorm1d(2)
-  input = torch.tensor(torch.rand(3, 2), requires_grad=True)
-  output = bn(input)
-  print(bn._buffers)
-  
-  # 输出 OrderedDict([('running_mean', tensor([0.0525, 0.0584])), ('running_var', tensor([0.9177, 0.9140])), ('num_batches_tracked', tensor(1))])
-  ```
+* 一个Net，也就是继承自 `nn.Module` 的类，当实例化后，本质上就是维护了以下8个字典(OrderedDict)，在上面和本小节都有介绍:
+  > https://www.jianshu.com/p/a4c745b6ea9b
 
-> 注意： `len([x for x in model.modules()])` 会比 `len([[x for x in model.parameters()])` 大，因为前者遍历了 a hierarchy of model（包含中间节点），后者只遍历了 model graph 的叶节点
+  ```
+  _parameters
+  _buffers
+  _backward_hooks
+  _forward_hooks
+  _forward_pre_hooks
+  _state_dict_hooks
+  _load_state_dict_pre_hooks
+  _modules
+    ```
+  * `model.modules()`：返回Generator，广度优先遍历模型所有子层  
+    ```python
+    for x in model.modules()：
+    ```
+  * `model.named_modules()`：返回Generator，比 `model.modules()` 多返回了每个module的名字  
+    ```python
+    for name, layer in model.named_modules():
+        if isinstance(layer, nn.Conv2d):
+    ```
+  * `model.children()`：返回Generator，只遍历model的子层（子层的子层不遍历了）
+  * `model.named_children()`：返回Generator， 比`model.children()` 多返回了每个child的名字  
+  * `model.parameters()`：返回Generator，迭代地返回所有参数，一般用于给optimizer传递参数
+  * `model.named_parameters()`：返回Generator，比`model.parameters()` 多返回了每个参数的名字，weights和bias也加以了区分
+  * `model.state_dict()`：返回OrderDict，一般用于模型保存  
+    ```python
+    for k,v in model.state_dict():
+    ```
+  * `model.buffers()`：返回OrderDict。反向传播不需要被optimizer更新的参数（和parameter正好相反），称之为buffer，用于存一些不变的模型参数（例如存BN的mean，存pruning时的mask） 
+    ```python
+    bn = nn.BatchNorm1d(2)
+    input = torch.tensor(torch.rand(3, 2), requires_grad=True)
+    output = bn(input)
+    print(bn._buffers)
+    
+    # 输出 OrderedDict([('running_mean', tensor([0.0525, 0.0584])), ('running_var', tensor([0.9177, 0.9140])), ('num_batches_tracked', tensor(1))])
+    ```
+
+  > 注意： `len([x for x in model.modules()])` 会比 `len([[x for x in model.parameters()])` 大，因为前者遍历了 a hierarchy of model（包含中间节点），后者只遍历了 model graph 的叶节点
+
+* 例子
+  * 打印网络
+    ```python
+    for name, param in model.named_parameters():
+        print(name, ' ', param.size())
+    ```
+
+  * 初始化网络： 
+  https://blog.csdn.net/daydayjump/article/details/80899029
+
 ### 2.1.8 其他
 * torchvision 由以下四部分组成：  
   torchvision.datasets， torchvision.models， torchvision.transforms， torchvision.utils  

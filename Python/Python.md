@@ -328,7 +328,13 @@ print index, item
 for key,values in  dict.items():
     print key,values
 ```
-## 2.3 一些处理文本的方法
+
+## 2.3 python中的cls是什么
+> https://www.zhihu.com/question/49660420  
+
+也即两个修饰器： `@staticmethod`，`@classmethod` 的用法
+
+## 2.4 一些处理文本的方法
 |方法|用途|
 | :------------ | :-----|
 |split()|将字符串按空格分割，返回分割后的列表|
