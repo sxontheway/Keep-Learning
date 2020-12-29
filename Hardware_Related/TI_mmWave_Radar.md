@@ -23,3 +23,13 @@
 # 2. AWR1443 mmWave Demo 
 https://github.com/juruoWYC/AWR1443-Demo-Analysis
 
+# 3. DCA1000EVM+AWR1843BOOST
+> 主要参考：https://e2echina.ti.com/blogs_/b/the_process/archive/2019/01/09/dca1000evm
+中间遇到的一些bug及解决:
+* 需要安装driver，若失败：可能是因为没禁用数字签名
+* mmWave Studio不能顺利打开：需要在安装mmWave Studio之前安装matlab runtime (必须是 8.5.1 32 bit)
+* mmWave Studio中SPI connectivity status不变绿（连接失败）：先用uniflash进行format
+* 无法连接到FPGA：用某些usb hub转网口会出问题，最好将网线直接连在电脑上（用同typec也许可以，没试过）
+* RS232对应的COM口对应的XDS110 UART的Port
+* Radar AWR上面的SOP应该设置成110，uniflash的时候是101，standalone的时候是100; AWR1843的S2应该拨到SPI，而不是CAN
+* DCA1000EVM的SW2的key 5，设置成1(Software_config); Key3: 1243支持3发射天线，1642只支持2发射天线；Key2：可选择是存SD还是通过eternet发送
