@@ -11,3 +11,6 @@
 
 * Windows挂VPN并开热点
     * change adapter options -> 找到VPN那个connection -> properties -> sharing -> Allows sharing 并选择开热点对应那个connection
+
+* 在 windoes 中运行 python
+    * 不同于linux，可以尝试 `python`，`py`，例如 `py a.py`
