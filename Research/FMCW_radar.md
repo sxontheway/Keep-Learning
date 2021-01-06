@@ -11,7 +11,7 @@ fftshift 将零频点从四个角上移到频谱的中间，方便观察，主�
 ## 离散傅立叶变换 DFT
 > https://zh.wikipedia.org/zh-hans/%E7%A6%BB%E6%95%A3%E5%82%85%E9%87%8C%E5%8F%B6%E5%8F%98%E6%8D%A2  
   <p align="center" >
-	<img src="./pictures/dft.png" width="600">
+	<img src="./pictures/dft.png" width="800">
   </p>
 
 * 傅立叶变换的输出是复数吗？  
@@ -63,10 +63,10 @@ DFT中，k前面的系数是`(2*pi*n/N)`，也即一个bin对应的分辨率。�
 > [阵列信号处理中DOA算法分类总结](https://wenku.baidu.com/view/5d9d869a0912a2161579299b.html)
 
 总的来说分辨率上，MUSIC > Capon > Bartlett > FFT
-* 延迟相加法/Bartlett法
+* 延迟相加法/Bartlett法  
 目标函数是使得来自信号方向的功率最大
 
-* Capon 最小方差法
+* Capon 最小方差法  
 约束条件是使得来自期望方向的信号功率不变；目标函数使得输出总功率最小，会用到原信号的协方差矩阵
 
 * 子空间法：MUSIC，ESPRIT  
