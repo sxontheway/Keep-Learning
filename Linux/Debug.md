@@ -4,7 +4,7 @@
 
    * `lsb_release -a`：查看Ubuntu版本  
 
-   * `df -lh`:查看存储  
+   * `df -lh`：查看存储；`du -h --max-depth=1`：查看当前目录下文件夹大小
 
    * `sudo dmidecode`: 查看硬件配置，最常用的选项就是用`-t`来限定关键字，例如 `bios, system, baseboard, chassis, processor, memory, cache, connector, slot`  
 
