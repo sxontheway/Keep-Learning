@@ -15,6 +15,5 @@
 * 在 windoes 中运行 python
     * 不同于linux，可以尝试 `python`，`py`，例如 `py a.py`
 
-* Windows+Vscode+C  
-Windows 10上使用vscode编译运行和调试C/C++，见：https://zhuanlan.zhihu.com/p/77645306   
-一些概念明晰：https://zhuanlan.zhihu.com/p/82977824
+* Windows 上用 Vscode 配置 C  
+Windows 10上使用vscode编译运行和调试C/C++，需要下载compiler，例如 `MingW`，见：https://zhuanlan.zhihu.com/p/77645306   

@@ -68,12 +68,16 @@
 
 <br>
 
-* 安装 google protobuf 
-  > https://cloud.tencent.com/developer/article/1720879  
-  * Protobuf是啥？ https://blog.csdn.net/weixin_42730667/article/details/102550176    
-  * 解决 `apt-get /var/lib/dpkg/lock-frontend` 问题： https://zhuanlan.zhihu.com/p/126538251  
-  * 浅析./configure、make、make install之间的关系：http://pro.webplus.net.cn/_s80/_t690/2018/0729/c3276a26052/page.psp  
+* Google Protobuf    
+   > Protobuf 是由 Google 开发的一套开源序列化协议框架，类似于 XML/JSON，采用协议序列化用于数据存储与读取：https://blog.csdn.net/weixin_42730667/article/details/102550176  
+  * Protobuf安装：  
+  https://cloud.tencent.com/developer/article/1720879
+  * `apt-get install` 时遇到 `apt-get /var/lib/dpkg/lock-frontend`相关的问题：  
+  https://zhuanlan.zhihu.com/p/126538251  
+  * 自定义一个 `.proto` 文件之后生成 `.h`，`.cc` 文件：  
+  `protoc --cpp_out=./ ./BATsNet/radar_iwr6843/proto/radar.proto` 
 
+<br>
 
 * Vscode
    * Vscode + jupyter-notbook:
