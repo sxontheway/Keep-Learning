@@ -68,6 +68,13 @@
 
 <br>
 
+* 安装 google protobuf 
+  > https://cloud.tencent.com/developer/article/1720879  
+  * Protobuf是啥？ https://blog.csdn.net/weixin_42730667/article/details/102550176    
+  * 解决 `apt-get /var/lib/dpkg/lock-frontend` 问题： https://zhuanlan.zhihu.com/p/126538251  
+  * 浅析./configure、make、make install之间的关系：http://pro.webplus.net.cn/_s80/_t690/2018/0729/c3276a26052/page.psp  
+
+
 * Vscode
    * Vscode + jupyter-notbook:
       > https://stackoverflow.com/questions/60330837/jupyter-server-not-started-no-kernel-in-vs-code  
