@@ -1,3 +1,49 @@
+# Object Detection 一些最新的进展
+
+## Network Neck 的结构
+> https://blog.csdn.net/flyfish1986/article/details/110520667
+* 基于多尺度特征提取：FPN，PANet，BiFPN，得到多尺度的 feature maps 
+* PANet (Path Aggregation Network) 比 FPN 多了个 bottom-up 的结构
+
+
+## SPP (spatial pyramid pooling)
+> https://zhuanlan.zhihu.com/p/68027807  
+
+* 相当于是 RoI pooling 的加强版，Faster-RCNN 中 RoI pooling 的尺寸是 7*7
+* SPP 用了多个size 的 pooling kernel (例如`1*1, 3*3, 5*5, 7*7`)，然后 flatten 再 concat 到一起，作为 FC 层的输入
+
+
+## Anchor-Free Object Detection
+### One-stage anchor-free 检测器三个基本要素的表现形式
+* classification 分类
+* localization 边框定位
+* quality estimation 质量估计
+
+
+### FCOS: Fully Convolutional One-Stage Object Detection
+> https://zhuanlan.zhihu.com/p/63868458    
+* FPN：multi-head 使用了共享权重的检测头，即对FPN出来的多尺度Feature Map使用同一组卷积预测检测框，然后每一层使用一个可学习的Scale值作为系数，对预测出来的框进行缩放。
+这么做的好处是能够将检测头的参数量降低为不共享权重状态下的1/5。这对于光是检测头就拥有数百通道的卷积的大模型来说非常有用。但是对于轻量化模型来说，共享权重检测头并没有很大的意义。由于移动端模型推理由CPU进行计算，共享权重并不会对推理过程进行加速，而且在检测头非常轻量的情况下，共享权重使得其检测能力进一步下降，因此还是选择每一层特征使用一组卷积比较合适
+
+* 创新点：centerness branch，对于每一个像素都可以预测一个box，不用手动预先设定的anchor了。centerness介于0~1之间，越接近1，说明该点的位置越接近框中心
+* FCOS v2 相对于 v1 的更新：https://blog.csdn.net/flyfish1986/article/details/110143467 
+
+
+### Generalized Focal Loss
+> https://blog.csdn.net/flyfish1986/article/details/110143467
+* 将 Quality Focal Loss (QFL) 变为了 Generalized Focal Loss, 相当于从 hard label 变成了 soft label
+
+
+### NanoDet: 上述各种技巧的综合
+> https://zhuanlan.zhihu.com/p/306530300  
+> https://github.com/RangiLyu/nanodet 
+* shufflenet v2 + PAN + FCOS like Anchor-free + ATSS for target sampling + GFocalLoss 
+
+<br><br>
+
+
+
+
 # SSD的细节
 > https://zhuanlan.zhihu.com/p/33544892
 ## 网络结构
@@ -349,7 +395,7 @@ Faster-RCNN 效率低的一个主要原因是，Detection head 的 fc layers 部
 <br><br>
 
 # 减小conv layer计算量方法
-> 见 ShuffleNet v2
+> 见 ShuffleNet v2, https://blog.csdn.net/tintinetmilou/article/details/81607721 
 * group-wise + point-wise/ channel-shuffling
     * `depth-wise conv`其实是 `group-wise` 在 `group_size = 1` 时的特例
     * `point-wise conv`也即1*1卷积
