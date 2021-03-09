@@ -49,7 +49,6 @@ def plot_radar_heatmap(self, points, img_size, bboxes, save_path):
     plt.close('all')
 ```
 
-
 ## 用 ax.***
 ```python
 def plot_radar_heatmap(self, points, img_size, bboxes, save_path):
@@ -74,6 +73,35 @@ def plot_radar_heatmap(self, points, img_size, bboxes, save_path):
     fig.savefig(save_path)  # to save figure, use fig.savefig()  
     plt.close('all')
 ```
+
+## 自定义legend
+```python
+import matplotlib.pyplot as plt
+from matplotlib.pyplot import scatter
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+
+fig = plt.figure(figsize=(4,2))
+
+
+legend_elements = [
+    scatter([], [], marker='s', lw=1, color='grey', edgecolor='r', label='1'), 
+    scatter([], [], marker='o', lw=1, color='w', edgecolor='r', label='2'), 
+    scatter([], [], marker='x', lw=1, color='grey', label='3'),
+    plt.plot([],[], marker="o", ms=8, ls=":", color='b', label="4")[0],
+    Patch(color='g', label="5"),
+    Line2D([], [], color='y', marker='*', markersize=10, label='6')
+    ]
+
+plt.legend(handles=legend_elements, loc='best', ncol=2)
+
+plt.show()
+```
+用到了 legend 的 handler，结果如图：
+<p align="center" >
+    <img src="./pictures/legend.png" width="600">
+</p>
+
 
 ## 其他
 * 查看 matplotlib 默认颜色循环：
