@@ -147,6 +147,85 @@
 实验室serve崩了，症状：不能SSH，键盘连接到USB口指示灯不亮（USB口无供电），接上显示屏：`sending NMI from CPU 23 to CPUs31; Shutting down cpus with NMI; Hard LOCKUP`  
 解决方案：强制重启  
 
+<br>
+
+## Vscode + Remote + X11 Forwarding
+### 起因
+尝试在 TX2 上安装了 VScode，但是键盘按键有延迟，于是放弃；但是有可视化需求，故打算对 TX2 配置 Remote + X11 Forwarding  
+需求：在 Windows 10 PC 上用 Vscode remote，对 TX2 的窗口进行可视化
+
+
+### 步骤
+> https://blog.csdn.net/Dteam_f/article/details/109806294  
+* 首先安装 Vscode 插件：
+   * PC 上 Remote X11 (SSH)
+   * TX2 上 Remote X11
+* PC 上安装 X Server，推荐 vcxsrv：https://sourceforge.net/projects/vcxsrv/ 
+* 配置使用密钥登录、并开启 X11 Forwarding
+   > https://blog.csdn.net/u010417914/article/details/96918562  
+   > https://zhuanlan.zhihu.com/p/260189540  
+   * 在 TX2 上
+      ```
+      # 建立密钥对
+      ssh-keygen
+      cd ~/.ssh
+      
+      # 确保生成功authorized_keys
+      cat id_rsa.pub >> authorized_keys
+      ls
+
+      # 保证以下文件权限正确
+      sudo chmod 600 authorized_keys
+      sudo chmod 700 ~/.ssh
+
+      # 打开SSH配置文件
+      sudo vim /etc/ssh/sshd_config
+
+      # 使用密钥登录
+      RSAAuthentication yes
+      PubkeyAuthentication yes
+
+      # 开启 X11
+      X11Forwarding yes
+      X11UseLocalhost yes
+
+      # 重启 SSH
+      sudo service sshd restart
+      ```
+   * 在 PC 上  
+   将 TX2 上 `/home/alex/.ssh/id_rsa` 文件复制到 `C:\Users\alex\.ssh` 文件夹中
+   * 重启SSH，应该就可以免密码登陆了
+
+* 更改 PC VScode 上 remote 相关配置  
+   `.ssh/config` 文件：
+   ```
+   Host tx2
+   HostName 192.168.xx.xx
+   Port 22
+   User alex
+   ForwardX11 yes
+   ForwardX11Trusted yes
+   ForwardAgent yes
+   ```
+   `ssh_config` 文件：加上 `ForwardX11 yes`
+*  在 TX2 上配置环境变量
+   * 在 `~/.basshrc` 中加上 `export DISPLAY='localhost:10.0'`，并 `. ~/.bashrc`更新
+   * `echo $DISPLAY` 输出10
+
+* PC 上重启 VScode 并连接 reomte
+* 打开 Xlaunch，选择 Display Number=10（和TX2的环境变量要匹配），其他默认
+* 运行 `xeyes`，或`xclock`，或下面的 python 画图程序
+   ```python
+   import matplotlib.pyplot as plt
+   import numpy as np
+   from mpl_toolkits.mplot3d import Axes3D
+   ax = plt.axes(projection='3d')
+   ax.scatter(np.random.rand(10),np.random.rand(10),np.random.rand(10))
+   plt.show()
+   ```
+
+<br>
+
 ## 记另一次服务器修复
 ### 起因
 > https://juejin.im/entry/6844903765321973768  
