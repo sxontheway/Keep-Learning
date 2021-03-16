@@ -92,17 +92,31 @@ https://zhpmatrix.github.io/2019/03/09/torch-jit-pytorch/
 
 
 
-## Dataloader
-* Dataloader 数据装载阻塞的问题: https://bbs.cvmart.net/topics/2066  
+## Dataloader 加速
+* 仅从使用者的角度考虑,DataLoader做了下面的事情：
+    * 开启多个子进程worker
+    * 每个 worker 通过主进程获得自己需要采集的idx。idx的顺序由采样器（sampler）或 shuffle 得到。每个 worker 开始采集一个batch的数据。因此增大 num_workers 的数量，内存（不是显存）占用也会增加。因为每个 worker 都需要缓存一个 batch 的数据
+    * 第一个 worker 数据采集完成后，会卡在这里，等着主进程取走数据。主进程处理完这个 batch 之后，这个 worker 开始采集下一个 batch    
+    * 主进程采集完最后一个 worker 的batch。此时需要回去采集第一个 worker 产生的第二个 batch。如果第一个 worker 此时没有采集完，主线程会卡在这里等（这也是为什么在数据加载比较耗时的情况下，每隔 num_workers 个 batch，主进程都会在这里卡一下）
+
+* Dataloader 数据装载阻塞的问题: https://zhuanlan.zhihu.com/p/91521705  
     <p align="center" >
         <img src="pictures/dataloader.jpg", width='800'>
     </p>
 
+    * Pytorch Dataloader 的实现是多进程
     * 一个 worker 独立的处理一个 batch，而不是多个 worker 同时处理一个 batch
     * dataloader **不是** 等所有worker数据取完才进行下一批次的数据读取，worker 之间并没有同步
-    * 输出的数据必须保持顺序性：主线程（进行反front/back propagation）按照`idx=0, 1, 2, 3...`依次处理 worker 产生的 batch
+    * 输出的数据保持顺序性：主线程（进行front/back propagation）按照`idx=0, 1, 2, 3...`依次处理 worker 产生的 batch
+    * worker 会等待主进程处理完（主要即GPU time）上个 batch，才采样下一个 batch
 * 用 GPU 来完成 dataloader 中的 transform:   
 https://zhuanlan.zhihu.com/p/77633542  
 https://github.com/pytorch/pytorch/issues/31359  
+
+* 进一步加速：  
+    > https://www.cnblogs.com/pprp/p/14199865.html 
+
+    * Prefetch next batch / 新开的cuda stream拷贝tensor到gpu：https://zhuanlan.zhihu.com/p/97190313  
+    * 生产者消费者模型：https://blog.csdn.net/winycg/article/details/92443146    
 
 ## APEX
