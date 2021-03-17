@@ -24,11 +24,13 @@ torchvision安装：sudo pip3 install torchvision
 scikit-learn安装: 需要先安装`sudo apt-get install gfortran`, `sudo pip3 install Cython`
 VSCode安装及Romote Control：https://www.jetsonhacks.com/2019/10/01/jetson-nano-visual-studio-code-python/ 
 
-# TX2 2 cores 被禁用
+# 3. TX2上两个cores被禁用
 > https://forums.developer.nvidia.com/t/cannot-enable-denver-cores-for-tx2-jetpack-4-4-dp/124708/48
 
 Jetpack 4.4, Jetpack 4.5 用 `jtop`可能出现两个核denver cores被禁用的情况，解决方案：
 * 将 `/boot/extlinux/extlinux.conf` 中的 `isolcpus=1-2` 改为 `isolcpus=`
 * reboot
 * 查看 `cat /proc/cmdline`，显示`isolcpus=`，而不是 `isolcpus=1-2`；查看`jtop`，所有核都被启动
+
+实际上，被禁用的两个核是Denver内核，因为TX2的调度机制使得两个Denver的内核优先级比四个Cortex-A57优先级高，但是他们其实更慢，所以禁用这两个cores其实对大多数任务（在四个A57核足够应对时）有性能提升，并且可以降低功耗。所以可以先执行上述修改启用这两个核，再通过 `jtop` 中 disable jetson_clocks 关闭两个 Denver 核（需要时可以随时打开）
 
