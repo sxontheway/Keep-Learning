@@ -51,6 +51,19 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 <br>
 
 # Papers
+## Few-shot image classification 几篇串讲
+* Low-Shot Learning with Imprinted Weights：本质是将 embedding 归一化 + 最邻近（未 finetuning 的情况）；后续还可以 finetuning  
+* A New Meta-Baseline for Few-Shot Learning_arXiv20：提出了两个 baseline，一个 classifier-basleine，本质上就是 imprinting；另外一个 meta-baseline，是用 meta learning 的方法训练 classifier。结果是 meta-baseline 效果要比 classifier-basleine 好两个点，这当然是很正常的啊，毕竟 imprinting 只用做一次 forwading，本质上只是做一个权重的初始化 
+* Rethinking Few-Shot Image Classification: a Good Embedding Is All You Need?：把所有 meta training set 打包成一个训练集，然后用自监督的方法来训练 encoder，再用 meta testing 中的 support set 用来训练 classifier（固定 encoder）。文中比较了 `最邻近NN` 和 `逻辑回归LR`（也即一层FC层），LR 比 NN 高两个点左右
+* CrossTransformers: spatially-aware few-shot transfer：用对比学习训练 encoder，用一个 spatial-aware 的 transformer（用了 attention 机制） 将 encoder 得到的 embedding 再微调一下，classifier 用的 prototypical
+* A Baseline For Few-Shot Image Classification_ICLR20：没细看，但本质上还是 imprinting。文章得出的两个结论：imprinting 这种权重初始化的方式很有用，finetuning 很有必要，其实都是之前就知道的事实。本文 finetuning 用的 loss 比较特别，还用到了一个 query set 上的熵，也即每一次 inference 之前还得先训练一遍，运算量很大，但是带来的提升其实可以说不太显著
+
+> 总结下，few-shot classification 有几个重要部分：encoder，embedding layer，classifier  
+> Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
+> Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下
+> Classifier 部分从很早之前就没怎么有革命性的方法：现在主流还是 NN 或者 LR（一层 FC）
+
+
 ## MAML & Reptile
 <center class="half">
     <img src="./pictures/maml.jpg" height="300"/>
