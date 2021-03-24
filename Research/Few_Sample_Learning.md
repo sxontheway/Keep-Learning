@@ -60,7 +60,7 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 
 > 总结下，few-shot classification 有几个重要部分：encoder，embedding layer，classifier  
 > Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
-> Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下
+> Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下  
 > Classifier 部分从很早之前就没怎么有革命性的方法：现在主流还是 NN 或者 LR（一层 FC）
 
 
