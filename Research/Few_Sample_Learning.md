@@ -59,9 +59,9 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 * A Baseline For Few-Shot Image Classification_ICLR20：没细看，但本质上还是 imprinting。文章得出的两个结论：imprinting 这种权重初始化的方式很有用，finetuning 很有必要，其实都是之前就知道的事实。本文 finetuning 用的 loss 比较特别，还用到了一个 query set 上的熵，也即每一次 inference 之前还得先训练一遍，运算量很大，但是带来的提升其实可以说不太显著
 * ProtoNet，RelationNet相关: A Comparison of Few-Shot Learning Methods for Underwater Optical and Sonar Image Classification  
 > 总结下，few-shot classification 有几个重要部分：encoder，embedding layer，classifier  
-> Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
-> Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下  
-> Classifier 部分从很早之前就没怎么有革命性的方法：现在主流还是 NN 或者 LR（一层 FC）
+> * Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
+> * Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下  
+> * Classifier 部分从很早之前就没怎么有革命性的方法：现在主流还是 NN （最邻近）或者 LR（一层 FC），一层FC layer等效于ProtoNet（用了NN） + Cosine distance。同时一般来讲 embedding L-2 normalization 可以有效果提升。从效果上来说，ProtoNet 好于 RelationNet 和 MatchingNet
 
 
 ## MAML & Reptile
