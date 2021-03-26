@@ -57,7 +57,7 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 * Rethinking Few-Shot Image Classification: a Good Embedding Is All You Need?：把所有 meta training set 打包成一个训练集，然后用自监督的方法来训练 encoder，再用 meta testing 中的 support set 用来训练 classifier（固定 encoder）。文中比较了 `最邻近NN` 和 `逻辑回归LR`（也即一层FC层），LR 比 NN 高两个点左右
 * CrossTransformers: spatially-aware few-shot transfer：用对比学习训练 encoder，用一个 spatial-aware 的 transformer（用了 attention 机制） 将 encoder 得到的 embedding 再微调一下，classifier 用的 prototypical
 * A Baseline For Few-Shot Image Classification_ICLR20：没细看，但本质上还是 imprinting。文章得出的两个结论：imprinting 这种权重初始化的方式很有用，finetuning 很有必要，其实都是之前就知道的事实。本文 finetuning 用的 loss 比较特别，还用到了一个 query set 上的熵，也即每一次 inference 之前还得先训练一遍，运算量很大，但是带来的提升其实可以说不太显著
-
+* ProtoNet，RelationNet相关: A Comparison of Few-Shot Learning Methods for Underwater Optical and Sonar Image Classification  
 > 总结下，few-shot classification 有几个重要部分：encoder，embedding layer，classifier  
 > Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
 > Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下  
