@@ -62,6 +62,13 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 > * Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
 > * Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下  
 > * Classifier 部分从很早之前就没怎么有革命性的方法：现在主流还是 NN （最邻近）或者 LR（一层 FC），一层FC layer等效于ProtoNet（用了NN） + Cosine distance。同时一般来讲 embedding L-2 normalization 可以有效果提升。从效果上来说，ProtoNet 好于 RelationNet 和 MatchingNet
+## 几个总结、观察
+* Few shot 常用数据集有：miniImageNet, TieredImagenet
+    > 其中 TieredImagenet 的分类，类与类之间差别更大。例如，在miniImagenet中，`pipe organ`属于训练集，`electrc guitar`属于测试，即使它们都是乐器。这种情况在tieredImageNet中不会发生，因为`musical instrument`是一个大类别（category），因此不会在训练集和测试集之间划分  
+    
+    * MiniImagenet: 100类，每类600张，https://blog.csdn.net/wangkaidehao/article/details/105531837  
+    * TieredImagenet：608个类，一共70多万张，https://blog.csdn.net/Dream_xd/article/details/105579392  
+* meta-training 和 meta-testing 之间的 gap 越大，pre-training + finetuning 的方法可能比 meta learning 的方法更好：https://bbs.cvmart.net/topics/3581  
 
 
 ## MAML & Reptile
