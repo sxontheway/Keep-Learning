@@ -329,10 +329,54 @@ for key,values in  dict.items():
     print key,values
 ```
 
-## 2.3 python中的cls是什么
+## 2.3 @staticmethod，@classmethod
 > https://www.zhihu.com/question/49660420  
 
-也即两个修饰器： `@staticmethod`，`@classmethod` 的用法
+### 普通方法，实例方法，类方法，静态方法
+* 普通方法：只能用类名调用，传参时无 self
+* 实例方法：只能用实例名调用，传递的参数第一个是self
+* 静态方法：@staticmethod，可同时使用类名或实例名调用
+* 类方法：@classmethod，类方法只与类本身有关而与实例无关，一般用于继承的情况，可以将类作为对象传入函数：https://www.zhihu.com/question/20021164/answer/676780051 
+
+```python
+class Num:
+    def one():      # 普通方法：能用Num调用而不能用实例化对象调用    
+        print ('1')
+
+    def two(self):  # 实例方法：能用实例化对象调用，而不能用Num调用
+        print ('2')
+
+    @staticmethod   # 静态方法：能同时用Num和实例化对象调用
+    def three():   
+        print ('3')
+        # Num.two()   # 报错
+  
+    # 类方法：第一个参数cls是什么不重要，都是指Num类本身，调用时将类作为对象传入方法 
+    @classmethod  
+    def go(cls):     
+        cls().two() 
+        cls.two(cls)  
+
+Num.one()      # 1
+# Num.two()    # Error
+Num.three()    # 3
+Num.go()       # 2 2
+
+i = Num()                 
+# i.one()          # Error         
+i.two()            # 2       
+i.three()          # 3
+i.go()             # 2 2
+```
+
+### 总结：
+* `cls` 对应的是类本身，`self` 对应的是类实例化后的对象
+* `@staticmethod` 和普通的方法区别不太大，跟它所属的类没有必然联系，将一个 `staticmethod` 放到类的外部也是可以实现一样的功能，之所以放到类里面，是便于管理
+* `staticmethod`，`classmethod` 都不需要实例化，直接用`类名.方法名()`来调用，但区别是：`classmethod` 因为传入了一个 `cls`，可以调用类中定义的其他方法（例如`two()`），但 `staticmethod` 不行
+
+
+
+
 
 ## 2.4 一些处理文本的方法
 |方法|用途|

@@ -1,5 +1,4 @@
-# Few Sample Learning
-> Learning from Very Few Samples: A Survey  
+# Learning from Very Few Samples: A Survey  
 > https://arxiv.org/abs/2009.02653
 
 ## Definition
@@ -50,20 +49,53 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 
 <br>
 
-# Papers
-## Few-shot image classification 几篇串讲
-* Low-Shot Learning with Imprinted Weights：本质是将 embedding 归一化 + 最邻近（未 finetuning 的情况）；后续还可以 finetuning  
-* A New Meta-Baseline for Few-Shot Learning_arXiv20：提出了两个 baseline，一个 classifier-basleine，本质上就是 imprinting；另外一个 meta-baseline，是用 meta learning 的方法训练 classifier。结果是 meta-baseline 效果要比 classifier-basleine 好两个点，这当然是很正常的啊，毕竟 imprinting 只用做一次 forwading，本质上只是做一个权重的初始化 
-* Rethinking Few-Shot Image Classification: a Good Embedding Is All You Need?：把所有 meta training set 打包成一个训练集，然后用自监督的方法来训练 encoder，再用 meta testing 中的 support set 用来训练 classifier（固定 encoder）。文中比较了 `最邻近NN` 和 `逻辑回归LR`（也即一层FC层），LR 比 NN 高两个点左右
-* CrossTransformers: spatially-aware few-shot transfer：用对比学习训练 encoder，用一个 spatial-aware 的 transformer（用了 attention 机制） 将 encoder 得到的 embedding 再微调一下，classifier 用的 prototypical
-* A Baseline For Few-Shot Image Classification_ICLR20：没细看，但本质上还是 imprinting。文章得出的两个结论：imprinting 这种权重初始化的方式很有用，finetuning 很有必要，其实都是之前就知道的事实。本文 finetuning 用的 loss 比较特别，还用到了一个 query set 上的熵，也即每一次 inference 之前还得先训练一遍，运算量很大，但是带来的提升其实可以说不太显著
-* ProtoNet，RelationNet相关: A Comparison of Few-Shot Learning Methods for Underwater Optical and Sonar Image Classification  
-> 总结下，few-shot classification 有几个重要部分：encoder，embedding layer，classifier  
-> * Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
-> * Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下  
-> * Classifier 部分从很早之前就没怎么有革命性的方法：现在主流还是 NN （最邻近）或者 LR（一层 FC），一层FC layer等效于ProtoNet（用了NN） + Cosine distance。同时一般来讲 embedding L-2 normalization 可以有效果提升。从效果上来说，ProtoNet 好于 RelationNet 和 MatchingNet
+# Transductive Learning
+* Transductive vs. Inductive  
+    * 简单版本：在训练过程中，已知 testing data（unlabelled data）的是 transductive learning;在训练过程中，并不知道 testing data，训练好模型后去解决未知的 testing data 是 inductive learing
+    * 详细版本：Inductive learning：监督学习中的 train 和 test 集是不交叉的，这种叫做 inductive learning。半监督学习中我们添加了额外的未标记数据辅助训练，它的 train 和 test 集依然是不交叉的，叫做 inductive semi-supervise learning。 假设我们添加的这部分未标注的数据部分或者全部来自 test set，那么这时候很明显 train 和 test 就相交了，这种叫做 transductive learning
+
+* Transductive 在 few-shot 中的应用  
+    * few shot 定义：首先有 base classes 和 novel classes，他们的类别都没有交叉。其中 base classes 有全部的 label，novel classes 中每一类有 support set 和 query set，support set 有 label ，但是数据是 few shot 的。目标是在 query set 上达到很好效果
+    * Transductive inference：不仅要用 few-shot but labeled support set，也要用 unlabeled query set。每次 inference 时还得先再调调网络，自然效果要比只用 support set 训练的 inductive learning 好
+* Transductive 方法的缺点  
+    * 首当其冲的是 Overhead 也大，因为 inference 的时候需要现场训练，开销大概是 inductive 的100 倍以上
+    * 针对 stream data 可能不行，也就是 query set 的数据是一张一张来的，它可能训练不好
+
+<center class="center">
+    <img src="./pictures/tranductive_meta.png" width="560"/>
+</center>
 
 
+<br>
+
+#  Few-shot image classification 几篇串讲
+先来两篇不是 CV 顶会，但我认为有价值的：
+* 一文概括 ProtoNet，RelationNet: `A Comparison of Few-Shot Learning Methods for Underwater Optical and Sonar Image Classification`
+* `Augmenting Few-Shot Learning With Supervised Contrastive Learning`：监督式对比学习 + Tranductive learning，虽然原创性的东西不多，但文章整体效果不错、得到的 lesson 很实在、文章写得也不错，发在 IEEE Access 上还是有点可惜了。一个insight是：**`在 train 和 test set 不存在 domain shift 的基础上，将对比学习用在小数据集（CUB）上训练 base class，也能提高 few shot 性能；但缺点是对比学习训练时所需的 batch size 大，耗时长`**
+
+CV 顶会论文：
+* `Low-Shot Learning with Imprinted Weights`：本质是将 embedding 归一化 + 最邻近（未 finetuning 的情况）；后续还可以 finetuning  
+* `A New Meta-Baseline for Few-Shot Learning_arXiv20`：提出了两个 baseline，一个 classifier-basleine，本质上就是 imprinting；另外一个 meta-baseline，是用 meta learning 的方法训练 classifier。结果是 meta-baseline 效果要比 classifier-basleine 好两个点，这当然是很正常的啊，毕竟 imprinting 只用做一次 forwading，本质上只是做一个权重的初始化 
+* `Rethinking Few-Shot Image Classification: a Good Embedding Is All You Need?`：把所有 meta training set 打包成一个训练集，然后用自监督蒸馏的方法来训练 encoder，再用 meta testing 中的 support set 用来训练 classifier（固定 encoder）。文中比较了 `最邻近NN` 和 `逻辑回归LR`（也即一层FC层），LR 比 NN 高两个点左右。这是一个比较重要的 insight: **`non-parameter 的方法例如 Protonet 没有用 meta testing 阶段的 support set 去更改任何的网络权重，被证明效果不如 support set 去微调了分类器权重的 LR 方法`**
+* `CrossTransformers: spatially-aware few-shot transfer`：用对比学习训练 encoder，用一个 spatial-aware 的 transformer（用了 attention 机制） 将 encoder 得到的 embedding 再微调一下，classifier 用的 prototypical
+* `A Baseline For Few-Shot Image Classification_ICLR20`：没细看，但本质上还是基于 imprinting。文章得出的两个结论：imprinting 这种权重初始化的方式很有用，finetuning 很有必要，这其实之前就知道了。本文属于 transductive inference，finetuning 时用到的 loss 用到了一个 query set 上的熵，也即每一次 inference 之前还得先训练一遍，运算量很大，但是带来的提升其实可以说不太显著  
+* `Few-Shot Learning via Embedding Adaptation with Set-to-Set Functions (FEAT)`：简单理解就是 `ProtoNet + Transformer`，其中第5行是将 encoder 输出的 embedding 做一定排列之后输入 transformer 得到的新的 embedding
+<center class="center">
+    <img src="./pictures/feat.png" height="400"/>
+</center>
+
+
+
+
+**所以总结下，few-shot classification 有几个重要部分：encoder，embedding layer，classifier：**
+1. Encoder 部分可以有的创新比如对比学习、自监督蒸馏等，目的都是训练一个更有泛化性的 encoder  
+1. Embedding layer 可以用简单的 normalization （比如 imprinting 那篇），或者用 transformer 把 embedding 再提升下  
+1. Classifier 部分从很早之前就没怎么有革命性的方法：现在主流还是 NN （最邻近）或者 LR（也即一层 FC），一层 FC layer 在 one-shot 时等效于 ProtoNet（用了 NN 最邻近） + Cosine distance。当 shot 数变多时，ProtoNet 等直接将多张图的 embedding 求平均的做法略显粗暴，效果不如 LR。从效果上来说，ProtoNet 好于 RelationNet 和 MatchingNet。同时一般来讲 embedding L-2 normalization 可以有效果提升
+1. 其他的方法诸如 tranductive learning 等放宽了 inductive learning 的设定也可以达到更好的效果
+
+<br>
+
+# Paper List
 ## MAML & Reptile
 <center class="half">
     <img src="./pictures/maml.jpg" height="300"/>
