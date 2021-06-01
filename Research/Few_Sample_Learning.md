@@ -65,10 +65,26 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
     <img src="./pictures/tranductive_meta.png" width="560"/>
 </center>
 
+<br>
+
+# Meta learning 和 Federated Learning
+> 一个详细讲 Reptile 的文章（特别是那张图）： https://openai.com/blog/reptile/ 
+* Reptile 和 FedAvg 是有相似处的，都是一个 outerloop 和一个 innerloop（下图最左边一列）
+    * meta-learning 中一个 episode（或称作task），对应一次 client update
+    * 一个epoch，对应一个 FL round
+    * Reptile 中，step 多少步，对应 FedAvg 中的 local epoch
+
+        <center class="center">
+            <img src="./pictures/metaFL.png" width="800"/>
+        </center>
+
+* 但显然 Reptile 和 FL 也不能完全对应上
+    * Reptile 中，model 在接受第二个 episode 的梯度时，已经被第一个 episode 的数据改变
+    * 但 FedAvg 中，第二个 client 的梯度和第一个 client 的梯度相加后都是作用在同一个 global model 上
 
 <br>
 
-#  Few-shot image classification 几篇串讲
+# Few-shot image classification 几篇串讲
 先来两篇不是 CV 顶会，但我认为有价值的：
 * 一文概括 ProtoNet，RelationNet: `A Comparison of Few-Shot Learning Methods for Underwater Optical and Sonar Image Classification`
 * `Augmenting Few-Shot Learning With Supervised Contrastive Learning`：监督式对比学习 + Tranductive learning，虽然原创性的东西不多，但文章整体效果不错、得到的 lesson 很实在、文章写得也不错，发在 IEEE Access 上还是有点可惜了。一个insight是：**`在 train 和 test set 不存在 domain shift 的基础上，将对比学习用在小数据集（CUB）上训练 base class，也能提高 few shot 性能；但缺点是对比学习训练时所需的 batch size 大，耗时长`**
@@ -114,7 +130,8 @@ CV 顶会论文：
     > https://zhuanlan.zhihu.com/p/239929601
 
     * MAML 中 training tasks 是分为 support set 和 query set，Reptile 没有分（__实际上 meta-learning 不一定要分 support set 和 query set ！！__）
-    * 对于每个 training task，MAML 和 Reptile 都只走一步，但是方向不一样
+    * 对于每个 training task，MAML 和 Reptile 都只下降一步，但是方向不一样
+    * Reptile 如果只step一次（绿色的箭头），那和一般的训练就没有任何区别
 
 <br>
 
