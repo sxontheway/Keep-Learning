@@ -68,18 +68,26 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 <br>
 
 # Meta learning 和 Federated Learning
-> 一个详细讲 Reptile 的文章（特别是那张图）： https://openai.com/blog/reptile/ 
-* Reptile 和 FedAvg 是有相似处的，都是一个 outerloop 和一个 innerloop（下图最左边一列）
-    * meta-learning 中一个 episode（或称作task），对应一次 client update
-    * 一个epoch，对应一个 FL round
-    * Reptile 中，step 多少步，对应 FedAvg 中的 local epoch
+> 一个详细讲 Reptile 的文章： https://lilianweng.github.io/lil-log/2018/11/30/meta-learning.html 
 
+* Reptile 也可以分为 serial version 和 batched versions (将多个 episode/task 作为一个 batch)
+    <center class="center">
+        <img src="./pictures/reptile_version.jpg" width="800"/>
+    </center>
+
+* **Batched version Reptile** 和 FedAvg 是能对应上的，如下图。最左边一列，两者都是一个 outerloop 和一个 innerloop
+    * 对应关系
+        | Reptile  | FL |
+        |---------- | -----------|
+        | step k | local epoch of client |
+        | episode (也叫 task) | client update |
+        | epoch | FL round |
         <center class="center">
             <img src="./pictures/metaFL.png" width="800"/>
         </center>
 
-* 但显然 Reptile 和 FL 也不能完全对应上
-    * Reptile 中，model 在接受第二个 episode 的梯度时，已经被第一个 episode 的数据改变
+* Reptile Serial model 和 FedAvg 有一定区别
+    * Reptile Serial model 中，model 在接受第二个 episode 的梯度时，已经被第一个 episode 的数据改变
     * 但 FedAvg 中，第二个 client 的梯度和第一个 client 的梯度相加后都是作用在同一个 global model 上
 
 <br>
@@ -112,25 +120,27 @@ CV 顶会论文：
 <br>
 
 # Paper List
+> https://zhuanlan.zhihu.com/p/72920138  
+
 ## MAML & Reptile
 <center class="half">
-    <img src="./pictures/maml.jpg" height="300"/>
-    <img src="./pictures/reptile.jpg" height="300"/>
+    <img src="./pictures/maml_reptile.jpg" width="800"/>
 </center>
 
-* MAML：
-    > https://zhuanlan.zhihu.com/p/72920138
-    > https://zhuanlan.zhihu.com/p/66926599
+* MAML-FO (First Order)：
 
-    MAML 要解决的问题，本质上是使得网络在所有 training task 的 query set 上的loss之和最小化。经过一些数学近似（忽略高阶项），训练策略可简化为：
+    MAML 的优化目标，是使得 Loss 对于所有 task T `(T_i~P(T))` 的期望最小。按照大数定理，采样次数越多，就能接近无偏估计，所以期望这个东西的具体实现方式是：迭代地用每个 task 进行更新 （Algorithm 1第八行）。
 
-    * 对于每一个training task：设初始模型为 M0，先在 support set 上迭代一次，进行一次BP，得到 M1。M1再在 query set 迭代一次，算出梯度，最终用该梯度对 M0 进行更新得到 M'，这就完成了在一个 training task 上的学习  
+    * 对于 Few-shot 问题，Algorithm 1第八行的 update 是在 query set 上做，因为在 meta-teat 阶段优化目标也是去预测 query set 的类别。  
+    具体方法：对于每一个training task：设初始模型为 M0，先在 support set 上迭代一次，进行一次BP，得到 M1。M1再在 query set 迭代一次，算出梯度 g，最终用该梯度 g 对 M0 进行更新得到 M'，这就完成了在一个 training task 上的学习  
+
+        <center class="half">
+            <img src="./pictures/maml_algr.jpg" width="780"/>
+        </center>
 
 * Reptile
-    > https://zhuanlan.zhihu.com/p/239929601
-
     * MAML 中 training tasks 是分为 support set 和 query set，Reptile 没有分（__实际上 meta-learning 不一定要分 support set 和 query set ！！__）
-    * 对于每个 training task，MAML 和 Reptile 都只下降一步，但是方向不一样
+    * 对于每个 training task，MAML 和 Reptile 都只进行一次模型的 update，但是方向不一样
     * Reptile 如果只step一次（绿色的箭头），那和一般的训练就没有任何区别
 
 <br>
