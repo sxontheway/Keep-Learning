@@ -95,6 +95,15 @@ Meta-learning 是解决 Few-shot 问题的一种训练策略，可以和其他�
 # Few-shot image classification 几篇串讲
 先来两篇不是 CV 顶会，但我认为有价值的：
 * 一文概括 ProtoNet，RelationNet: `A Comparison of Few-Shot Learning Methods for Underwater Optical and Sonar Image Classification`
+    * ProtoNet 的 meta learning 的方法既不是 MAML，也不是 Reptile：ProtoNet 是在 few-shot 设定下的一种 meta learning 方法，MAML 和 Reptile 是通用的梯度下降的方法，但 ProtoNet 和 MAML 有点相似
+
+        || Reptile  | MAML(FO) | ProtoNet |
+        |------|---------- | -----------| -----------|
+        |区分support和query set吗?| no | yes | yes|
+        |计算loss| 任何一张图都可以计算 | 任何一张图都可以计算 | 需要联合support和query set才能计算
+        |BP的梯度的来源| 任何一张图 | query set（但是model是先在support set上下降过的） | query set |
+        |一个episode下降几步| 多步的叠加 | 下降一步 | 下降一步 |
+
 * `Augmenting Few-Shot Learning With Supervised Contrastive Learning`：监督式对比学习 + Tranductive learning，虽然原创性的东西不多，但文章整体效果不错、得到的 lesson 很实在、文章写得也不错，发在 IEEE Access 上还是有点可惜了。一个insight是：**`在 train 和 test set 不存在 domain shift 的基础上，将对比学习用在小数据集（CUB）上训练 base class，也能提高 few shot 性能；但缺点是对比学习训练时所需的 batch size 大，耗时长`**
 
 CV 顶会论文：
