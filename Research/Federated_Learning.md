@@ -14,7 +14,7 @@
 下面根据上图，对一些分支的文献进行一个整理：
 
 ## Data-based
-* `Federated Learning with Non-IID Data`：server 给 client 发一小部分 shared data，减少 weight deviation  
+* `FedPer_Federated Learning with Non-IID Data`：server 给 client 发一小部分 shared data，减少 weight deviation  
 * 还可以对不均衡样本进行 over-sampling，down-sampling, GAN 之类的方法
 
 ## Model-based 
@@ -58,24 +58,49 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
 ### N-model
 * Multi-task Learning  
     * `MOCHA_NIPS17`：每个 client 都要求参与每个 FL round，并且需要上传一个关于 raw data 的 linear transformation，而不仅是 model
-* Transfer Leraning  
-连 model 都不用上传了，而上传对于一个 public dataset 的预测结果（作为 knowledge）。server 对 knowledge 进行 aggregate，client 利用 aggregated knowledge 进行知识蒸馏。但这类方法需要一个 public dataset 来做知识蒸馏，算是传统 FL 形式的拓展，支持 heterogeneous models.
-    * `Personalized Federated Learning for Intelligent IoT Applications: A
-Cloud-Edge based Framework`  
-    * `FedMD: Heterogenous Federated Learningvia Model Distillation`
+* Transfer Leraning/ Knowledge Distillation  
+连 model 都不用上传了，而上传对于一个 (public dataset + private dataset) 的 logit 预测结果（作为 knowledge）。server 对 knowledge 进行 aggregate，client 利用 aggregated knowledge 进行知识蒸馏（local model 作为学生）。但这类方法需要一个 public dataset 来做知识蒸馏，算是传统 FL 形式的拓展，支持 heterogeneous models
+    * `Personalized Federated Learning for Intelligent IoT Applications: A Cloud-Edge based Framework`  
+    * `FedMD: Heterogenous Federated Learningvia Model Distillation`：知识蒸馏在 client 端进行，server 负责 aggregate logit；classifier所需的分类数 = public dataset类别数 + private dataset类别数
 
+### Multiple-Model --> Clustering
+* 我们组现有的工作主要在这个方向，比如 `ClusterFL`, `FedDL`
 
-### Non-iid
-* 通过改 server 端 aggregation 算法
-    * ***`Federated Learning on Non-IID Data Silos: An Experimental Study`*** (挺有启发的一篇文章)：比较了 FedAvg, FedProx,  SCAFFOLD, FedNova 几种算法，有几个观察：
-        * IID 时，FedAvg 不比其他3个方法差；Feature distribution skew, quantity skew 情况下，准确率下降不明显，并且 FedAvg 甚至比其他三个更好（The state-of-the-art algorithms signifi-cantly outperform FedAvg only in several cases）
-        * Label distribution skew（也即 label non-iid）确实会带来巨大准确率下降。极端 non-iid 情况下，FedProx 比 FedAvg 稍好
-        * SCAFFOLD, FedNova 在很多情况下不稳定（可以排除掉了）
-        * Dirichlet 分布产生的 Label distribution skew 相比每个 client 只有一类这种极端情况，要稍微好一点。另外这篇文章也提到，只有一类这种极端情况在现实中也可能存在，比如 speaker recognition
-    * `FedAdp: Fast-Convergent Federated Learning with Adaptive Weighting_IEEE_TCCN21`：server 通过计算每个 client 上传的梯度之间两两的夹角（相似度），得到对每个 model 的权重，而不是像 FedAvg 那样简单平均（权重都相等）
-* 其他
-    * `FedBN: Federated Learning on Non-IID Features via Local Batch Normalization_ICLR21`：server does not aggregate BN layers
-    * `On The Convergence of FedAvg on Non-IID_ICLR20`：从理论和实验上证明对于 non-iid，Fedavg 需要 learning rate decay
+<br>
+
+# Non-iid
+## 通过改 server 端 aggregation 算法
+* ***`Federated Learning on Non-IID Data Silos: An Experimental Study`*** (挺有启发的一篇文章)：比较了 FedAvg, FedProx,  SCAFFOLD, FedNova 几种算法，有几个观察：
+    * IID 时，FedAvg 不比其他3个方法差；Feature distribution skew, quantity skew 情况下，准确率下降不明显，并且 FedAvg 甚至比其他三个更好（The state-of-the-art algorithms signifi-cantly outperform FedAvg only in several cases）
+    * Label distribution skew（也即 label non-iid）确实会带来巨大准确率下降。极端 non-iid 情况下，FedProx 比 FedAvg 稍好
+    * SCAFFOLD, FedNova 在很多情况下不稳定（可以排除掉了）
+    * Dirichlet 分布产生的 Label distribution skew 相比每个 client 只有一类这种极端情况，要稍微好一点。另外这篇文章也提到，只有一类这种极端情况在现实中也可能存在，比如 speaker recognition
+* `FedMA_Federated learning withmatched averaging_ICLR20`：对于每一层（以FC为例），local dataset 训练得到的 weight 是 optimal 乘上一个 L*L 的矩阵，其中 L 是 hidden unit 数量。在 server 端，可以先求出来每一层的这个变换矩阵（通过迫使 global model 和 local model 变换后接近），再 aggregate；缺点是不支持 BN 层
+* `FedBN: Federated Learning on Non-IID Features via Local Batch Normalization_ICLR21`：server does not aggregate BN layers，探索的是 BN 层怎么 aggregate 的问题
+
+* `FedDF_Ensemble Distillation for Robust Model Fusion in Federated Learning_NIPS20`
+    * 最终目标还是产生一个 model，不是 personalized FL；其中知识蒸馏在 server 端进行，client 还是只需要上传 model
+    * 相比于 FedAvg（算法第6行为止），FedDF 多了在 server 上的 N 次迭代；每次迭代中，将 client models 对于 `samples d` 的 logit 的平均值作为 teacher，global model（`x_{t, j-1}`）作为 student
+    <center class="left">
+        <img src="./pictures/feddf.jpg" width="600"/>
+    </center>
+* `FedAdp: Fast-Convergent Federated Learning with Adaptive Weighting_IEEE_TCCN21`：server 通过计算每个 client 上传的梯度之间两两的夹角（相似度），得到对每个 model 的权重，而不是像 FedAvg 那样简单平均（client 样本数量相同时，权重都相等）
+
+## 利用 Embedding 的方法
+* `FedAWS_Federated Learning with Only Positive Labels_ICML20` 
+
+    * 文章的 setting 是每个 client 只有一类数据，怎么在 FL 下训练一个多分类的 model，很明显是 extreme non-iid 的，FedAvg 肯定不行。并且本文说，classifier 本质上是 class embedding，是比较敏感的，所以本文假设 client 只能从 server 获取 classifier 中属于它的那一类的权重（***`但是 server 还是知道每个 client 是哪一类，这个并不算破坏了隐私，而应该算是 FL 上传 model 本身带来的问题`***）
+    * 于是本文提出了一个在 server 端的规范项，强迫来自每个 client 的 class embedding 彼此之间有距离
+    * 比较有趣的一个发现是，在算法的第7行，如果把 classifier `ω_i` 固定，也能得到接近于 upper bound 的结果，见文章的 baseline2，这一点很有启发
+    * 剩下的解读见：https://zhuanlan.zhihu.com/p/168016399  
+        <center class="center">
+            <img src="./pictures/fedaws.jpg" width="900"/>
+        </center>
+* `FedUV_Federated Learning of User Verification Models Without Sharing Embeddings_ICLR21_rej`
+
+## 一些理论和实验
+* `On The Convergence of FedAvg on Non-IID_ICLR20`：从理论和实验上证明对于 non-iid，Fedavg 需要 learning rate decay
+
 * FedAvgM 好于 FedAvg
     * `Measuring the Effects of Non-Identical Data
 Distribution for Federated Visual Classification`：人为产生 Non-iid 的数据，也可以用 Dirichlet 分布
