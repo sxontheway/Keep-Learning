@@ -538,9 +538,23 @@ if __name__ = "__main__":
 
     # 输出结果分别为 1 2 3 4 5
     ```
-* global和nonlocal关键字的使用: https://blog.csdn.net/youngbit007/article/details/64905070
-  * python变量查找法则：LEGB（见闭包一节）
-  * 如果内部函数有引用外部函数的同名变量或者全局变量，并且对这个变量有修改，那么python会认为它是一个局部变量；global关键字用于在函数或其他局部作用域中使用全局变量  
+* global和nonlocal关键字的使用: 
+  * python 变量查找法则：LEGB，见 https://zhuanlan.zhihu.com/p/111284408 
+  * python 可以遵循 LEGB 法则自动在函数之外查找变量，变量的修改就严格得多
+
+    * 如果函数内部有引用同名的全局变量，并且对其做了修改，那么python会认为它是一个局部变量。要在函数内修改全局变量，必须用 global 关键字 
+    * 有意思的是，在函数中也可以随时定义 global 变量，使得它可以被其他函数使用
+  
+        ```python
+        def a():
+            global q # 若去掉这一行，显然会报错
+            q=7
+        def b():
+            print(q)
+
+        a(); b()
+        print(q)    # 输出 7 7 
+        ```
   * nonlocal关键字用来在函数或其他作用域中使用外层 **(非全局)** 变量
     ```python
     def funx():
