@@ -87,11 +87,13 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
 * `FedAdp: Fast-Convergent Federated Learning with Adaptive Weighting_IEEE_TCCN21`：server 通过计算每个 client 上传的梯度之间两两的夹角（相似度），得到对每个 model 的权重，而不是像 FedAvg 那样简单平均（client 样本数量相同时，权重都相等）
 
 ## 利用 Embedding 的方法
-* `FedAWS_Federated Learning with Only Positive Labels_ICML20` 
+* `FedAWS_Federated Learning with Only Positive Labels_ICML20`：一篇很有意思的文章！！
 
     * 文章的 setting 是每个 client 只有一类数据，怎么在 FL 下训练一个多分类的 model，很明显是 extreme non-iid 的，FedAvg 肯定不行。并且本文说，classifier 本质上是 class embedding，是比较敏感的，所以本文假设 client 只能从 server 获取 classifier 中属于它的那一类的权重（***`但是 server 还是知道每个 client 是哪一类，这个并不算破坏了隐私，而应该算是 FL 上传 model 本身带来的问题`***）
     * 于是本文提出了一个在 server 端的规范项，强迫来自每个 client 的 class embedding 彼此之间有距离
-    * 比较有趣的一个发现是，在算法的第7行，如果把 classifier `ω_i` 固定，也能得到接近于 upper bound 的结果，见文章的 baseline2，这一点很有启发
+    * 有两个有趣的发现：
+        * 如果不要第14行，也即只有 positive loss，那么得到的 global model 对于所有类会产生几乎相同的 embedding。因为在这种情况下，classifier 本质上并没有被训练，而 backbone 收敛的条件是 local model 和 fedavg 之后的 global model 几乎相同，也即每个 client 上用不同类别的数据训练出来的 local model 是相同的（只有驱同的力，而没有将不同类别/local model分开的力）。
+        * 在算法的第7行，如果把 classifier `ω_i` 固定，也能得到接近于 upper bound 的结果，见文章的 baseline2，文章中有解释
     * 剩下的解读见：https://zhuanlan.zhihu.com/p/168016399  
         <center class="center">
             <img src="./pictures/fedaws.jpg" width="900"/>
