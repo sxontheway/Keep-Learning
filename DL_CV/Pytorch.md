@@ -184,10 +184,12 @@ pytorch 中，对于中间变量（由别的变量计算得到的变量）/ Modu
   > 注意： `len([x for x in model.modules()])` 会比 `len([[x for x in model.parameters()])` 大，因为前者遍历了 a hierarchy of model（包含中间节点），后者只遍历了 model graph 的叶节点
 
 * 例子
-  * 打印网络
+  * 打印网络每层名字，大小，是否需要梯度  
     ```python
     for name, param in model.named_parameters():
-        print(name, ' ', param.size())
+        print(name, ' ', param.size(), param.requires_grad)
+        print(type(param), type(param.detach()))  # <class 'torch.nn.parameter.Parameter'> <class 'torch.Tensor'>
+        # torch.nn.parameter.Parameter 是 torch.Tensor 的子类，用了 .detach() 梯度就不反传了  
     ```
 
   * 初始化网络： 
@@ -286,7 +288,7 @@ tensor 能像 numpy array 一样进行索引
 Tensor与numpy对象共享内存，但numpy只支持CPU，所以他们在CPU之间切换很快。但也意味着其中一个变化了，另外一个也会变。
 * tensor 和 python 对象转换：  
 `tensor.tolist()`：多个元素的tensor  
-`tensor.item()`：只含一个元素的tensor
+`tensor.item()`：只能用于含一个元素的tensor（标量）  
 
 * Torch -> NumPy:
   ```python
