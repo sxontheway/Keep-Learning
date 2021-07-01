@@ -1,6 +1,59 @@
 # 1.多进程
 > 官方文档： https://docs.python.org/zh-cn/3/library/multiprocessing.html
+## 基础
+* `p.daemon = True`：进程 p 作为守护进程，也即当主进程结束时，无论子进程是否还在运行，都伴随主进程一起退出（主死子死）
+* `p.start()`：主进程开启进程，不会产生阻塞
+* `p.join()`：主进程会阻塞，会一直等到子进程返回，和 `daemon=True` 正好相反
+
+
 ## Process 类
+一个类用一个进程（需要继承 Process）。使用 event，主进程可以选择性激活某些类，未激活的类处于 wait 状态（在联邦学习的多进程实现中会有用）
+```python
+import multiprocessing
+from multiprocessing import Process
+
+class Local(Process): 
+    def __init__(self, client_num, event):
+        super(Local, self).__init__()
+        self.num = client_num
+        self.event = event
+
+    def run(self):
+        while 1:
+            print(f"{self.num}--before")
+            self.event.wait()
+            print(f"{self.num}--after")
+            self.event.clear()
+
+
+if __name__ == '__main__':
+
+    process_list, event_list = [], []
+    for i in range(5):  
+        e = multiprocessing.Event()
+        p = Local(i, e) 
+        process_list.append(p)
+        event_list.append(e)
+
+    for p in process_list:
+        p.daemon = True
+        p.start()
+
+    for i in range(5):
+        p = process_list[0]
+        p.event.set()
+        time.sleep(1)
+
+    import time
+    time.sleep(10)
+
+    for p in process_list:
+        p.terminate()
+
+    print("End")
+```
+
+多进程运行函数：
 ```python
 from multiprocessing import Process
 
@@ -127,14 +180,21 @@ if __name__ == '__main__':
         except:
             pool.terminate()
     ```
+## 随机数
+* 多进程的各个子进程中，可能会产生相同的随机数：https://blog.csdn.net/largetalk/article/details/7910400 
 
 <br>
 
 # 2.多线程  
+## 多线程之间可以贡献全局变量：  
+https://zhuanlan.zhihu.com/p/258716555  
+
+## GIL锁
 Python虽然有多线程，但python解释器执行代码时，有一个GIL锁：`Global Interpreter Lock`。任何Python线程执行前，必须先获得GIL锁，然后每执行100条字节码，解释器就自动释放GIL锁，让别的线程有机会执行。所以，多线程在Python中只能交替执行，即使100个线程跑在100核CPU上，也只能用到1个核。不过，Python虽然不能利用多线程实现多核任务，但可以通过多进程实现多核任务。多个Python进程有各自独立的GIL锁，互不影响。  
 
 简单来说，python多线程能提高IO密集型任务的效率；对于计算密集型，需要用多进程。  
 PS：但有了协程之后，python的多线程就显得鸡肋了。在 2.x 系列里我们可以使用 gevent，在 3.x 系列的标准库里又有了 asyncio 。IO bound 的问题完全可以用协程解决。而且我们可以自主的控制协程的调度了。为什么还要使用由 OS 调度的不太可控的线程呢？
+
 
 <br>
 
