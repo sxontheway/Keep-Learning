@@ -100,5 +100,23 @@ public:
 ------
 <br><br>
 
-# 3. 实践：用OpenCV读取多个读取多个IP摄像头的视频流
+# 3. 实践
+* OpenCV读取多个读取多个IP摄像头的视频流
 > https://zhuanlan.zhihu.com/p/38136322  
+
+* 用 cv2 写视频
+> https://blog.csdn.net/Arctic_Beacon/article/details/111587432  
+> https://stackoverflow.com/questions/57235454/opencv-video-write-out-size-is-reduced
+
+```python
+filename_rgb = f"{foldername}/rgb.avi"
+fourcc_rgb = cv2.VideoWriter_fourcc(*'XVID')  # size: `fourcc = 0` > HFYU >> MJPG >> DIVX = XVID
+# fourcc_rgb = 0      # the raw video, no compression
+vout_rgb = cv2.VideoWriter()
+vout_rgb.open(filename_rgb, fourcc_rgb, 30, (640, 480), isColor=True)
+ 
+while 1:
+   vout_rgb.write(rgbframe)
+```
+ 
+ 
