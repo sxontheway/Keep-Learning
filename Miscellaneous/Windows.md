@@ -19,7 +19,11 @@
     * 下载textlive，特别需要注意的一点是：`需要用管理员权限安装`，否则会报错
     * 用Texlive，file 'slashbox.sty' not found：https://blog.csdn.net/u010801696/article/details/79410545  
  
-
+* 两台 Windows 传共享数据: 假设电脑A要传数据给电脑B  
+   > https://consumer.huawei.com/cn/support/content/zh-cn00688400/ 
+   * B开热点，A连B的 wifi，在A上用 ifconfig 查看自己的 ip
+   * 在 A 上对想要共享的文件夹点右键：give access to
+   * 在B上：`win+r`, `\\192.168.XXX.XXX` 即可访问A上共享的文件夹
 
 # Others
 * Visio 形状搜索始终找不到
