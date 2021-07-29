@@ -3,6 +3,16 @@
 ---
 <br>
 
+* python 不能在 for 循环中直接修改列表元素  
+需要用索引来改变 
+  ```python
+  import numpy as np  
+  a = np.array([1,2,3,4,5])
+  for i in a:
+      if i < 5:
+          i = 1
+  ```
+
 * PIL image shape 是 `W*H`，numpy 存图片是 `H*W`，输入CNN的tensor是 `C*H*W`
 
 <br>
