@@ -160,8 +160,8 @@
 * 首先安装 Vscode 插件：
    * PC 上 Remote X11 (SSH)
    * TX2 上 Remote X11
-* PC 上安装 X Server，推荐 vcxsrv：https://sourceforge.net/projects/vcxsrv/ 
-* 配置使用密钥登录、并开启 X11 Forwarding
+* PC 上安装 X Server，推荐 XMing：https://zh.osdn.net/projects/sfnet_xming/downloads/Xming/6.9.0.31/Xming-6-9-0-31-setup.exe/  
+* 配置使用密钥登录（免密码）、并开启 X11 Forwarding
    > https://blog.csdn.net/u010417914/article/details/96918562  
    > https://zhuanlan.zhihu.com/p/260189540  
    * 在 TX2 上
@@ -214,6 +214,7 @@
 
 * PC 上重启 VScode 并连接 reomte
 * 打开 Xlaunch，选择 Display Number=10（和TX2的环境变量要匹配），其他默认
+  * 后来试了试，即便`echo $DISPLAY` 输出10，`Xlaunch`中选0也可以成功显示
 * 运行 `xeyes`，或`xclock`，或下面的 python 画图程序
    ```python
    import matplotlib.pyplot as plt
