@@ -17,12 +17,13 @@ store命令`sudo  ~/jetson_clocks.sh --store`，restore命令`sudo  ~/jetson_clo
 * ROS Kinetic的安装： https://github.com/sxontheway/Keep-Learning/blob/master/ROS/ros_basic.md  
 * Jetpack3.3，Scipy通过pip安装奇慢无比(20-30分钟)。但用`sudo apt-get install python3-scipy`安装，版本会过低。
 * 刷了Jetpack4.2之后，安装十分方便。  
-刷机见：https://developer.nvidia.com/embedded/jetpack  
-pytorch 安装见:https://devtalk.nvidia.com/default/topic/1049071/jetson-nano/pytorch-for-jetson-nano/  
-pip,numpy,tensorflow,deepstream,tensorrt在刷机时就可以安好  
-torchvision安装：sudo pip3 install torchvision  
-scikit-learn安装: 需要先安装`sudo apt-get install gfortran`, `sudo pip3 install Cython`
-VSCode安装及Romote Control：https://www.jetsonhacks.com/2019/10/01/jetson-nano-visual-studio-code-python/ 
+    * 刷机见：https://developer.nvidia.com/embedded/jetpack 中的 NVIDIA SDK Manager 部分。连线上只需要从 PC 连一个 usb 线出来插到 tx2 的 microUSB 口即可  
+    * 库安装  
+    pytorch 安装见:https://devtalk.nvidia.com/default/topic/1049071/jetson-nano/pytorch-for-jetson-nano/  
+    pip,numpy,tensorflow,deepstream,tensorrt在刷机时就可以安好  
+    torchvision安装：sudo pip3 install torchvision  
+    scikit-learn安装: 需要先安装`sudo apt-get install gfortran`, `sudo pip3 install Cython`  
+    VSCode安装及Romote Control：https://www.jetsonhacks.com/2019/10/01/jetson-nano-visual-studio-code-python/ 
 
 # 3. TX2上两个cores被禁用
 > https://forums.developer.nvidia.com/t/cannot-enable-denver-cores-for-tx2-jetpack-4-4-dp/124708/48

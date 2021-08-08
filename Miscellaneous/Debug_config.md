@@ -1,4 +1,6 @@
-# 整理
+# 配环境相关操作
+
+## Debug
 * Ubuntu 命令
    * `uname -a`: 输出操作系统信息 
 
@@ -138,22 +140,35 @@
 
 <br>
 
+## Linux 下多 python 版本
+已经有了 python2.7, python3.6，但想用 python3.8 的多进程间 share_memory 的功能，于是想要在 TX2 上安装 python 3.8  
 
-# 服务器运维
+* 安装 python 3.8: https://linuxize.com/post/how-to-install-python-3-8-on-ubuntu-18-04/  
+   ```bash
+   sudo apt update
+   sudo apt install software-properties-common
+   sudo add-apt-repository ppa:deadsnakes/ppa
+   sudo apt install python3.8
+   python3.8 --version
+   ```
 
-## Soft Lockup and Hard Lockup
-> https://blog.csdn.net/Rong_Toa/article/details/109606560  
+*  使用 update-alternatives
+   ```bash
+   # 查看路径
+   which update-alternatives     # 返回 /usr/bin/update-alternatives
 
-实验室serve崩了，症状：不能SSH，键盘连接到USB口指示灯不亮（USB口无供电），接上显示屏：`sending NMI from CPU 23 to CPUs31; Shutting down cpus with NMI; Hard LOCKUP`  
-解决方案：强制重启  
+   # 添加 py3.8 到 update-alternatives
+   sudo /usr/bin/update-alternatives --install /usr/bin/python python /usr/bin/python3.8
 
-<br>
+   # 切换版本
+   sudo /usr/bin/update-alternatives --config python
+   ```
+
 
 ## Vscode + Remote + X11 Forwarding
 ### 起因
 尝试在 TX2 上安装了 VScode，但是键盘按键有延迟，于是放弃；但是有可视化需求，故打算对 TX2 配置 Remote + X11 Forwarding  
 需求：在 Windows 10 PC 上用 Vscode remote，对 TX2 的窗口进行可视化
-
 
 ### 步骤
 > https://blog.csdn.net/Dteam_f/article/details/109806294  
@@ -226,6 +241,19 @@
    ```
 
 <br>
+
+
+
+# 服务器运维
+
+## Soft Lockup and Hard Lockup
+> https://blog.csdn.net/Rong_Toa/article/details/109606560  
+
+实验室serve崩了，症状：不能SSH，键盘连接到USB口指示灯不亮（USB口无供电），接上显示屏：`sending NMI from CPU 23 to CPUs31; Shutting down cpus with NMI; Hard LOCKUP`  
+解决方案：强制重启  
+
+<br>
+
 
 ## 记另一次服务器修复
 ### 起因
