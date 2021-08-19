@@ -5,6 +5,20 @@
 * Windows 上用 Vscode 配置 C  
    * Windows 10上使用vscode编译运行和调试C/C++，需要下载compiler，例如 `MingW`，见：https://zhuanlan.zhihu.com/p/77645306  
 
+* Windows 上深度学习环境的搭建：cuda + cudnn + conda + pytorch
+   * 下载安装 CUDA Toolkit，选择默认安装（会重装显卡驱动）
+   * 下载 CuDNN，要与 CUDA 版本一致
+   * 将 `cudnn-11.4-windows-x64-v8.2.2.26/cuda/bin` ，`xx/lib`, `xx/include` 中的内容复制到 `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.4` 中的对应目录
+   * 添加 **系统的** 环境变量： 
+      * C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2
+      * C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64
+   * 检查安装结果：`nvidia-smi`
+   * 下一步是下载安装 conda：https://www.anaconda.com/products/individual  
+      安装过程中不要勾选替代系统 python 环境之类的
+   * 添加 **系统的** 环境变量：`E:\anaconda3\Library\bin`
+      * 这个命令不会让系统自动调用自动 conda 的 python，而需要通过在 shell 里面输入 conda activate base 才能启动
+   * 紧接着安装 pytorch，按照官网的 pip 命令就可以   
+
 * Windows + Vscode 上用 bash
    > https://stackoverflow.com/questions/42606837/how-do-i-use-bash-on-windows-from-the-visual-studio-code-integrated-terminal
    * 需要先安装 git bash
@@ -18,7 +32,7 @@
 * Windows + VSCode + latex
     * 下载textlive，特别需要注意的一点是：`需要用管理员权限安装`，否则会报错
     * 用Texlive，file 'slashbox.sty' not found：https://blog.csdn.net/u010801696/article/details/79410545  
- 
+
 * 两台 Windows 传共享数据: 假设电脑A要传数据给电脑B  
    > https://consumer.huawei.com/cn/support/content/zh-cn00688400/ 
    * B开热点，A连B的 wifi，在A上用 ifconfig 查看自己的 ip
