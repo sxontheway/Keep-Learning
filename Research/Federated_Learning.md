@@ -44,9 +44,10 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
 * 其他的比如 `Elastic Weight Consolidation (EWC)` 等
 
 ### Parameter-decoupling
-* 左图：client 同时 end-to-end 训练 backbone 和 classifier，但是 FL 过程只上传 backbone，server 也只对 backbone 进行 aggregation。下面两篇都是基于这个思想
+* 左图：client 同时 end-to-end 训练 backbone 和 classifier，但是 FL 过程只上传 backbone，server 也只对 backbone 进行 aggregation。下面3篇都是基于这个思想
     * `FedPav: Performance Optimization for Federated PersonRe-identification via Benchmark Analysis_MM20`  
-    * `Federated Learning with Personalization Layers`
+    * `Federated Learning with Personalization Layers`  
+    * `Exploiting Shared Representations for Personalized Federated Learning_ICML21`: local update 先固定 backbone 更新 classifier，再固定 classifier 更新 backbone，并上传   
 
 * 右图：和上面一篇刚好反过来，FL 过程中只上传并 aggregate classifier；client 上的训练分两步：先固定 aggregate 的 classifier 训练 backbone，再训练 classifier。背后的思想是，FL 得到的 classifier 比较平均，有助于迫使 client 端训练的 backbone 不要过拟合，同时这种方法能减少通信代价
 `LG-FEDAVG: Think Locally, Act Globally:Federated Learning with Local and Global Representations_NIPS19W`
