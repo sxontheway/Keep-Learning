@@ -1,3 +1,26 @@
+# 协方差
+## 样本方差 和 样本方差的无偏估计
+方差：分母为N；样本方差的无偏估计，分母为 N-1  
+* 直观的解释：如果在样本的均值给定的情况下，样本方差的无偏估计也是以 N 为分母的；但实际上，样本的均值本来也不是确定的，相当于实际的不确定度比 `以N为分母的方差` 大  
+* 数学推导：https://www.zhihu.com/question/20099757/answer/13971886
+
+<p align="center" >
+<img src="./pictures/var.png" width=600">
+</p>
+
+## 协方差
+> https://blog.csdn.net/zch1990s/article/details/80005940  
+```python
+import numpy as np
+x = np.array([[0, 2], [1, 1], [2, 0]])  # shape (3,2)，3个样本，两个维度
+y = np.cov(x.T)   # shape (2,2)，先转置，才能求维度和维度之间的 cov
+```
+求出的协方差，可以用来生成多元正态分布矩阵等等：
+`np.random.multivariate_normal(mean, cov, size=None, check_valid=None, tol=None)`，这里 cov 要的是维度和维度之间的协方差，而不是样本和样本之间的相关系数
+
+<br>
+---
+
 # 分布
 * 伯努利分布重复 n 次就是二项分布
 * 二项分布和 Beta 分布共轭

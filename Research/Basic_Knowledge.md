@@ -13,7 +13,9 @@
         如果只输出一个标量，用sigmoid，那么只最后得到一个score，还需要手动选取阈值确定是笑脸还是哭脸，而这个阈值可能和训练数据分布有很大关系。
 
 * 为什么 Loss Function 要用对数？  
-    * 对于 Logistic Loss Function: 最小化Loss Function = 最大化二项分布的对数似然函数 = 最大化二项分布的似然函数
+    >  https://blog.csdn.net/saltriver/article/details/63683092  
+
+    * 对于 Logistic Loss Function: 最小化Loss Function = 最大化二项分布的对数似然函数 = 最大化二项分布的似然函数 `L(θ)=P(y=1|x)^y * P(y=0|x)^(1-y)`
     * 同理，对于Cross Entropy: 最小化Loss Function = 最大化多项分布的对数似然函数
 
 * focal loss
