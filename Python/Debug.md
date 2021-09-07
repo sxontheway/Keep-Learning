@@ -108,3 +108,7 @@ opencv读入的图像是BGR，要转化为RGB，可以有如下两种实现，�
     ```
 
 <br>
+
+* weight_decay 会导致本来不应该梯度更新的参数改变
+  * FC 层得到的 logit 是 (batch_size, 10)。我们只选取第 1,3,5,7,9 类，得到 (batch_size, 5) 的 tensor，进行 CrossEntropy 求 loss。在这种情况下，对应第 0,2,4,6,8 类的权重是应该不会变的，但训练发现它们都变了  
+  * 问题出在 weight_decay：没有设成 0。现象：将 grad print 出来，发现 grad 都是 0，然后 weight 的 parameter 随着训练不断减小
