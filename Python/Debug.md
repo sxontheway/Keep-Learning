@@ -3,6 +3,11 @@
 ---
 <br>
 
+* 联邦学习在 server 上用多进程模拟多个 client，报错：  
+`RuntimeError: unable to open shared memory object </torch_161471_2025326299> in read-write mode`，  
+解决方案：将 `import torch.multiprocessing` 改成 `import multiprocessing` 就好了   
+
+
 * python 不能在 for 循环中直接修改列表元素  
 需要用索引来改变 
   ```python
