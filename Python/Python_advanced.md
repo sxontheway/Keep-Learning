@@ -7,7 +7,8 @@
 
 
 ## Process 类
-一个类用一个进程（需要继承 Process）。使用 event，主进程可以选择性激活某些类，未激活的类处于 wait 状态（在联邦学习的多进程实现中会有用）
+* 对一个不包含 target 属性的 Process 类执行 `start()` 方法，就会运行这个类中的 `run()` 方法，所以这里会执行 `Local.run()`：https://blog.csdn.net/sinat_35360663/article/details/78328448
+* 一个类用一个进程（需要继承 Process）。使用 event，主进程可以选择性激活某些类，未激活的类处于 wait 状态（在联邦学习的多进程实现中会有用）
 ```python
 import multiprocessing
 from multiprocessing import Process

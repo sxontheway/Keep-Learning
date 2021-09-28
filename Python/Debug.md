@@ -3,6 +3,31 @@
 ---
 <br>
 
+* 联邦学习在 server 上用多进程模拟多个 client，报错：  
+`RuntimeError: unable to open shared memory object </torch_161471_2025326299> in read-write mode`，  
+  * 解决方案：将 `import torch.multiprocessing` 改成 `import multiprocessing` 就好了   
+  * torch.multiprocessing 是对 Python 的 multiprocessing 模块的一个封装。它添加了一个新方法 `share_memory_()`，它允许数据处于一种特殊的状态，可以在不需要拷贝的情况下，任何进程都可以直接使用该数据。由于我的程序本身就手动写有复杂的进程间数据共享步骤，不知道哪一步和 torch 库中的不兼容，导致进程间数据传输紊乱了   
+    ```python
+    # model作为一个 global 变量，不需要手动在进程之间传递了，直接存在 shared memory 里面
+    import torch.multiprocessing as mp
+    def train(model):
+        for data, labels in data_loader:
+            optimizer.zero_grad()
+            loss_fn(model(data), labels).backward()
+            optimizer.step()  # This will update the shared parameters
+    model = nn.Sequential(nn.Linear(n_in, n_h1),
+                          nn.ReLU(),
+                          nn.Linear(n_h1, n_out))
+    model.share_memory() # Required for 'fork' method to work
+    processes = []
+    for i in range(4): # No. of processes
+        p = mp.Process(target=train, args=(model,))
+        p.start()
+        processes.append(p)
+    for p in processes: 
+        p.join()
+    ```
+
 * python 不能在 for 循环中直接修改列表元素  
 需要用索引来改变 
   ```python
