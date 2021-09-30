@@ -1,11 +1,44 @@
-# 1. 用Amazon Lightsail创建实例
+# 自建跳板机直连 GPU Server
+## 背景
+实验室给我们分了几台多卡 GPU Server，但是必须通过网页的跳板机才能连接，而且不支持 Vscode Remote，所以调试和传文件很不方便。于是我想绕开它的跳板机，而用自己的电脑搭建一个跳板机，这样就可以实现 Vscode Remote 和 Winscp 传文件等功能
+
+## 原理
+* 因为 GPU Server 通过外界不能直接访问，所以无法通过 SSH 直连，但它自己能上网。所以可以找一个有公网 ip 的 PC1 （作为 ***服务器***），让它和 GPU Server 建立一个通道。具体步骤：  
+    * 在 GPU Server 和 PC1 上都安装配置 v2ray。v2ray 和 Shadowsocks 一样都是开源的 VPN 框架。因为 PC1 不能直接 pin 到 GPU Server，所以本质上是 GPU Server 给 PC1 发消息，然后建立的通道，这个通道一旦建立就会一直存在。
+    * 之后再在 My PC，也即用户最终使用的电脑上，也安装一个 v2rayN，用 VMess 协议进行配置。配置好后，一旦每次开启 v2rayN，My PC 和 PC1 的通道就建立了。例如下图，My PC 所有经 10080 端口的流量的网络环境就完全和 GPU Server 的网络环境一样    
+        <p align="center" >
+            <img src="./Pictures/vpn.png", width='290'>
+            <img src="./Pictures/vpn2.png", width='650'>
+        </p>
+    * Vscode Remote 
+    `~/.ssh/config` 文件，`127.0.0.1`是指本机名，也就是让流量从 My PC 的 10080 端口出去，也即仿佛就像直接在 GPU Server 上一样。然后 GPU Server 用 `~/.ssh/my_id_rsa` 文件进行 SSH，本质上是 GPU Server SSH 自己
+        ``` 
+        Host cpii_bj
+        HostName localhost
+        IdentityFile ~/.ssh/my_id_rsa
+        User XXXXXX
+        ForwardX11 Yes
+        ProxyCommand E:\\Git\\mingw64\\bin\\connect.exe -S 127.0.0.1:10080 %h %p
+        ```
+    * WinScp  
+    左图 `127.0.0.1` 是代指 GPU Server，自己 SSH 自己。Scp 的全程是 secure copy，也即 `cp + SSH`，所以只要能 SSH，就能用 Scp 传文件。这里 File Protocol 选 SCP  
+    右图 `127.0.0.1` 代指 My PC，通过 SOCKS5 代理协议和 10080 端口通信，和 v2rayN 的配置相吻合 
+        <p align="center" >
+            <img src="./Pictures/vpn3.png", width='320'>
+            <img src="./Pictures/vpn4.png", width=490'>
+        </p>
+
+<br>
+
+# 在 Amazon 上搭建 VPN
+## 1. 用Amazon Lightsail创建实例
 Lightsail是亚马逊提供的适用于个人的虚拟服务器，每月收取固定的费用，而不像EC2安装使用的资源收费。  
 详见 https://www.heartnn.com/2018/05/11/deploy-shadowsocks-on-amazon-lightsail/ 
 > 在不用了之后，为避免扣款，需要 1.删除实例 2.同时删除未附着实例的静态IP
 
 <br>
 
-# 2. 用虚拟机ssh登录Server
+## 2. 用虚拟机ssh登录Server
 这一步的目的是为了方便复制第3步的命令，详见 https://www.cnblogs.com/liubin0509/p/6211909.html
 * 给Server设置一个静态ip
 * 下载密钥，例如`this_is_a_key.pem`
@@ -16,7 +49,7 @@ Lightsail是亚马逊提供的适用于个人的虚拟服务器，每月收取�
 
 <br>
 
-# 3. 在Server上安装Shadowsocks
+## 3. 在Server上安装Shadowsocks
 详见 https://www.heartnn.com/2018/05/11/deploy-shadowsocks-on-amazon-lightsail/ 
 关键步骤：
 ```bash
@@ -55,7 +88,7 @@ chmod +x shadowsocks-all.sh
 <br>
 
 
-# 4. 使用Shadowsocks
+## 4. 使用Shadowsocks
 详见 https://ssr.tools/386  
 * Shadowsocks Windows版本下载 https://github.com/shadowsocks/shadowsocks-windows/releases/
 ，选PAC模式或全局模式（PAC使用GFWList列表，绕过大陆地址，但不一定稳定）
