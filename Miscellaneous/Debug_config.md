@@ -82,6 +82,8 @@
 <br>
 
 * Vscode
+   * Vscode Remote 的 `~/.ssh/config` 文件，直接复制的话可能会产生错误，一般手打一遍就好了
+
    * Vscode + jupyter-notbook:
       > https://stackoverflow.com/questions/60330837/jupyter-server-not-started-no-kernel-in-vs-code  
       * Press Command+Shift+P to open a new command pallete  
