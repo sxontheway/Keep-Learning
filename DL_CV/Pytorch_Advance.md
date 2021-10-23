@@ -1,3 +1,61 @@
+# 多GPU多进程模拟联邦学习，进程初始化报错
+> https://discuss.pytorch.org/t/understanding-minimum-example-for-torch-multiprocessing/101010 
+
+## 背景
+* 由于要调用 CUDA，多进程用的是 `spawn` 而不是 `fork`
+* 多进程之间是要共享一个 list of tensors，但不同进程用的是 list 里面不同的 slices    
+
+一个错误复现的代码如下：
+```python
+import torch, os
+import torch.distributed as dist
+import torch.multiprocessing as mp
+
+def run(rank, size):
+    """ Distributed function to be implemented later. """
+    print(f'rank {rank} of {size}')
+
+def init_process(rank, size, data, fn, backend='gloo'):
+    """ Initialize the distributed environment. """
+    os.environ['MASTER_ADDR'] = '127.0.0.1'
+    os.environ['MASTER_PORT'] = '29500'
+    dist.init_process_group(backend, rank=rank, world_size=size)
+    fn(rank, size)
+
+def processes(data):
+    size = len(data)
+    processes = []
+    for rank in range(size):
+        p = mp.Process(target=init_process, args=(rank, size, data, run))
+        p.start()
+        processes.append(p)
+    for p in processes:
+        p.join()
+
+if __name__ == "__main__":
+    mp.set_start_method("spawn")
+    size_vector = 133
+    part = int(size_vector/8)
+    indices = torch.arange(size_vector)
+    split_data = torch.split(indices, part)
+    print(split_data)
+    processes(split_data)
+```
+
+## 解决方案
+* 以上代码在 Pytorch1.9 的Linux版本下会报错：` ValueError: bad value(s) in fds_to_keep`，在windows下则正常运行
+* 解决方案有两种：
+    * 将 `mp.Process()` 那行改成：`data_i = data[rank]; p = mp.Process(target=init_process, args=(rank, size, data_i, run))`
+    * 在 `mp.Process()` 那行之前加：`data = [i.clone() for i in data]`，相当于将 data 的每个元素重新在内存里面复制了一遍
+
+## 原因分析
+> You cannot pass a tensor to the mp.Process that has data shared with other processes
+
+* 报错的的原因应该是来源于 Pytorch 内部的内存管理机制，tensor 和 tensor 之间是自动共享内存的。试过 `copy.deepcopy(data)` 不起作用，必须要用 `.clone()`
+* 为什么 windows 不报错而 linux 报错，可能和两个平台的多进程实现机制有关，windows没有fork，所以为新进程强行开了新的存储空间
+
+<br>
+
 # pytorch多gpu并行训练  
 > https://zhuanlan.zhihu.com/p/105755472
 > https://zhuanlan.zhihu.com/p/86441879  
