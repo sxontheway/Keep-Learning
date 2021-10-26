@@ -52,7 +52,8 @@
 ## 实现2：用 SSH Tunnel
 适用于 PC1 用 ip 在国外的没有墙的服务器，因为不用代理了，只用 SSH Reverse Tunnel，对于 My PC 的配置就和普通 SSH 差不多
 > SSH Tunnel 介绍：https://pohsienshih.github.io/2019/SSH-Tunnel-Introduction/#%E4%B8%80%E8%88%AC%E6%83%85%E5%A2%83     
-
+在 GPU server 上输入：`autossh -M 3332 -CNR <port>:localhost:22 root@XXX.XXX.XXX.XXX` 即可  
+                                                      
 ```
 Host cpii_bj_zhang
 HostName XXX
