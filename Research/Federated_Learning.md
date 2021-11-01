@@ -1,3 +1,54 @@
+# 背景
+## FL开山之作
+https://blog.csdn.net/biongbiongdou/article/details/104358321  
+## 框架
+* FedIoT：https://arxiv.org/pdf/2106.07976.pdf    
+* FedML：http://fedml.ai/ 
+* PySyft：基于 pytorch 的联邦学习框架，但是运行速度比较慢：https://github.com/OpenMined/PySyft  
+## 横向/纵向
+* 横向（同特征不同id）：Horizontal federated learning (HFL). HFL, also known as ***sample-based federated learning***, can be applied in scenarios in which datasets share the same feature space, but differ in sample space. In other words, different parties own datasets which are of the same format but collected from different sources. 例如两家不同地区的银行
+* 纵向（同id不同特征）：例如一家银行一家电商，他们拿到的是同一个用户在不同平台上的数据
+## 联邦学习和其他领域的联系（MAML, Reptile, FedAvg, FedSGD）
+* FedAvg = FedSGD + 多次 FOMAML  
+    > 见文章：Improving Federated Learning Personalization via MAML，https://ereebay.me/posts/6350/  
+
+    FedAvg相当于是一系列在多轮本地更新后进行个性化效果优化的算法的线性组合。  
+    直观上理解，FedAvg = FedSGD（即local端进行一次SGD，传梯度）+ 多个First Order MAML（local_ep产生的多次梯度下降）
+* Reptile：如果将一个 FL round 视作 meta learning 的一个 episode，那么两者有相似之处，但也有以下不同：
+    * 需要忽略 Reptile 的高阶梯度，FedAvg 中 local 都是用的同一个 global model 作为起点
+    * 需要假设 FedAvg 中每个节点拥有同分布的数据 
+* Per-FedAvg: 一个 personalized FL 的算法。在 local 端，将传统的梯度下降，变成用 maml 的方式更新，再经过FL，得到一个 global 的模型，这个模型具有较好泛华性，是一个很好的初始化模型
+## Multi-task FL
+* Dual problem  
+    > https://cosx.org/2014/03/svm-series-add-1-duality/  
+    * 基本思想：prime problem 最小化问题不好解，可以用 dual problem 的最大化来逼近
+    * 其中，拉格朗日乘子法是其中一个将 prime 转化为 dual 的方法，解决 dual problem 一般可以用迭代法，每次迭代分别更新 x 和拉个朗日参数，例如 admm 方法：[admm介绍1](https://blog.csdn.net/shanglianlm/article/details/45919679), [admm介绍2](https://www.zhihu.com/question/36566112/answer/118715721) 
+
+
+## Domain Shift in FL
+* DA 常用数据集：Office-31，Office-Caltech-10，MINIST+USPS，更多的见：https://github.com/jindongwang/transferlearning/blob/master/data/dataset.md  
+* 一个 baseline 方法：DDC，见：https://github.com/jindongwang/transferlearning/tree/master/code/DeepDA  
+* domain adaption 的 setting: source domain 有 labeled data，target domain 没有或者只有少量 labeled data（可以有大量 unlabeled data）。在 FL 下可能的 setting：
+    * client 有 target unlabeded data，server 有 source labeled data
+    * client 有 target unlabeded data + server 共享的 source labeled data
+    * client 之间 target unlabeled data 存在 non-iid
+
+## Long tail in FL
+* CIFAR10/100-LT, Places-LT, ImageNets-LT, iNaturalist 2018 
+
+    <center class="center">
+        <img src="./pictures/lt_dataset.jpg" width="500"/>
+    </center>
+
+* 一些经验：
+    * 实际的数据集，不会是一个绝对病态的 non-iid 的情况。绝对病态的 non-iid，`FedAWS` 会是比较好的能使得 backbone 学到东西的方法
+    * head class 在数量和出现频率上都高（会在大多数client上都出现），类别缺失程度低，所以他们的特征学习在 FL 下面不会是一个问题；tail class 正相反，数量和出现频率都低，non-iid 的程度大。所以在实际中，主要还是 tail classes 的学习问题
+* Personalized FL 和 Generic FL (例如 FedAvg):   
+从现实角度看，都不是符合显示的完美解决方案。Gen-FL 想用一个 model 适应所有场景，p 目前的 Per-FL 在 eval 时都假设每个 client 上测试集和训练接同分布
+
+<br>
+<br>
+
 # Personalized FL
 > 先是一个 survey: Towards Personalized Federated Learning  
 
@@ -7,6 +58,7 @@
     <img src="./pictures/pFL.png" width="560"/>
 </center>
 
+<br>
 <br>
 
 ---
@@ -68,6 +120,7 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
 * 我们组现有的工作主要在这个方向，比如 `ClusterFL`, `FedDL`
 
 <br>
+<br>
 
 # Non-iid
 ## 通过改 server 端 aggregation 算法
@@ -102,10 +155,11 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
 * `FedUV_Federated Learning of User Verification Models Without Sharing Embeddings_ICLR21_rej`
 
 ## 一些理论和实验
-* `On The Convergence of FedAvg on Non-IID_ICLR20`：从理论和实验上证明对于 non-iid，Fedavg 需要 learning rate decay
+* `On The Convergence of FedAvg on Non-IID_ICLR20`：从理论和实验上证明在 strong-convex + smooth 条件下，FedAvg 在 iid 可收敛到全局最优；对于 non-iid，Fedavg 需要 learning rate decay
 
 * FedAvgM 好于 FedAvg
     * `Measuring the Effects of Non-Identical Data
 Distribution for Federated Visual Classification`：人为产生 Non-iid 的数据，也可以用 Dirichlet 分布
     * `Federated Visual Classification with Real-World
 Data Distribution_ECCV20`
+
