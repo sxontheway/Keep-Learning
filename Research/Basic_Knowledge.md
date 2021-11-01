@@ -1,47 +1,81 @@
+## Optimizer 常用技巧：Warm up
+One-Cycle SGD能达到的最好效果会比Adam好：https://zhuanlan.zhihu.com/p/365873548   
+Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/ 
+
+
 ## 关于Loss Function
 > https://zhuanlan.zhihu.com/p/36670444   
 > https://www.cnblogs.com/yinheyi/p/6131262.html
 
-* `Softmax Function + Cross Entropy Loss` 和 `Logistic Function + Logistic Loss` 关系？
-    > https://www.zhihu.com/question/36981158 
-    * 前者是后者从二分到多分类的推广
-    * softmax 和 logistic 函数都将负无穷到正无穷映射到 [0, 1] 
-    * softmax强调互斥性，多个类的概率加起来为1；logistic没有互斥性。
-        * 例如people包含male，那么应该对people和male两类分别用求logistic loss，再相加；而不是用softmax
-        * 例如要判断一张图是笑脸还是哭脸，推荐做法：  
-        网络输出`1*2`的向量-> softmax -> focal loss/BCE loss -> 看两个数哪个大，得到结果   
-        如果只输出一个标量，用sigmoid，那么只最后得到一个score，还需要手动选取阈值确定是笑脸还是哭脸，而这个阈值可能和训练数据分布有很大关系。
+### `Softmax Function + Cross Entropy Loss` 和 `Logistic Function + Logistic Loss` 关系？
+> https://www.zhihu.com/question/36981158 
+* 前者是后者从二分到多分类的推广
+* softmax 和 logistic 函数都将负无穷到正无穷映射到 [0, 1] 
+* softmax强调互斥性，多个类的概率加起来为1；logistic没有互斥性。
+    * 例如people包含male，那么应该对people和male两类分别用求logistic loss，再相加；而不是用softmax
+    * 例如要判断一张图是笑脸还是哭脸，推荐做法：  
+    网络输出`1*2`的向量-> softmax -> focal loss/BCE loss -> 看两个数哪个大，得到结果   
+    如果只输出一个标量，用sigmoid，那么只最后得到一个score，还需要手动选取阈值确定是笑脸还是哭脸，而这个阈值可能和训练数据分布有很大关系
 
-* 为什么 Loss Function 要用对数？  
-    >  https://blog.csdn.net/saltriver/article/details/63683092  
-
-    * 对于 Logistic Loss Function: 最小化Loss Function = 最大化二项分布的对数似然函数 = 最大化二项分布的似然函数 `L(θ)=P(y=1|x)^y * P(y=0|x)^(1-y)`
+### 求 Loss 过程中，hy Log and One-hot Coding？  
+>  https://blog.csdn.net/saltriver/article/details/63683092  
+* 原理上：最大化似然函数时，将乘方变成乘法
+    * 对于 Logistic Loss Function: 最小化Loss Function = 最大化二项分布的对数似然函数 `log L(θ)` = 最大化二项分布的似然函数 `L(θ)=P(y=1|x)^y * P(y=0|x)^(1-y)`
     * 同理，对于Cross Entropy: 最小化Loss Function = 最大化多项分布的对数似然函数
+* 从优化效率的角度看，为什么要用 log loss？
+    > https://zhuanlan.zhihu.com/p/242763826  
 
+    从 https://kexue.fm/archives/6620 中可以看出：`max(x)` 的光滑近似是 `logsumexp()`，`Softmax(x)` 其实是 `onehot(argmax(x))` 的光滑近似。讲道理，准确的光滑近似应该是优化一个没有 log 的 loss
+    <p align="center" >
+        <img src="./pictures/smooth_acc.png" width=700>
+    </p>
+    但由于不好优化，其会导致：误差特别大时，梯度反而变小了。加了 `log` 之后才方便优化  
+
+
+* One-hot Coding：  
+初衷是为了使得各种结果之间距离相等：如果是0-9这10个数字，如果不用编码，那么0和9的距离就是9，但是，如果用了one hot 编码后，编码后0与9，或者0与任何其他的值，距离都是一样的，都是为1
+
+### Softmax 和 Cross Entropy 的梯度？
+* Softmax + cross-entropy 的前向传播和反向传播:  https://zhuanlan.zhihu.com/p/86184547   
+    loss对logits的梯度，形式很简洁：`∂L/∂z=a-y`，其中 `logits是z，a是z经过softmax，y是one-hot label`
+
+
+### 解决正负样本不均  
+* OHEM: online hard example mining，Faster-RCNN 用了这个，正负样本数量为 1:3，正样本从 `IoU>0.5` 中选，负样本从 `0.1~0.5` 中选
 * focal loss
-    > 	https://www.cnblogs.com/leebxo/p/11291140.html  
-        https://www.cnblogs.com/ymjyqsx/p/9508664.html
+    > https://www.cnblogs.com/leebxo/p/11291140.html  
+    https://www.cnblogs.com/ymjyqsx/p/9508664.html  
 
+    相当于将上文的 OHEM 1:3 的硬截断换成 soft 的版本
+<br>
 <br>
 
-## 关于 One-hot Coding
-> https://www.zhihu.com/question/53802526/answer/515535985
+## BatchNorm
+> https://blog.csdn.net/LoseInVain/article/details/86476010  
+    <p align="center" >
+        <img src="./pictures/batchnorm.png" width=700>
+    </p>
 
-为了使得各种结果之间距离相等
+* 要学习的两个参数：`gamma` 和 `beta` 都是和通道数同维度的
+* 而第一、二步得到的方差，都是统计得到的。在 `model.train()`时，running_mean 和 running_var 都会变，以不断追踪整个数据集上的均值和方差。`optimizer.step()` 则会改变 `gamma` 和 `beta`
+* 只有当 `model.eval()` 时，running_mean 和 running_var 才不会变
+    * `model.eval()`：会改变 BN，dropout 等特性，会计算梯度，但不反向传播
+    * `with torch.no_grad()`：直接不计算梯度了，节省显存
+* 某些情况下，即便整体的模型处于 `model.train()` 的状态，但是某些BN层也可能需要按照需求设置为 `model_bn.eval()`
 
-<br>
 
 ## LSTM
 > https://www.zhihu.com/question/64470274
 
 <p align="center" >
-	<img src="./pictures/lstm.jpg">
+	<img src="./pictures/lstm.jpg" width=700>
 </p>
 
 * A被称作cell，LSTM的`cell`在每个`time_step`是复用的
 * `num_units` = `h_t` 和 `s_t` 的维度大小（两者相同维度）= 最后一个time step输出维度大小（输出为h） = 黄色框的输出维度大小 = `hidden_size`
 * LSTM参数量：`(hidden_size * (hidden_size + x_dim ) + hidden_size) *4 `，因为 `f = sigma(W[h, x] + b)`，相当于将维度 `(hidden_size + x_dim)` 变到了 `hidden_size`
 
+<br>
 <br>
 
 ## Transformer
@@ -73,6 +107,7 @@ Encoder
     </p>
 
 ### 一些对比：
+> https://zhuanlan.zhihu.com/p/80986272  
 * 数据集本身比较小，Transform 要训练好所需要的数据量比较大，这时用 train from scratch LSTM 也比较好
 * 数据并行的问题，一次可以输入多个单词，而不像 LSTM/RNN 需要一个接一个
 * transfer learning：LSTM几乎不支持transfer learning，Transformer可以
@@ -81,8 +116,10 @@ Encoder
 	<img src="./pictures/seq2seq.png"  width="600">
     </p>
 
-* LSTM is still good when sequence too long, transformer is O(N^2)
+* LSTM is still good when sequence too long, transformer is O(N^2). Transform 要训练好所需要的数据量比较大，在数据集本身比较小可能不会有好效果
 
+
+<br>
 <br>
 
 ## 知识蒸馏
@@ -94,3 +131,17 @@ Encoder
     <p align="center" >
 	<img src="./pictures/kd.png"  width="600">
     </p>
+
+<br>
+<br>
+
+## 网络结构
+### 做简单的视频检测：
+可以用 3DCNN：https://dl.acm.org/doi/pdf/10.1145/3213344.3213351
+
+### ResNet 
+* 常规的用于 ImagenNet 的 Resnet 是 224*224
+    * 网络的前两层 kernel size 分别为 7 和 3，并降低采样了两次，使得输入第一个 Resnet Block 前的尺寸变为了 56*56
+    * 变种包括：`Resnet-18/34/50/101/152`，编号的数字代表有多少个可训练参数的层。Resnet-18/34用的是Basic Block，Resnet-50及以上用的是 BottleNeck Block
+* ResNet for CIFAR：
+    * 输入尺寸是 32*32，一共经历两次 `stride=2`，在 avg pooling 之前的输出尺寸是 `(N, feat_dim, 8, 8)`，参见：[链接1](https://github.com/KaihuaTang/Long-Tailed-Recognition.pytorch/blob/master/classification/models/ResNet32Feature.py)，[链接2](https://zhuanlan.zhihu.com/p/144665196)

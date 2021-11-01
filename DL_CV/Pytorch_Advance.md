@@ -1,3 +1,10 @@
+# Deterministic 的问题
+> 其实没必要严格要求 deterministic，从实际角度出发，只要每次跑出来结果差距都不大就行了：https://pytorch.org/docs/stable/notes/randomness.html 
+* `torch.backends.cudnn.deterministic=True` 是能让卷积操作 deterministic，其他操作如 `torch.nn.MaxPool3d` 基本没办法确保deterministic： https://stackoverflow.com/a/66647424
+* 初始化也不行：https://github.com/pytorch/pytorch/issues/19013
+* Dataloader 的 worker 数量不同也会使得采样结果 non-deterministic: https://pytorch.org/docs/stable/data.html#data-loading-randomness 
+
+
 # 多GPU多进程模拟联邦学习，进程初始化报错
 > https://discuss.pytorch.org/t/understanding-minimum-example-for-torch-multiprocessing/101010 
 
@@ -55,6 +62,7 @@ if __name__ == "__main__":
 * 为什么 windows 不报错而 linux 报错，可能和两个平台的多进程实现机制有关，windows没有fork，所以为新进程强行开了新的存储空间
 
 <br>
+<br>
 
 # pytorch多gpu并行训练  
 > https://zhuanlan.zhihu.com/p/105755472
@@ -75,6 +83,7 @@ Use multi-machine `DistributedDataParallel` and the launching script, if the app
     * 按模块启动 `python -m xxx.py` 是把你输入命令的目录（也就是当前路径），放到了sys.path属性中  
 
 <br>
+<br>
 
 # Pytorch Internals
 ## Folders
@@ -87,6 +96,7 @@ Use multi-machine `DistributedDataParallel` and the launching script, if the app
 
 * `c10/`：这是一个双关语。C代表Caffe，10既是二级制的2 (Caffe2)，也是十进制的10（英文Ten，同时也是Tensor的前半部分）。包含PyTorch的核心抽象，包括Tensor和Storage数据结构的实际实现。
 
+<br>
 <br>
 
 # Pytorch Features

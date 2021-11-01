@@ -6,16 +6,22 @@ https://blog.csdn.net/biongbiongdou/article/details/104358321
 * FedML：http://fedml.ai/ 
 * PySyft：基于 pytorch 的联邦学习框架，但是运行速度比较慢：https://github.com/OpenMined/PySyft  
 * 或者自己写一个 FL 的框架：
+    * 注意事项
+        * 每个 model 要有一个 optimizer，一个 dataloader
+        * 多进程时，不要用类似 `函数返回值是一个类` (见 [create_model](https://github.com/hyperconnect/LADE/blob/cfe96b7ca6520f3410d4cae9cc10919e6114bbb9/models/DotProductClassifier.py#L34)) 的形式创建 model，因为 Python 的多进程实现中用的是 pickle 将数据序列化，这样写会导致没办法序列化
+
+
+
     * 单线程：用一个 class handle 所有，但多个 client 的 local update 是用 for 循环顺序执行的
-    * 单进程 but 多线程：还是用一个 class handle 所有，但多个 client 的 local update 用多线程执行
-        * 缺点：python 的多线程只会用一个 CPU Core，导致 client 数量一多，GPU 占用率仍然上不去
-        * 多线程中，dataloader 的 num_worker 必须设成 0，因为自线程不能再调用多进程了：https://zhuanlan.zhihu.com/p/133707658 
-        * 可以将数据集预先加载在内存里面加速 dataloer。如果 pre-precessing 时间很长，甚至可以考虑将数据集先预处理之后存成文件（但无法做 random augmentation 之类的操作了）
-    * 多进程：每个进程 handle 一个 client，缺点是显存消耗大 
-        > https://stackoverflow.com/questions/57496285/why-is-the-memory-in-gpu-still-in-use-after-clearing-the-object  
-        > https://discuss.pytorch.org/t/does-cuda-cache-memory-for-future-usage/87680
-        
-        只要一个进程调用了 `xxx.to(cuda)`，就要占用 `700MB` 左右的显存，不管 xxx 是啥，甚至使用是一个 int 而已。并且 `del xxx; torch.cuda.empty_cache()` 这两个命令只能释放变量占的显存，而这700MB大多是 CUDA context 占用的，没办法释放
+    * 单进程 + 多线程：还是用一个 class handle 所有，但多个 client 的 local update 用多线程执行
+        * 缺点：python 的多线程只会用一个 CPU Core，导致 client 数量一多，GPU 占用率仍然上不去；优点：线程比进程轻量，通信代价小
+        * 子线程/进程中，dataloader 的 num_worker 必须设成 0，因为自线程不能再调用多进程了：https://zhuanlan.zhihu.com/p/133707658 
+        * 由于 `num_worker=0`，pre-processing 可能是瓶颈，可以考虑将数据集预先加载在内存里面加速 dataloer，甚至可以考虑将数据集先预处理之后存成文件（但无法做 random augmentation/shuffle 之类的操作了）
+    * 多进程：每个进程 handle 一个 client，优点是快，缺点是显存消耗大 
+        > [链接1](https://stackoverflow.com/questions/57496285/why-is-the-memory-in-gpu-still-in-use-after-clearing-the-object)，[链接2](https://discuss.pytorch.org/t/does-cuda-cache-memory-for-future-usage/87680)  
+
+        * 只要一个进程调用了 `xxx.to(cuda)`，就要占用 `700MB` 左右的显存，不管 xxx 是啥，甚至使用是一个 int 而已。并且 `del xxx; torch.cuda.empty_cache()` 这两个命令只能释放变量占的显存，而这700MB大多是 CUDA context 占用的，没办法释放
+        * 用两个类：Fed_Server，Fed_Client，之间用多进程通信传 state_dict
 
 ## 横向/纵向
 * 横向（同特征不同id）：Horizontal federated learning (HFL). HFL, also known as ***sample-based federated learning***, can be applied in scenarios in which datasets share the same feature space, but differ in sample space. In other words, different parties own datasets which are of the same format but collected from different sources. 例如两家不同地区的银行
