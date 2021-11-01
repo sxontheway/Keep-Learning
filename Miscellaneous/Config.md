@@ -24,20 +24,19 @@ conda install pytorch==1.1.0 torchvision==0.3.0 cudatoolkit=9.0 -c pytorch
 pip3 install tensorboard
 ```
 
-## Debug
+## Debug  
+* Ubuntu 开机循环输入密码无法进入桌面的解决办法：  
+`ctrl+Alt+f1~f6` 都是通过终端进入系统，`Ctrl+alt+f7` 是图形化界面进入，https://segmentfault.com/q/1010000007830779   
+
+<br>
+
 * Ubuntu 命令
    * `uname -a`: 输出操作系统信息 
-
    * `lsb_release -a`：查看Ubuntu版本  
-
    * `df -lh`：查看存储；`du -h --max-depth=1`：查看当前目录下文件夹大小
-
    * `sudo dmidecode`: 查看硬件配置，最常用的选项就是用`-t`来限定关键字，例如 `bios, system, baseboard, chassis, processor, memory, cache, connector, slot`  
-
    * `nvidia-smi`, `htop`, `nvtop`, `jtop`： 不同平台下的资源monitor 
-
    * 查看在GPU上的所有进程： `fuser -v /dev/nvidia*`
-
    * 批量清理GPU中的残留进程（例如孤儿进程）： `sudo fuser -v /dev/nvidia* |awk '{for(i=1;i<=NF;i++)print "kill -9 " $i;}' | sudo sh`
 
 
@@ -54,7 +53,6 @@ pip3 install tensorboard
     * Linux下， 安装vscode
     * sudo apt-get install texlive-full cjk-latex latex-cjk-chinese
     * 安装 Latex Workshop 插件 
-
     * Debug:
         * 有一篇的Bibtex的Library未找到，结果显示所有reference有错
         

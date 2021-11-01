@@ -5,6 +5,18 @@ https://blog.csdn.net/biongbiongdou/article/details/104358321
 * FedIoT：https://arxiv.org/pdf/2106.07976.pdf    
 * FedML：http://fedml.ai/ 
 * PySyft：基于 pytorch 的联邦学习框架，但是运行速度比较慢：https://github.com/OpenMined/PySyft  
+* 或者自己写一个 FL 的框架：
+    * 单线程：用一个 class handle 所有，但多个 client 的 local update 是用 for 循环顺序执行的
+    * 单进程 but 多线程：还是用一个 class handle 所有，但多个 client 的 local update 用多线程执行
+        * 缺点：python 的多线程只会用一个 CPU Core，导致 client 数量一多，GPU 占用率仍然上不去
+        * 多线程中，dataloader 的 num_worker 必须设成 0，因为自线程不能再调用多进程了：https://zhuanlan.zhihu.com/p/133707658 
+        * 可以将数据集预先加载在内存里面加速 dataloer。如果 pre-precessing 时间很长，甚至可以考虑将数据集先预处理之后存成文件（但无法做 random augmentation 之类的操作了）
+    * 多进程：每个进程 handle 一个 client，缺点是显存消耗大 
+        > https://stackoverflow.com/questions/57496285/why-is-the-memory-in-gpu-still-in-use-after-clearing-the-object  
+        > https://discuss.pytorch.org/t/does-cuda-cache-memory-for-future-usage/87680
+        
+        只要一个进程调用了 `xxx.to(cuda)`，就要占用 `700MB` 左右的显存，不管 xxx 是啥，甚至使用是一个 int 而已。并且 `del xxx; torch.cuda.empty_cache()` 这两个命令只能释放变量占的显存，而这700MB大多是 CUDA context 占用的，没办法释放
+
 ## 横向/纵向
 * 横向（同特征不同id）：Horizontal federated learning (HFL). HFL, also known as ***sample-based federated learning***, can be applied in scenarios in which datasets share the same feature space, but differ in sample space. In other words, different parties own datasets which are of the same format but collected from different sources. 例如两家不同地区的银行
 * 纵向（同id不同特征）：例如一家银行一家电商，他们拿到的是同一个用户在不同平台上的数据
