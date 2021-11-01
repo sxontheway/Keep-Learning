@@ -7,7 +7,7 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
 > https://zhuanlan.zhihu.com/p/36670444   
 > https://www.cnblogs.com/yinheyi/p/6131262.html
 
-### `Softmax Function + Cross Entropy Loss` 和 `Logistic Function + Logistic Loss` 关系？
+### Softmax Function + Cross Entropy Loss 和 Logistic Function + Logistic Loss 关系？
 > https://www.zhihu.com/question/36981158 
 * 前者是后者从二分到多分类的推广
 * softmax 和 logistic 函数都将负无穷到正无穷映射到 [0, 1] 
@@ -17,7 +17,7 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
     网络输出`1*2`的向量-> softmax -> focal loss/BCE loss -> 看两个数哪个大，得到结果   
     如果只输出一个标量，用sigmoid，那么只最后得到一个score，还需要手动选取阈值确定是笑脸还是哭脸，而这个阈值可能和训练数据分布有很大关系
 
-### 求 Loss 过程中，hy Log and One-hot Coding？  
+### 求 Loss 过程中，Why Log and One-hot Coding？  
 >  https://blog.csdn.net/saltriver/article/details/63683092  
 * 原理上：最大化似然函数时，将乘方变成乘法
     * 对于 Logistic Loss Function: 最小化Loss Function = 最大化二项分布的对数似然函数 `log L(θ)` = 最大化二项分布的似然函数 `L(θ)=P(y=1|x)^y * P(y=0|x)^(1-y)`
@@ -30,8 +30,6 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
         <img src="./pictures/smooth_acc.png" width=700>
     </p>
     但由于不好优化，其会导致：误差特别大时，梯度反而变小了。加了 `log` 之后才方便优化  
-
-
 * One-hot Coding：  
 初衷是为了使得各种结果之间距离相等：如果是0-9这10个数字，如果不用编码，那么0和9的距离就是9，但是，如果用了one hot 编码后，编码后0与9，或者0与任何其他的值，距离都是一样的，都是为1
 
@@ -46,7 +44,8 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
     > https://www.cnblogs.com/leebxo/p/11291140.html  
     https://www.cnblogs.com/ymjyqsx/p/9508664.html  
 
-    相当于将上文的 OHEM 1:3 的硬截断换成 soft 的版本
+    相当于将上文的 OHEM 1:3 的硬截断的 soft version
+    
 <br>
 <br>
 
@@ -63,6 +62,8 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
     * `with torch.no_grad()`：直接不计算梯度了，节省显存
 * 某些情况下，即便整体的模型处于 `model.train()` 的状态，但是某些BN层也可能需要按照需求设置为 `model_bn.eval()`
 
+<br>
+<br>
 
 ## LSTM
 > https://www.zhihu.com/question/64470274
