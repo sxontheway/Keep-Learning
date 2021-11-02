@@ -4,7 +4,7 @@
 * SM：以TX2为例，其 GPU 只有2个SM
 * warp：warp 是 SM 执行和调度的最小单元。一般一个 warp 包含32个 thread，warp 中的 SP 的工作遵循 `SIMT （Single Instruction Multiple Thread）`，也就是说这些 thread 以不同数据资源执行相同的指令。也因此，分支语句在 GPU 的效率很低
 <p align="center" >
-<img src="./pictures/ifelse.png", width='600'>
+<img src="./Pictures/ifelse.png", width='600'>
 </p>
 
 * SP：在 GPU 中最小的硬件单元（在 Nvidia 的 fermi 构架之后也叫 CUDA core，现在这个术语现在通常也使用 thread 来代替，可以简单将 `thread == CUDA core == SP`）
@@ -12,7 +12,7 @@
 
 ## 软件概念：`grid -> block -> thread`
 <p align="center" >
-<img src="./pictures/gpu_basic.jpg", width='1000'>
+<img src="./Pictures/gpu_basic.jpg", width='1000'>
 </p>
 
 > 与上面3个硬件概念是相对的 
