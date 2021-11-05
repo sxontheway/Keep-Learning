@@ -24,6 +24,44 @@ conda install pytorch==1.1.0 torchvision==0.3.0 cudatoolkit=9.0 -c pytorch
 pip3 install tensorboard
 ```
 
+## systemd
+是 Linux 自带的系统工具，可以实现某些服务的自动重启
+
+> https://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-commands.html 
+```bash
+sudo systemctl daemon-reload  # 重载所有修改过的配置文件
+sudo systemctl enable radar_record.service   # 开机自启动
+sudo systemctl start radar_record.service    # 直接启动
+sudo systemctl stop radar_record.service     # 停止
+sudo systemctl disable radar_record.service  # 关闭自启动
+
+# 查看 logger
+sudo systemctl status radar_record.service   
+journalctl -u radar_record.service -f
+sudo systemctl is-active radar_record.service
+sudo systemctl is-enabled radar_record.service
+```
+
+`/etc/systemd/system/radar_record.service` 文件：
+```
+[Unit]
+Description=radar test service
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+RemainAfterExit=no
+WorkingDirectory=/home/pi/radar_deploy
+ExecStart=/usr/bin/python3 /home/pi/Desktop/collect_radar.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
 ## Debug  
 * Ubuntu 开机循环输入密码无法进入桌面的解决办法：  
 `ctrl+Alt+f1~f6` 都是通过终端进入系统，`Ctrl+alt+f7` 是图形化界面进入，https://segmentfault.com/q/1010000007830779   
