@@ -1,6 +1,19 @@
 ## Optimizer 常用技巧：Warm up
-One-Cycle SGD能达到的最好效果会比Adam好：https://zhuanlan.zhihu.com/p/365873548   
+### Adam，L2, weight decay 和 AdamW
+> https://www.jiqizhixin.com/articles/2018-07-03-14   
+
+* 背景：2014年被提出的Adam优化器的收敛性被证明是错误的，之前大部分机器学习框架中对于Adam的权重衰减的实现也都是错误的。`Fixing Weight Decay Regularization in Adam` （ICLR 2017 Best Paper）提出了一种新的方法用于修复Adam的权重衰减错误，命名为AdamW，Pytorch 中也有一个优化器叫 AdamW
+* L2正则化和权重衰减在大部分情况下并不等价，只在 SGD 优化的情况下是等价的。而大多数框架中对于 `Adam+L2` 正则使用的是权重衰减的方式，两者不能混为一谈
+
+
+
+### 其他
+One-Cycle SGD 能达到的最好效果会比 Adam 好：https://zhuanlan.zhihu.com/p/365873548   
 Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/ 
+
+
+<br>
+<br>
 
 
 ## 关于Loss Function
