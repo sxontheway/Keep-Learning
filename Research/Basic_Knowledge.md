@@ -1,20 +1,31 @@
-## Optimizer 常用技巧：Warm up
+## Optimizer
 ### Adam，L2, weight decay 和 AdamW
 > https://www.jiqizhixin.com/articles/2018-07-03-14   
 
 * 背景：2014年被提出的Adam优化器的收敛性被证明是错误的，之前大部分机器学习框架中对于Adam的权重衰减的实现也都是错误的。`Fixing Weight Decay Regularization in Adam` （ICLR 2017 Best Paper）提出了一种新的方法用于修复Adam的权重衰减错误，命名为AdamW，Pytorch 中也有一个优化器叫 AdamW
 * L2正则化和权重衰减在大部分情况下并不等价，只在 SGD 优化的情况下是等价的。而大多数框架中对于 `Adam+L2` 正则使用的是权重衰减的方式，两者不能混为一谈
 
-
-
 ### 其他
+* Optimizer 常用技巧：Warm up   
 One-Cycle SGD 能达到的最好效果会比 Adam 好：https://zhuanlan.zhihu.com/p/365873548   
 Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/ 
-
+* AdamW 是一个比较通用的比较好的 optimizer
 
 <br>
 <br>
 
+## Unstructure Pruning: Lottery Hypothesis
+* `The Lottery Hypothesis`：一个网络，先train到收敛，然后我剪枝，剪枝之后呢，我把那些还没有被剪的参数重新初始化到刚开始初始化的样子，然后再train，发现效果还挺好，有时候甚至更好。和之前的 pruning 的区别是，pruning 是 `先train网络 --> prune --> 再 finetune pruned 过后的网络（整个过程重复多次）`；Lottery 直接用的是最古老的原网络的权重
+* `Rethinking the Value of Network Pruning_ICLR19`: 这篇文章也是差不多的结论，只是有一点不同：剪枝之后，Lottery 要把未被剪的参数重新变成之前初始化的样子，而 Rethinking 则更简单一些，不需要变成之前初始化的样子，你随便再随机初始化也是一样的。这篇文章说明：网络结构也许比权重更重要
+* `Deconstructing Lottery Tickets Zeros, Signs, and the Supermask_NIPS19`：
+    > https://www.cnblogs.com/chenbong/p/14118965.html  
+    * 直接mask一个随机初始化的网络，得到的非结构化稀疏网络，可以比原随机初始化网络准确度高很多
+    * 权重的正负号，比权重的数值更重要：`We also showed that the only element of the original initialization that is crucial to the performance of LT networks is the sign, not the relative magnitude of the weights`
+    * 可以通过训练 mask，而不是原网络的权值，来优化网络，得到近似于原网络的准确度：`we demonstrated that the masking procedure can be thought of as a training operation`
+
+
+<br>
+<br>
 
 ## 关于Loss Function
 > https://zhuanlan.zhihu.com/p/36670444   
