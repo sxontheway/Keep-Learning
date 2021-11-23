@@ -3,7 +3,7 @@
 
 ## Without shared memory
 <center class="half">
-    <img  src="./Pictures/tiling.png" height=450>
+    <img  src="./Pictures/wo_tiling.png" height=400>
 </center>
 
 * `MatMulKernel<<<dimGrid, dimBlock>>>(d_A, d_B, d_C);`：invoke kernel，`dimGrid, dimBlock` 代表 thread grid 和 block 的数量，是 int 类型或者 dim3（3维向量，因为 grid 和 block 最多可以是3维）
@@ -81,7 +81,7 @@
 ## With shared memory (Tiling)
 
 <center class="half">
-    <img  src="./Pictures/tiling.png" height=450>
+    <img  src="./Pictures/tiling.png" height=400>
 </center>
 
 * `__shared__` 定义了使用 shared memory，每次从 global memory 中 fetch `C_sub` 大小的 data 
