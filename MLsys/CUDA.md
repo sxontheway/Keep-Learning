@@ -2,6 +2,9 @@
 > https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#shared-memory 
 
 ## Without shared memory
+<center class="half">
+    <img  src="./Pictures/tiling.png" height=450>
+</center>
 
 * `MatMulKernel<<<dimGrid, dimBlock>>>(d_A, d_B, d_C);`：invoke kernel，`dimGrid, dimBlock` 代表 thread grid 和 block 的数量，是 int 类型或者 dim3（3维向量，因为 grid 和 block 最多可以是3维）
 * 每个 thread 都执行 `__global__ void MatMulKernel(Matrix A, Matrix B, Matrix C)`，因为不同 thread 的 blockIdx 和 threadIdx 不同，所以会被分到计算不同的部分，以实现并行
@@ -78,7 +81,6 @@
 ## With shared memory (Tiling)
 
 <center class="half">
-    <img  src="./Pictures/wo_tiling.png" height=450>
     <img  src="./Pictures/tiling.png" height=450>
 </center>
 
