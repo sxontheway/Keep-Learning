@@ -1,8 +1,8 @@
 # 背景
-## 硬件概念：`SM -> warps -> threads (sp)`
+## GPU 硬件概念：`SM -> warps -> threads (sp)`
 > SM (streaming multiprocessors), warp, SP (streaming processor)
 * SM：以TX2为例，其 GPU 只有2个SM
-* warp：warp 是 SM 执行和调度的最小单元。一般一个 warp 包含32个 thread，warp 中的 SP 的工作遵循 `SIMT （Single Instruction Multiple Thread）`，也就是说这些 thread 以不同数据资源执行相同的指令。也因此，分支语句在 GPU 的效率很低
+* warp：warp 是 SM 执行和调度的最小单元。一般一个 warp 包含32个 thread（Nvidia GPU），warp 中的 SP 的工作遵循 `SIMT （Single Instruction Multiple Thread）`，也就是说这些 thread 以不同数据资源执行相同的指令。也因此，分支语句在 GPU 的效率很低
 <p align="center" >
 <img src="./Pictures/ifelse.png", width='600'>
 </p>
@@ -10,7 +10,7 @@
 * SP：在 GPU 中最小的硬件单元（在 Nvidia 的 fermi 构架之后也叫 CUDA core，现在这个术语现在通常也使用 thread 来代替，可以简单将 `thread == CUDA core == SP`）
 
 
-## 软件概念：`grid -> block -> thread`
+## GPU 软件概念：`grid -> block -> thread`
 <p align="center" >
 <img src="./Pictures/gpu_basic.jpg", width='1000'>
 </p>
@@ -18,6 +18,11 @@
 > 与上面3个硬件概念是相对的 
 * 由于 warp 的大小一般为32，所以 block 所含的 thread 的大小一般要设置为32的倍数 (软件的 block 对应于硬件上的 warp)
 * 同一个 block 中的 thread 可以同步（上文 SIMT），也可以通过 shared memory 进行通信
+
+## GPU 存储构架：global memory > shared memory > register/local memory
+* 每个 thread 都有自己的一份 register 和 local memory 
+* 一组 thread 构成一个 block，这些 thread 则共享有一份 shared memory
+* 不同 block 的所有 thread 都共享一份 global memory、constant memory、和 texture memory
 
 
 ## 线程标识 threadIdx  
@@ -27,13 +32,7 @@
 int tid = blockIdx.x * blockDim.x + threadIdx.x;
 ```
 
-## GPU 存储构架：global memory > shared memory > register/local memory
-* 每个 thread 都有自己的一份 register 和 local memory 
-* 一组 thread 构成一个 block，这些 thread 则共享有一份 shared memory
-* 不同 block 的所有 thread 都共享一份 global memory、constant memory、和 texture memory
-
-
-## 缓存命中
+## CPU 缓存命中
 > https://zhuanlan.zhihu.com/p/209181629  
 
 因为一次需要缓存 cache line 大小的数据（linux 可以通过 `coherency_line_size` 查看），当需要用的数据已经被载入 cache 时，就称作命中。例如，遍历访问数组时，按照内存布局顺序访问将会带来很大的性能提升（当访问某个元素时，缓存已经把紧随其后的元素也载入了，提升了命中率）。好的CPU会有一些预测的技术，如果找到一种pattern的话，就会预先加载更多的内存，包括指令也可以预加载，这叫 Prefetching 技术。
@@ -47,9 +46,26 @@ for (int i = 0; i < LEN; i += 8) arr[i] *= i;
 ```
 按我们的想法来看，第二个循环要比第一个循环少4倍的计算量，其应该也是要快4倍的。但实际跑下来并不是，在我的机器上，第一个循环需要127毫秒，第二个循环则需要121毫秒，相差无几。这里最主要的原因就是 Cache Line，因为CPU会以一个Cache Line 64Bytes最小时单位加载，也就是16个 32bits 的整型，所以，无论你步长是2还是8，都差不多。而后面的乘法其实是不怎么耗CPU时间的。
 
-### An example
-不同的 data layout 使得最优的内存访问顺序不同。例如 PyTorch 用的是 NCHW，最后一维为W，也就是按照 W 的方向遍历最高效，能增加 cache hit  
-`A[i][k]` 内存访问是连续的，`A[k][i]` 内存访问是不连续的，导致 cache hit 低
+<br>
+<br>
+
+
+
+# Loop Optimization
+> [tvm schedule详细举例](https://zhuanlan.zhihu.com/p/94846767)
+
+<p align="center" >
+<img src="./Pictures/conv_loop.png", width='600'>
+</p>
+
+H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。有如下三种常见优化方式：
+<p align="center" >
+<img src="./Pictures/loop_opt.png", width='1000'>
+</p>
+
+## Loop Reorder
+不同的 data layout 使得最优的内存访问顺序不同。例如 PyTorch 用的是 NCHW，最后一维为W，也就是按照 W 的方向遍历最高效（NCHW遍历时，001是000朝W方向移动一个），能增加缓存命中  
+红框中 `A[i][k]` 内存访问是连续的，`A[k][i]` 内存访问是不连续的，导致 cache hit 低
 <p align="center" >
 <img src="./Pictures/mat_order.png", width='900'>
 </p>
@@ -58,31 +74,19 @@ for (int i = 0; i < LEN; i += 8) arr[i] *= i;
 <img src="./Pictures/mat_multi.jpg", width='900'>
 </p>
 
-<br>
-<br>
-
-
-
-# Loop Optimization
-<p align="center" >
-<img src="./Pictures/conv_loop.png", width='700'>
-</p>
-
-H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。一般有如下三种优化方式：
-<p align="center" >
-<img src="./Pictures/loop_opt.png", width='1200'>
-</p>
-
 ## Data Reuse
 > P20/21: http://www.cse.cuhk.edu.hk/~byu/CMSC5743/2021Fall/slides/Lec02-conv.pdf  
 
 避免重复计算，例如在卷积中把需要被重复使用多次元素先算出来
 
-## Loop Tiling 
+## Loop Tiling: Ultilize Shared Memory
 > https://zhuanlan.zhihu.com/p/367644657  
- 
-将 global memory 中的数据 load 到每个 block 的 shared memory 中去，减少对低速存储的访问:
+> [Loop Tiling 的 CUDA 代码实现](./CUDA_Program.md#loop-tiling)
 
+将 global memory 中的数据 load 到每个 block 的 shared memory 中去，减少对低速存储的访问
+
+## 避免 bank conflict
+见 [Loop Tiling 的 CUDA 代码实现](./CUDA_Program.md#avoid-bank-conflict)
 
 ## Loop Unrolling
 > [Why is it faster to process a sorted array than an unsorted array?](https://zhuanlan.zhihu.com/p/22469702)  
@@ -116,3 +120,4 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。一般�
 
     * 分支预测器（Branch predictor）  
     是一种数字电路，在分支指令执行结束之前猜测哪一路分支将会被运行（下图中的一行也即一个分支），以提高处理器的指令流水线（pipeline）的性能 
+
