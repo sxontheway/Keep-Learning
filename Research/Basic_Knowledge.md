@@ -167,6 +167,6 @@ Encoder
 ### ResNet 
 * 常规的用于 ImagenNet 的 Resnet 是 224*224
     * 网络的前两层 kernel size 分别为 7 和 3，并降低采样了两次，使得输入第一个 Resnet Block 前的尺寸变为了 56*56
-    * 变种包括：`Resnet-18/34/50/101/152`，编号的数字代表有多少个可训练参数的层。Resnet-18/34用的是Basic Block，Resnet-50及以上用的是 BottleNeck Block
+    * 变种包括：`Resnet-18/34/50/101/152`，编号的数字基本代表有多少个conv层（Resnet-18有17层，Resnet-50有49层）。Resnet-18/34用的是Basic Block，Resnet-50及以上用的是 BottleNeck Block
 * ResNet for CIFAR：
     * 输入尺寸是 32*32，一共经历两次 `stride=2`，在 avg pooling 之前的输出尺寸是 `(N, feat_dim, 8, 8)`，参见：[链接1](https://github.com/KaihuaTang/Long-Tailed-Recognition.pytorch/blob/master/classification/models/ResNet32Feature.py)，[链接2](https://zhuanlan.zhihu.com/p/144665196)
