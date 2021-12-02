@@ -66,13 +66,32 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。有如�
 ## Loop Reorder
 不同的 data layout 使得最优的内存访问顺序不同。例如 PyTorch 用的是 NCHW，最后一维为W，也就是按照 W 的方向遍历最高效（NCHW遍历时，001是000朝W方向移动一个），能增加缓存命中  
 红框中 `A[i][k]` 内存访问是连续的，`A[k][i]` 内存访问是不连续的，导致 cache hit 低
-<p align="center" >
-<img src="./Pictures/mat_order.png", width='900'>
-</p>
 
-<p align="center" >
-<img src="./Pictures/mat_multi.jpg", width='900'>
-</p>
+<center class="half">
+	<img  src="./Pictures/mat_order.png" height=300>
+</center>
+
+
+* 例如 A*B=C 的矩阵卷积，`i->k->j` 比 `i->j->k` 高效。
+
+    因为矩阵虽然是3维的，但是在内存中还是按一维线性在存储；对于行主序，要想矩阵A的访问高效，要`i->k`；对B要`k->j`，所以要都满足只能是 `i->k->j`
+
+    <center class="half">
+        <img  src="./Pictures/ikj.png" height=300>
+    </center>
+
+    ```python
+    for i in 0..M:  # i->j->k
+        for j in 0..N:
+            for k in 0..K:
+                C[i, j] += A[i, k] * B[k, j]
+
+    # loop re-order
+    for i in 0..M:  # i->k->j
+        for k in 0..K:
+            for j in 0..N:
+                C[i, j] += A[i, k] * B[k, j]
+    ```  
 
 ## Data Reuse
 > P20/21: http://www.cse.cuhk.edu.hk/~byu/CMSC5743/2021Fall/slides/Lec02-conv.pdf  
@@ -121,3 +140,169 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。有如�
     * 分支预测器（Branch predictor）  
     是一种数字电路，在分支指令执行结束之前猜测哪一路分支将会被运行（下图中的一行也即一个分支），以提高处理器的指令流水线（pipeline）的性能 
 
+
+<br>
+<br>
+
+# 卷积优化
+## Im2Col (Image2Column)
+将卷积转化为矩阵乘法：将每个卷积核`（k^2*c）`，和 X 对应的感受野数据 `（k^2*c）`提前展开 
+<p align="center" >
+<img src="./Pictures/im2col.png", width='500'>
+</p>
+
+
+## 矩阵乘法的加速
+* 假设矩阵乘法：Weight * Input = Output，维度分别为 (H, C)，(C, W)，(H, W)
+    * 每个 `Output[i * W + j]` 的值，是 Weight 第 i 行和 Input 第 j 列两个向量的点乘。但这种情况下，当矩阵按行优先存储时，每次读取 Input时都会产生 cache miss：
+        ```c
+        for (i = 0; i < H; i++)
+        {
+            for (j = 0; j < W; j++)
+            {
+                tmp = 0;
+                for (k = 0; k < C; k++)
+                {
+                    tmp += weight[i * C + k] * input[k * W + j];
+                }   // input[k * W + j] 是按列访问了
+                dst[i * W + j] = tmp;
+            }
+        }
+        ```
+    * 可以把中间层和最内层循环调换位置，按行读取右矩阵：
+        > 见：https://zhuanlan.zhihu.com/p/383115932 
+    
+        ```c
+        for (i = 0; i < H; i++) // 对于weight和output第i行
+            {
+                for (k = 0; k < C; k++)
+                {
+                    tmp = weight[i * C + k];
+                    cur_dst = dst + i * W;    // 代表output第i行
+                    cur_src = input + k * W;  // 代表input（右矩阵）的第k行（k是哑元）
+                    for (j = 0; j < W; j++)
+                    {  
+                        cur_dst[j] += tmp * cur_src[j]; 
+                    }
+                }
+                cur_dst = dst + i * w;
+            }
+        ```
+        这样计算顺序就变为了：左矩阵第 `i` 行的某个数与右矩阵第 `i` 行的所有数做乘法，并累加到输出矩阵第 `i` 行的每个位置，在最内层循环中右矩阵和输出矩阵都是按行访存，大大减少了 cache miss 的次数
+
+
+<br>
+<br>
+
+
+# TVM Example
+## 一个矩阵乘法的例子：tiling + split + re-ordering + vectorize
+
+> https://tvm.apache.org/docs/how_to/optimize_operators/opt_gemm.html#loop-permutation
+
+* outer loop 的 index 始终放在 inner loop 的外面
+* inner loop 用 m, k, n 的顺序遍历
+* reduce_axis 见 https://tvm.apache.org/docs/how_to/work_with_schedules/reduction.html  
+    ```python
+    import tvm
+    from tvm import te
+
+    M = 1024
+    K = 1024
+    N = 1024
+    dtype = "float32"
+    target = "llvm"
+    dev = tvm.device(target, 0)
+    bn = 32     # blocking size
+    kfactor = 4
+
+    k = te.reduce_axis((0, K), "k")     # reduce_axis 在 te.sum 的 axis=k 中使用
+    A = te.placeholder((M, K), name="A")
+    B = te.placeholder((K, N), name="B")
+    C = te.compute((M, N), lambda m, n: te.sum(A[m, k] * B[k, n], axis=k), name="C")    # 提供一个计算描述
+
+    s = te.create_schedule(C.op)    # 创建一个 scheduler
+
+    "用户手动定义 sceduler 规则"
+    mo, no, mi, ni = s[C].tile(C.op.axis[0], C.op.axis[1], bn, bn)  # block 大小 32 * 32 * sizeof(float) = 4KB
+    (kaxis,) = s[C].op.reduce_axis  # 返回 k 这个轴的对象
+    ko, ki = s[C].split(kaxis, factor=kfactor)  # split 作用于 k 对应的 axis，把该 axis 上的 iter 以 factor 为间隔分成 outer 与 inner 两层迭代，增加循环层数。这样是为了利用 GPU 等硬件的 grid/block 层级结构
+    s[C].reorder(mo, no, ko, mi, ki, ni)   # Loop re-ordering
+    s[C].vectorize(ni)  # 在数据size为常数、且分割的iter为2的幂时，LLVM 等编译器会自动生成支持 SIMD 的代码，这是SIMD 计算设备（如Intel CPU、Arm CPU）的常用schedule
+
+    func = tvm.build(s, [A, B, C], target=target, name="mmult") # 得到一个 tvm module
+    assert func
+
+    # Random generated tensor for testing
+    a = tvm.nd.array(numpy.random.rand(M, K).astype(dtype), dev)
+    b = tvm.nd.array(numpy.random.rand(K, N).astype(dtype), dev)
+    c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), dev)
+    func(a, b, c)
+    tvm.testing.assert_allclose(c.numpy(), answer, rtol=1e-5)
+
+    evaluator = func.time_evaluator(func.entry_name, dev, number=10)
+    print("Baseline: %f" % evaluator(a, b, c).mean)     # print running time
+    print(tvm.lower(s, [A, B, C], simple_mode=True))    # print lower-level IR for debugging
+    print("source code:\n", func.get_source())          # print source code
+    ```
+
+## Genrated Sample Program
+> https://jcf94.com/2021/08/28/2021-08-28-simd/ 
+
+例子为 `A * B = C` 的矩阵乘法，大小均为 `128*128`；索引的哑元是：`A(i,k), B(k,j), C(i,j)`
+* schedule 的 state：使用了 tiling，unroll，vectorize
+    ```c
+    Placeholder: placeholder, placeholder
+    parallel i.0@ (0,16)    // i方向分成16块（parallel实现在GPU以外的CPU等设备上并行）
+        for j.0 (0,4)           // j方向分成4块
+            for i.1 (0,2)       // i方向分成16块后，每块再细分成2块
+                for j.1 (0,2)       // i方向分成4块后，每块再细分成2块
+
+                    c.local auto_unroll: 16     // 使用 local memory c.local; 进行 unrolling
+                    for k.0 (0,16)              // [4, 128] x [128, 16] = [4, 16] 的运算，使用 local memory  
+                        for k.1 (0,8)           // [4, 8] x [8, 16] = [4, 16] 的运算
+                            for i_c.3 (0,4)
+                                vectorize j_c.3 (0,16)  // SIMD 代替 for 
+                                    c.local = ...
+
+                    for i.2 (0,4)               // 将所有 [4, 16] 的 c.local 赋给 c 的相应位置，完成运算
+                        vectorize j.2 (0,16)
+                            c = ...
+    ```
+
+* 对应的 TVM IR
+    ```c
+    primfn(placeholder_2: handle, placeholder_3: handle, c_1: handle) -> ()
+    attr = {"from_legacy_te_schedule": True, "global_symbol": "main", "tir.noalias": True}
+    buffers = {c: Buffer(c_2: Pointer(float32), float32, [128, 128], []),
+                placeholder_1: Buffer(placeholder_4: Pointer(float32), float32, [128, 128], []),
+                placeholder: Buffer(placeholder_5: Pointer(float32), float32, [128, 128], [])}
+    buffer_map = {placeholder_2: placeholder, placeholder_3: placeholder_1, c_1: c} {
+    for (i.outer.outer: int32, 0, 16) "parallel" {
+        allocate(c.local: Pointer(local float32x16), float32x16, [4]), storage_scope = local;
+        for (j.outer.outer: int32, 0, 4) {
+        for (i.outer.inner: int32, 0, 2) {
+            for (j.outer.inner: int32, 0, 2) {  
+            // 这里 unrolling 了
+            c.local[ramp(0, 1, 16)] = broadcast(0f32, 16)
+            c.local[ramp(16, 1, 16)] = broadcast(0f32, 16)
+            c.local[ramp(32, 1, 16)] = broadcast(0f32, 16)
+            c.local[ramp(48, 1, 16)] = broadcast(0f32, 16)
+            for (k.outer: int32, 0, 16) {
+                for (k.inner: int32, 0, 8) {    
+                // 这里 unrolling 了
+                c.local[ramp(0, 1, 16)] = ((float32x16*)c.local[ramp(0, 1, 16)] + (broadcast((float32*)placeholder_5[((((i.outer.outer*1024) + (i.outer.inner*512)) + (k.outer*8)) + k.inner)], 16)*(float32x16*)placeholder_4[ramp(((((k.outer*1024) + (k.inner*128)) + (j.outer.outer*32)) + (j.outer.inner*16)), 1, 16)]))   
+                c.local[ramp(16, 1, 16)] = ((float32x16*)c.local[ramp(16, 1, 16)] + (broadcast((float32*)placeholder_5[(((((i.outer.outer*1024) + (i.outer.inner*512)) + (k.outer*8)) + k.inner) + 128)], 16)*(float32x16*)placeholder_4[ramp(((((k.outer*1024) + (k.inner*128)) + (j.outer.outer*32)) + (j.outer.inner*16)), 1, 16)]))
+                c.local[ramp(32, 1, 16)] = ((float32x16*)c.local[ramp(32, 1, 16)] + (broadcast((float32*)placeholder_5[(((((i.outer.outer*1024) + (i.outer.inner*512)) + (k.outer*8)) + k.inner) + 256)], 16)*(float32x16*)placeholder_4[ramp(((((k.outer*1024) + (k.inner*128)) + (j.outer.outer*32)) + (j.outer.inner*16)), 1, 16)]))
+                c.local[ramp(48, 1, 16)] = ((float32x16*)c.local[ramp(48, 1, 16)] + (broadcast((float32*)placeholder_5[(((((i.outer.outer*1024) + (i.outer.inner*512)) + (k.outer*8)) + k.inner) + 384)], 16)*(float32x16*)placeholder_4[ramp(((((k.outer*1024) + (k.inner*128)) + (j.outer.outer*32)) + (j.outer.inner*16)), 1, 16)]))
+                }
+            }
+            for (i.inner: int32, 0, 4) {
+                c_2[ramp((((((i.outer.outer*1024) + (i.outer.inner*512)) + (i.inner*128)) + (j.outer.outer*32)) + (j.outer.inner*16)), 1, 16)] = (float32x16*)c.local[ramp((i.inner*16), 1, 16)]
+            }
+            }
+        }
+        }
+    }
+    }
+    ```
