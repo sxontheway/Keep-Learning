@@ -195,7 +195,66 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。有如�
 <br>
 
 
-# TVM Example
+# TVM
+## Schedule
+> 知乎：https://zhuanlan.zhihu.com/p/360385060   
+> TVM documents: [Schedule Primitives in TVM](https://tvm.apache.org/docs/how_to/work_with_schedules/schedule_primitives.html#)
+
+* compute_at：将某个 axis 的 compute 移到另外一个 axis，见 https://tvm.apache.org/docs/reference/api/python/tir.html?highlight=compute_at#tvm.tir.Schedule.compute_at 
+* rfactor(loop, factor_axis)
+
+    One problem of building a reduction is that we cannot simply parallelize over the reduction axis. We need to (1) divide the computation of the reduction, (2) store the local reduction result in a temporal array, and (3) do a reduction over the temporal array. The rfactor primitive does such rewrite of the computation. 其中第二步可以引入并行  
+
+    对于 `B = numpy.sum(A, axis=1)` 的操作：
+
+    ```python        
+    import tvm
+    from tvm import te
+    n = te.var("n")
+    m = te.var("m")
+    A = te.placeholder((n, m), name="A")
+    k = te.reduce_axis((0, m), "k")
+    B = te.compute((n,), lambda i: te.sum(A[i, k], axis=k), name="B")
+
+    s = te.create_schedule(B.op)
+    ko, ki = s[B].split(B.op.reduce_axis[0], factor=16) // ki的遍历区间为16
+    BF = s.rfactor(B, ki)   // 间隔 16 做 reduction
+    print(tvm.lower(s, [A, B], simple_mode=True))
+    ```
+    Output: 
+    ```c
+    primfn(A_1: handle, B_1: handle) -> ()
+    attr = {"from_legacy_te_schedule": True, "global_symbol": "main", "tir.noalias": True}
+
+    // stride 指的是 int float 等类型每个占多少字节
+    buffers = {B: Buffer(B_2: Pointer(float32), float32, [n: int32], [stride: int32], type="auto"), 
+                A: Buffer(A_2: Pointer(float32), float32, [n, m: int32], [stride_1: int32, stride_2: int32], type="auto")}
+    buffer_map = {A_1: A, B_1: B} {
+    allocate(B.rf: Pointer(global float32), float32, [(n*16)]), storage_scope = global {
+        // 对于 k.inner loop 中每个给定的 k.inner，k.outer*16 + k.inner 代表是按 stride=16 进行累加，得到包含16个元素的 B.rf。这一步可以引入并行加速
+        for (k.inner: int32, 0, 16) {
+        for (i: int32, 0, n) {
+            B.rf[((k.inner*n) + i)] = 0f32
+            for (k.outer: int32, 0, floordiv((m + 15), 16)) {
+            if @tir.likely((((k.outer*16) + k.inner) < m), dtype=bool) {
+                B.rf[((k.inner*n) + i)] = ((float32*)B.rf[((k.inner*n) + i)] + (float32*)A_2[((i*stride_1) + (((k.outer*16) + k.inner)*stride_2))])
+            }
+            }
+        }
+        }
+
+        // 将 B.rf 中的16个元素加起来
+        for (ax0: int32, 0, n) {
+        B_2[(ax0*stride)] = 0f32
+        for (k.inner.v: int32, 0, 16) {
+            B_2[(ax0*stride)] = ((float32*)B_2[(ax0*stride)] + (float32*)B.rf[((k.inner.v*n) + ax0)])
+        }
+        }
+    }
+    }
+    ```
+
+
 ## 一个矩阵乘法的例子：tiling + split + re-ordering + vectorize
 
 > https://tvm.apache.org/docs/how_to/optimize_operators/opt_gemm.html#loop-permutation
@@ -242,6 +301,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。有如�
 
     evaluator = func.time_evaluator(func.entry_name, dev, number=10)
     print("Baseline: %f" % evaluator(a, b, c).mean)     # print running time
+    print(s)
     print(tvm.lower(s, [A, B, C], simple_mode=True))    # print lower-level IR for debugging
     print("source code:\n", func.get_source())          # print source code
     ```
@@ -250,7 +310,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。有如�
 > https://jcf94.com/2021/08/28/2021-08-28-simd/ 
 
 例子为 `A * B = C` 的矩阵乘法，大小均为 `128*128`；索引的哑元是：`A(i,k), B(k,j), C(i,j)`
-* schedule 的 state：使用了 tiling，unroll，vectorize
+* `print(s)` 打印出的 schedule，使用了 tiling，unroll，vectorize
     ```c
     Placeholder: placeholder, placeholder
     parallel i.0@ (0,16)    // i方向分成16块（parallel实现在GPU以外的CPU等设备上并行）
@@ -270,7 +330,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环。有如�
                             c = ...
     ```
 
-* 对应的 TVM IR
+* 对应的 TVM Lower IR 
     ```c
     primfn(placeholder_2: handle, placeholder_3: handle, c_1: handle) -> ()
     attr = {"from_legacy_te_schedule": True, "global_symbol": "main", "tir.noalias": True}
