@@ -80,13 +80,12 @@
 ### With shared memory
 
 <center class="half">
-    <img  src="./Pictures/wo_tiling.png" height=450>
     <img  src="./Pictures/tiling.png" height=450>
 </center>
 
 * `__shared__` 定义了使用 shared memory，每次从 global memory 中 fetch `C_sub` 大小的 data 
 * By blocking the computation this way, we take advantage of fast shared memory and save a lot of global memory bandwidth since A is only read `(B.width / block_size)` times from global memory and B is read `(A.height / block_size)` times. 
-
+* 每个block负责右图一个黄色方块的计算，每个thread负责的是右图里面最小的一个橙色方格的计算（得到 Cvalue）
 
     ```c
     // Matrices are stored in row-major order:
@@ -253,8 +252,7 @@
         __syncthreads();    // 让所有 thread 同步
         d[t] = s[tr];       // 从 shared memory 到 global memory
     }
-
-    // 
+ 
     __global__ void dynamicReverse(int *d, int n)
     {
         extern __shared__ int s[];  // extern 标识符，未指定大小
@@ -319,9 +317,9 @@ Shared Memory 的访问速度
     <img src="./Pictures/bank_word.png", width='500'>
     </p>
 
-* 如果同时每个 thread 是存取不同的 bank，就不会产生任何问题，速度很快。但如果同时有两个（或更多个） threads 存取同一个 bank 的数据，就会发生 bank conflict，会降低 Shared Memory 读取速度
-    * 特例是：多个 thread 访问的是同一个 bank 里面的同一个 word，则会 multicast 和 broadcast，也不会 bank conflict
-    * 例如两个 thread 分别访问第 0，32，64，96 个words，就会发生 4-way bank block，读取速度会变为 1/4
+* 如果同时每个 thread 是存取不同的 bank，就不会产生任何问题，速度很快。但如果同时有两个（或更多个） threads 存取同一个 bank 的数据，就会发生 bank conflict，会降低 Shared Memory 读取速度。例如两个 thread 分别访问第 0，32，64，96 个words，就会发生 4-way bank block，读取速度会变为 1/4
+    * 特例是：多个 thread 访问的是同一个 bank 里面的同一个 word，则会 multicast 和 broadcast，也不会 bank conflict  
+
 
 一个例子：
 > https://www.youtube.com/watch?v=CZgM3DEBplE 
