@@ -12,7 +12,7 @@
 
 ## GPU 软件概念：`grid -> block -> thread`
 <p align="center" >
-<img src="./Pictures/gpu_basic.jpg", width='1000'>
+<img src="./Pictures/gpu_basic.png", width='1300'>
 </p>
 
 > 与上面3个硬件概念是相对的 
@@ -20,10 +20,14 @@
 * 同一个 block 中的 thread 可以同步（上文 SIMT），也可以通过 shared memory 进行通信
 
 ## GPU 存储构架：global memory > shared memory > register/local memory
-* 每个 thread 都有自己的一份 register 和 local memory 
-* 一组 thread 构成一个 block，这些 thread 则共享有一份 shared memory
-* 不同 block 的所有 thread 都共享一份 global memory、constant memory、和 texture memory
 
+
+* 每个 thread 都有自己的一份 register 
+* 一组 thread 构成一个 block，**`这些 thread 则共享一份 shared memory / L1 cache / Texture L1 cache `**
+* 不同 block 的所有 thread 都共享一份 global memory、constant memory
+* Server 和 Mobile GPU 也不同（See Romou Mobicom'22）
+    * Server GPU 上 shared memory 和 L1 cache 几乎一样快，如上图最右边
+    * Mobile GPU 上 shared memory 可能比 L1 cache 慢 
 
 ## 线程标识 threadIdx  
 一个 block 包含多个thread，这些 thread 的组织方式也可以是一维，二维或者三维的。`CUDA 中每一个线程都有一个唯一的标识 ID 即 threadIdx`，这个 ID 随着 block 的划分方式的不同而变化，例如：
@@ -35,8 +39,8 @@ int tid = blockIdx.x * blockDim.x + threadIdx.x;
 ## CPU 缓存命中
 > https://zhuanlan.zhihu.com/p/209181629  
 
-* CPU 访问各级存储的时钟周期：内存 >100，L3 ~30，L2 ~12，L1 ~4
-    * 三级缓存的大小的量级（每个CPU不一样）：一级32KB，二级256KB，三级20MB。其中每个CPU核心都有自己的一、二级缓存，但三级缓存却是一颗 CPU 上所有核心共享的
+* CPU 访问各级存储的时钟周期（一个周期时间是主频的倒数）：内存 >100，L3 ~40，L2 ~12，L1 ~4
+    * 三级缓存的大小的量级（每个CPU不一样）：一级32KB，二级256KB，三级20MB。其中每个CPU核心都有自己的一、二级缓存，**`但三级缓存却是一颗 CPU 上所有核心共享的`**
     * 程序执行时，会先将内存中的数据载入到共享的三级缓存中，再进入每颗核心独有的二级缓存，最后进入最快的一级缓存，之后才会被 CPU 使用
 
 * 从内存搬运数据到缓存时，一次需要缓存 cache line 大小的数据（linux 可以通过 `coherency_line_size` 查看），当需要用的数据已经被载入 cache 时，就称作命中。例如，遍历访问数组时，按照内存布局顺序访问将会带来很大的性能提升（当访问某个元素时，缓存已经把紧随其后的元素也载入了，提升了命中率）。好的CPU会有一些预测的技术，如果找到一种pattern的话，就会预先加载更多的内存，包括指令也可以预加载，这叫 Prefetching 技术。  
@@ -222,7 +226,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 
     s = te.create_schedule(B.op)
     ko, ki = s[B].split(B.op.reduce_axis[0], factor=16) // ki的遍历区间为16
-    BF = s.rfactor(B, ki)   // 间隔 16 做 reduction
+    BF = s.rfactor(B, ki)   // 间隔16做reduction，也即分为16组，idx相差16的为一组
     print(tvm.lower(s, [A, B], simple_mode=True))
     ```
     Output: 
