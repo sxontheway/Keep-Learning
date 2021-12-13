@@ -1,65 +1,3 @@
-# 背景
-## GPU 硬件概念：`SM -> warps -> threads (sp)`
-> SM (streaming multiprocessors), warp, SP (streaming processor)
-* SM：以TX2为例，其 GPU 只有2个SM
-* warp：warp 是 SM 执行和调度的最小单元。一般一个 warp 包含32个 thread（Nvidia GPU），warp 中的 SP 的工作遵循 `SIMT （Single Instruction Multiple Thread）`，也就是说这些 thread 以不同数据资源执行相同的指令。也因此，分支语句在 GPU 的效率很低
-<p align="center" >
-<img src="./Pictures/ifelse.png", width='600'>
-</p>
-
-* SP：在 GPU 中最小的硬件单元（在 Nvidia 的 fermi 构架之后也叫 CUDA core，现在这个术语现在通常也使用 thread 来代替，可以简单将 `thread == CUDA core == SP`）
-
-
-## GPU 软件概念：`grid -> block -> thread`
-<p align="center" >
-<img src="./Pictures/gpu_basic.png", width='1300'>
-</p>
-
-> 与上面3个硬件概念是相对的 
-* 由于 warp 的大小一般为32，所以 block 所含的 thread 的大小一般要设置为32的倍数 (软件的 block 对应于硬件上的 warp)
-* 同一个 block 中的 thread 可以同步（上文 SIMT），也可以通过 shared memory 进行通信
-
-## GPU 存储构架：global memory > shared memory > register/local memory
-
-
-* 每个 thread 都有自己的一份 register 
-* 一组 thread 构成一个 block，**`这些 thread 则共享一份 shared memory / L1 cache / Texture L1 cache `**
-* 不同 block 的所有 thread 都共享一份 global memory、constant memory
-* Server 和 Mobile GPU 也不同（See Romou Mobicom'22）
-    * Server GPU 上 shared memory 和 L1 cache 几乎一样快，如上图最右边
-    * Mobile GPU 上 shared memory 可能比 L1 cache 慢 
-
-## 线程标识 threadIdx  
-一个 block 包含多个thread，这些 thread 的组织方式也可以是一维，二维或者三维的。`CUDA 中每一个线程都有一个唯一的标识 ID 即 threadIdx`，这个 ID 随着 block 的划分方式的不同而变化，例如：
-```
-// 一维的block，一维的thread
-int tid = blockIdx.x * blockDim.x + threadIdx.x;
-```
-
-## CPU 缓存命中
-> https://zhuanlan.zhihu.com/p/209181629  
-
-* CPU 访问各级存储的时钟周期（一个周期时间是主频的倒数）：内存 >100，L3 ~40，L2 ~12，L1 ~4
-    * 三级缓存的大小的量级（每个CPU不一样）：一级32KB，二级256KB，三级20MB。其中每个CPU核心都有自己的一、二级缓存，**`但三级缓存却是一颗 CPU 上所有核心共享的`**
-    * 程序执行时，会先将内存中的数据载入到共享的三级缓存中，再进入每颗核心独有的二级缓存，最后进入最快的一级缓存，之后才会被 CPU 使用
-
-* 从内存搬运数据到缓存时，一次需要缓存 cache line 大小的数据（linux 可以通过 `coherency_line_size` 查看），当需要用的数据已经被载入 cache 时，就称作命中。例如，遍历访问数组时，按照内存布局顺序访问将会带来很大的性能提升（当访问某个元素时，缓存已经把紧随其后的元素也载入了，提升了命中率）。好的CPU会有一些预测的技术，如果找到一种pattern的话，就会预先加载更多的内存，包括指令也可以预加载，这叫 Prefetching 技术。  
-
-    一个例子：假设我们有一个64M长的数组，设想一下下面的两个循环：
-    ```c
-    const int LEN = 64*1024*1024;
-    int *arr = new int[LEN];
-    for (int i = 0; i < LEN; i += 2) arr[i] *= i;
-    for (int i = 0; i < LEN; i += 8) arr[i] *= i;
-    ```
-
-    按我们的想法来看，第二个循环要比第一个循环少4倍的计算量，其应该也是要快4倍的。但实际跑下来并不是，在我的机器上，第一个循环需要127毫秒，第二个循环则需要121毫秒，相差无几。这里最主要的原因就是 Cache Line，因为CPU会以一个Cache Line 64Bytes最小时单位加载，也就是16个 32bits 的整型，所以，无论你步长是2还是8，都差不多，而后面的乘法其实是不怎么耗CPU时间的。
-
-<br>
-<br>
-
-
-
 # 矩阵乘法/卷积优化
 > [tvm schedule详细举例](https://zhuanlan.zhihu.com/p/94846767)
 
@@ -263,9 +201,8 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
     ```
 
 
-## 一个矩阵乘法的例子：tiling (local memory) + split + re-ordering + vectorize
-
-> https://tvm.apache.org/docs/how_to/optimize_operators/opt_gemm.html#loop-permutation
+## An Example of Schedule
+> [tiling (local memory) + split + re-ordering + vectorize](https://tvm.apache.org/docs/how_to/optimize_operators/opt_gemm.html#loop-permutation)
 
 * outer loop 的 index 始终放在 inner loop 的外面
 * inner loop 用 m, k, n 的顺序遍历
@@ -274,6 +211,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
     ```python
     import tvm
     from tvm import te
+    import numpy as np
 
     M = 1024
     K = 1024
@@ -302,17 +240,17 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
     assert func
 
     # Random generated tensor for testing
-    a = tvm.nd.array(numpy.random.rand(M, K).astype(dtype), dev)
-    b = tvm.nd.array(numpy.random.rand(K, N).astype(dtype), dev)
-    c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), dev)
+    a = tvm.nd.array(np.random.rand(M, K).astype(dtype), dev)
+    b = tvm.nd.array(np.random.rand(K, N).astype(dtype), dev)
+    c = tvm.nd.array(np.zeros((M, N), dtype=dtype), dev)
+    answer = np.dot(a.numpy(), b.numpy())
     func(a, b, c)
-    tvm.testing.assert_allclose(c.numpy(), answer, rtol=1e-5)
+    np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 
     evaluator = func.time_evaluator(func.entry_name, dev, number=10)
     print("Baseline: %f" % evaluator(a, b, c).mean)     # print running time
-    print(s)
     print(tvm.lower(s, [A, B, C], simple_mode=True))    # print lower-level IR for debugging
-    print("source code:\n", func.get_source())          # print source code
+    print("source code:\n", func.get_source())          # print assembling source code
     ```
 
 ### Genrated Sample Program
