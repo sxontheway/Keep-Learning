@@ -176,6 +176,8 @@ WantedBy=multi-user.target
       ```
       在`train.py`中`from utils.utils. import *`，但 import 的所有 functions 都不能 peek definition，是因为文件夹名称重复了、或文件夹名称和文件名称重复了，vscode不知道去找哪一个。
 
+      * 对于那些安装在非标准位置的包（以tvm为例），在 `setting.json` 里面加 `"python.autoComplete.extraPaths": ["/home/xian/tvm/python"],`，然后 reload VsCode 即可
+
    * 使用 VSCode Debug 模式
       * 不能识别相对路径，需要在 `launch.json` 中配置工作目录
       * arguement 参数也需要在 `launch.json` 中进行输入

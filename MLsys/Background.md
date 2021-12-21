@@ -254,7 +254,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
     ```
 
 ### Genrated Sample Program
-> https://jcf94.com/2021/08/28/2021-08-28-simd/ 
+> Chengfan Jia Blog: https://jcf94.com/2021/08/28/2021-08-28-simd/ 
 
 例子为 `A * B = C` 的矩阵乘法，大小均为 `128*128`；索引的哑元是：`A(i,k), B(k,j), C(i,j)`
 * `print(s)` 打印出的 schedule，使用了 tiling，unroll，vectorize

@@ -83,4 +83,4 @@ export PYTHONPATH=$TVM_HOME/python:${PYTHONPATH}
 * 解决方案：
     * 原因可能是 cuda toolkit 没安装在 cmake 会找的默认路径 `/usr/local/cuda/`，所以 cmake 找不到，见 https://github.com/apache/tvm/issues/535 ，可以建立一个软连接：`ln -s /home/xian/cuda-10.1 /usr/local/cuda`；找不到 LLVM 的情况同理可以解决
     * 确认 `config.make` 中 `set(USE_CUDA ON)`，然后看 `CMakeCache.txt` 中搜 `cuda` 和 `llvm`，发现是 off，**手动改成 on**
-    * `cmake ..`，`make j16`
+    * `cmake ..`，`make -j16`
