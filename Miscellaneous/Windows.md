@@ -26,9 +26,6 @@
    * 加一行：`"terminal.integrated.shell.windows":  "D:\\git\\Git\\bin\\bash.exe"`（或其他安装路径），重启 Vscode
    * terminal 默认的 shell 就变为 bash 了，如果要用 powershell 或 cmd，在 terminal 中输入 powershell 或 cmd 即可
 
-* SSH 连不上 or VSCode Remote连不上
-   * 可能因为远程主机发过来的公钥和之前本机存的公钥不一致，出现：`Host key verification failed.`，解决方法： `ssh-keygen -R 你要访问的IP地址`
-
 * Windows + VSCode + latex
     * 下载textlive，特别需要注意的一点是：`需要用管理员权限安装`，否则会报错；Vscode 中的 setting.json 的配置见 https://shaynechen.gitlab.io/vscode-latex/  
     * 用Texlive，file 'slashbox.sty' not found：https://blog.csdn.net/u010801696/article/details/79410545  

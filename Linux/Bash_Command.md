@@ -1,6 +1,6 @@
 # 1. Bash语法
 1. 文件开头第一行`#!/bin/bash`，表示使用bash解释器
-1. For 循环
+1. For 循环例子
     ```bash
     list=(1 2 3 4 5 6 8 10)
     for i in ${list[@]}

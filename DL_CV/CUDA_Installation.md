@@ -32,10 +32,30 @@
     sudo chmod a+r /usr/local/cuda/lib64/libcudnn*
     ```
 
-## tensorflow / pytorch
-* 用pip即可
+## Conda 创建环境安装 Torch
 * tensorflow 和 CUDA/cuDNN 版本兼容性：https://www.tensorflow.org/install/source_windows#gpu 
+    ```bash
+    # conda 安装 https://www.jianshu.com/p/edaa744ea47d
+    mkdir miniconda3
+    cd miniconda3
+    wget -c https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    chmod 777 Miniconda3-latest-Linux-x86_64.sh #给执行权限
+    bash Miniconda3-latest-Linux-x86_64.sh -u #运行
 
+    # conda 内安装
+    conda create -n ml python=3.7
+    conda config --set auto_activate_base false
+    # 在 ~/.bashrc 最后一行加 conda activate ml
+
+    # 进入 (ml) 后
+    pip3 install matplotlib numpy scipy scikit-learn pandas pyyaml 
+
+    # 安装 nvidia driver 对应版本的 cuda/torch
+    nvidia-smi
+    nvcc --version  # 发现是 9.0 版本，只能安pytocrh 1.1
+    conda install pytorch==1.1.0 torchvision==0.3.0 cudatoolkit=9.0 -c pytorch
+    pip3 install tensorboard
+    ```
 
 <br>
 

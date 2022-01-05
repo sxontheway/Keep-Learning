@@ -1,4 +1,4 @@
-# 矩阵乘法/卷积优化
+# 矩阵乘法/卷积优化的原理
 > [tvm schedule详细举例](https://zhuanlan.zhihu.com/p/94846767)
 
 <p align="center" >
@@ -11,14 +11,36 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 </p>
 
 ## Loop Reorder
-* 不同的 data layout 使得最优的内存访问顺序不同。例如 PyTorch 用的是 NCHW，最后一维为W，也就是按照 W 的方向遍历最高效（NCHW遍历时，001是000朝W方向移动一个），能增加缓存命中  
 
 <center class="half">
 	<img  src="./Pictures/mat_order.png" height=350>
 </center>
 
+* 不同的 data layout 使得最优的内存访问顺序不同。例如 PyTorch 用的是 NCHW，最后一维为W，也就是按照 W 的方向遍历最高效（NCHW遍历时，001是000朝W方向移动一个），能增加缓存命中  
 
-* 例如 A*B=C 的矩阵卷积，`i->k->j` 比 `i->j->k` 高效
+    * 例如下面：`(i.outer, j.outer, i.inner, j.inner)` 的顺序比 `(i.outer, i.inner, j.outer, j.inner)` 慢很多（i.e., cutting line之前的更快）。由于行主序，矩阵是按行顺序，而不是按 32*32 的块存储，所以 `(j.outer, j.inner)` 有更好的局部性（代表一整行）
+
+        ```python
+
+        import tvm
+        from tvm import te
+
+        n = 1024
+        A = te.placeholder((n, n), name='A')
+        B = te.placeholder((n,n), name='B')
+        C = te.compute((n, n), lambda i, j: A[i, j] + B[i, j], name='C')
+        s = te.create_schedule(C.op)
+
+        xo, xi = s[C].split(s[C].op.axis[0], factor=32)
+        yo, yi = s[C].split(s[C].op.axis[1], factor=32)
+        print(tvm.lower(s, [A, B, C], simple_mode=True))
+        print("---------cutting line---------")
+
+        s[C].reorder(xo, yo, yi, xi)
+        print(tvm.lower(s, [A, B, C], simple_mode=True))    
+        ```
+
+* 再比如，对于 A*B=C 的矩阵卷积，`i->k->j` 比 `i->j->k` 高效
 
     因为矩阵虽然是3维的，但是在内存中还是按一维线性在存储；对于行主序，要想矩阵A的访问高效，要`i->k`；对B要`k->j`，所以要都满足只能是 `i->k->j`
 
@@ -38,7 +60,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
             for j in 0..N:
                 C[i, j] += A[i, k] * B[k, j]
     ```  
-* 进一步优化：矩阵在内存中也是存成一个一维向量的，所以可以手动写指针直接访问元素代替类似 `A[i, k]` 的索引，减少寻址时间
+* 上例的进一步优化：矩阵在内存中也是存成一个一维向量的，所以可以手动写指针直接访问元素代替类似 `A[i, k]` 的索引，减少寻址时间
     * 假设矩阵乘法：A * B = C，维度分别为 (M, K)，(K, N)，(M, N)
     * 每个 `C[i * W + j]` 的值，是 A 第 i 行和 B 第 j 列两个向量的点乘。假设存储是行主序的，未进行 loop order 时每次读取 B 都会产生 cache miss：
         ```c
@@ -141,12 +163,20 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 <br>
 
 
-# TVM
-## Schedule
+# 运用在 TVM 中
+## Schedule 
 > 知乎：https://zhuanlan.zhihu.com/p/360385060   
 > TVM documents: [Schedule Primitives in TVM](https://tvm.apache.org/docs/how_to/work_with_schedules/schedule_primitives.html#)
 
+* 常见的有 split, reorder, tile（可以由split和reorder实现）, vectorize（SIMD），parrallel（multi-core for thread-level parallelization），binding (GPU)；其中有些上文已提到过
+
 * compute_at：将某个 axis 的 compute 移到另外一个 axis，见 https://tvm.apache.org/docs/reference/api/python/tir.html?highlight=compute_at#tvm.tir.Schedule.compute_at 
+
+* reduce_axis
+    > https://mp.weixin.qq.com/s/ohWy5yBrsKpzApfjQLXWJg 
+
+    例如对于一个 batch 的 NCHW 的 2d 卷积，一共7层循环。其中 input channel number, 2d kernel size 一共3维是要被规约的，这个时候 reduce_axis 就能体现它的优势了
+
 * rfactor(loop, factor_axis)
 
     One problem of building a reduction is that we cannot simply parallelize over the reduction axis. We need to (1) divide the computation of the reduction, (2) store the local reduction result in a temporal array, and (3) do a reduction over the temporal array. The rfactor primitive does such rewrite of the computation. 其中第二步可以引入并行  
@@ -208,6 +238,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 * inner loop 用 m, k, n 的顺序遍历
 * reduce_axis 见 https://tvm.apache.org/docs/how_to/work_with_schedules/reduction.html  
 * split can split a specified axis into two axes by factor
+    > [见：0x.03 split](https://mp.weixin.qq.com/s?__biz=MzA4MjY4NTk0NQ==&mid=2247493649&idx=1&sn=fb9ddb7ee5a5fd54653fcb926ade4ffc&scene=21#wechat_redirect)
     ```python
     import tvm
     from tvm import te
@@ -253,7 +284,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
     print("source code:\n", func.get_source())          # print assembling source code
     ```
 
-### Genrated Sample Program
+### 上面代码生成的 Sample Program
 > Chengfan Jia Blog: https://jcf94.com/2021/08/28/2021-08-28-simd/ 
 
 例子为 `A * B = C` 的矩阵乘法，大小均为 `128*128`；索引的哑元是：`A(i,k), B(k,j), C(i,j)`

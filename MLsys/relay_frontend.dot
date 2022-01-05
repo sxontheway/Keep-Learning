@@ -1,0 +1,72 @@
+digraph graphname {
+    
+    subgraph cluster_0 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+        main [label="import tvm.relay as relay
+        mod, params = relay.frontend.from_onnx(onnx_model, shape_dict)
+        // Return: (tvm.IRModule, dict)"]
+
+		label = "main.py";
+	}
+
+    subgraph cluster_1 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+
+        main->onnx0 [label="invoke"]
+        onnx0 [label="from .. import op as _op 
+        GraphProto.from_onnx()"]
+        onnx1 [label="op = GraphProto._convert_operator(op_name, ...) 
+        // Return converted relay function: tvm.relay.function.Function"]
+        onnx0->onnx1 [label="invoke"]; 
+        onnx2 [label="_get_convert_map(opset)"]
+        onnx4 [label="Conv.get_converter(opset)"]
+        onnx4_1 [label="Conv._impl_v1()"]
+        onnx1->onnx2 [label="invoke: need conversion"]; 
+        onnx2->onnx4 [label="One of the returns"]; 
+        onnx4->onnx4_1[label="need first define"]
+
+        label = "tvm/python/tvm/relay/frontend/onnx.py";
+        }
+
+    subgraph cluster_2 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+		onnx5 [label="class AttrCvt(object)
+        // Turn op attributes from ONNX to TVM Relay.
+        // Changed some names. "]
+        onnx3 [label="get_relay_op(op_name)"]
+        onnx4_1->onnx5 [label="invoke: if need attribute conversion"]
+        onnx5->onnx3 [label="invoke"]
+        onnx1->onnx3 [label="invoke: for compatible operators 
+        that do NOT require any conversion"]; 
+		label = "/relay/frontend/common.py";
+	}
+    
+    subgraph cluster_3 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+        // onnx3->onnx7 [label="Find the callable function from Relay based on op_name"]
+        onnx7 [label="op.nn.bias_add()"]
+        onnx8 [label="_make.bias_add()
+        // Python Class registerd in C++"]
+        onnx7->onnx8 [label="invoke"]
+        onnx4_1 -> onnx7 [label="invoke"]
+
+        onnx9 [label="op.nn.conv2d()"]
+        onnx3->onnx9 [label="Find the callable function from Relay based on op_name"]
+
+        onnx10 [label="_make.conv2d()"]
+        onnx9->onnx10
+
+		label = "/relay/op/nn/nn.py";
+	}
+
+    // subgraph cluster_4 {
+	// 	style=filled;color=lightgrey;labeljust="l"
+    //     node [style=filled,color=white];
+
+	// 	label = "/relay/op/nn/nn.py";
+	// }
+}

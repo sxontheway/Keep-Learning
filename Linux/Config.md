@@ -1,30 +1,4 @@
-# 配环境相关操作
-
-## Conda
-```bash
-# conda 安装 https://www.jianshu.com/p/edaa744ea47d
-mkdir miniconda3
-cd miniconda3
-wget -c https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-chmod 777 Miniconda3-latest-Linux-x86_64.sh #给执行权限
-bash Miniconda3-latest-Linux-x86_64.sh -u #运行
-
-# conda 内安装
-conda create -n ml python=3.7
-conda config --set auto_activate_base false
-# 在 ~/.bashrc 最后一行加 conda activate ml
-
-# 进入 (ml) 后
-pip3 install matplotlib numpy scipy scikit-learn pandas pyyaml 
-
-# 安装 nvidia driver 对应版本的 cuda/torch
-nvidia-smi
-nvcc --version  # 发现是 9.0 版本，只能安pytocrh 1.1
-conda install pytorch==1.1.0 torchvision==0.3.0 cudatoolkit=9.0 -c pytorch
-pip3 install tensorboard
-```
-
-## systemd
+## Systemd
 是 Linux 自带的系统工具，可以实现某些服务的自动重启
 
 > https://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-commands.html 
@@ -96,7 +70,7 @@ WantedBy=multi-user.target
         
 <br>
 
-* No Wifi Model  
+* No WIFI Model  
     * `iwconfig`: see whether there is a model called wlan0. If not, it means that the network card driver is not installed.  
     * `sudo lshw -c network`: see the model and vendor oationf the network card. For example, `BCM43142 802.11 b/g/m, vendor: Broadcom Corportion`  
     * For Broadcast network card:`sudo apt-get install`, `sudo apt-get bcmwl-kernel-source`
@@ -138,6 +112,13 @@ WantedBy=multi-user.target
   https://zhuanlan.zhihu.com/p/126538251  
   * 自定义一个 `.proto` 文件之后生成 `.h`，`.cc` 文件：  
   `protoc --cpp_out=./ ./BATsNet/radar_iwr6843/proto/radar.proto` 
+
+<br>
+
+* SSH 连不上 or VSCode Remote连不上
+   * 可能因为远程主机发过来的公钥和之前本机存的公钥不一致，出现：`Host key verification failed.`，解决方法： `ssh-keygen -R 你要访问的IP地址`
+   * SSH 能连，但是 vscode 连不上，尝试删除 `rm -rf ~/.vscode-server`
+   * 显示公钥 Permission Denied：尝试将本地的 `~/.known_host` 清理一下
 
 <br>
 
@@ -308,7 +289,7 @@ WantedBy=multi-user.target
 
 
 
-# 服务器运维
+# 服务器运维记录
 
 ## Soft Lockup and Hard Lockup
 > https://blog.csdn.net/Rong_Toa/article/details/109606560  

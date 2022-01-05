@@ -5,6 +5,95 @@
 * Dataloader 的 worker 数量不同也会使得采样结果 non-deterministic: https://pytorch.org/docs/stable/data.html#data-loading-randomness 
 
 
+<br>
+<br>
+
+# DDP
+* DP: 单机多卡，所有设备都负责计算和训练网络，除此之外， device[0] (并非 GPU 真实标号而是输入参数 device_ids 首位) 负责整合梯度，更新参数，是 parameter server 的构架
+* DDP：https://zhuanlan.zhihu.com/p/187610959, https://zhuanlan.zhihu.com/p/358974461 
+
+    * 单进程单卡，推荐
+    * 多进程多卡，每个进程都是 DP，对于 python 的 PIL 会有 CPU bound
+    * 单进程多卡，并行（model 太大放不下 batchsize=1）
+
+    ```python
+    import os
+    import torch
+    import torchvision
+    import torch.distributed as dist
+    import torch.utils.data.distributed
+    from torchvision import transforms
+    from torch.multiprocessing import Process
+
+    os.environ['MASTER_ADDR'] = 'localhost'     # New added
+    os.environ['MASTER_PORT'] = '12355'         # New added
+
+
+    def main(rank):
+
+        dist.init_process_group("ncll", rank=rank, world_size=3)    # New added
+        torch.cuda.set_device(rank)                                 # New added
+
+        trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+        data_set = torchvision.datasets.MNIST("./", train=True, transform=trans, target_transform=None, download=True)
+
+        train_sampler = torch.utils.data.distributed.DistributedSampler(data_set)   # New added
+        data_loader_train = torch.utils.data.DataLoader(dataset=data_set, batch_size=256, sampler=train_sampler)    # use train_sampler to split the original batch size
+
+        net = torchvision.models.resnet101(num_classes=10)
+        net.conv1 = torch.nn.Conv1d(1, 64, (7, 7), (2, 2), (3, 3), bias=False)
+        net = net.cuda()
+
+        net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[rank]) # New added
+        criterion = torch.nn.CrossEntropyLoss()
+        opt = torch.optim.Adam(net.parameters(), lr=0.001)
+        for epoch in range(10):
+            for i, data in enumerate(data_loader_train):
+                images, labels = data
+                images, labels = images.cuda(), labels.cuda()
+                opt.zero_grad()
+                outputs = net(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                opt.step()
+                if i % 10 == 0:
+                    print("loss: {}".format(loss.item()))
+        if rank == 0:       # only the main process saves the model 
+            torch.save(net, "my_net.pth")   
+
+
+    if __name__ == "__main__":
+        size = 3
+        processes = []
+        for rank in range(size):
+            p = Process(target=main, args=(rank,))
+            p.start()
+            processes.append(p)
+        for p in processes:
+            p.join()
+
+        # or use spawn
+        # mp.spawn(main, args=(size,), nprocs=size, join=True)
+    ```
+    
+* torch.distributed.init_process_group() 默认 `env://` 的初始方法，也可以使用 tcp 和 file
+* 多机分布式启动方式： 用 torch.distributed.launch。假设一共有两台机器（节点1和节点2），每个节点上有8张卡，节点1的IP地址为192.168.1.1，占用的端口12355（端口可以更换），启动的方式如下：
+
+    ```bash
+    # 节点1
+    python -m torch.distributed.launch --nproc_per_node=8
+            --nnodes=2 --node_rank=0 --master_addr="192.168.1.1"
+            --master_port=12355 MNIST.py
+    # 节点2
+    python -m torch.distributed.launch --nproc_per_node=8
+            --nnodes=2 --node_rank=1 --master_addr="192.168.1.1"
+            --master_port=12355 MNIST.py
+    ```
+    * 其中 torch.distributed.launch 将会被 torchrun 代替：https://pytorch.org/docs/stable/elastic/run.html#launcher-api
+<br>
+<br>
+
+
 # 多GPU多进程模拟联邦学习，进程初始化报错
 > https://discuss.pytorch.org/t/understanding-minimum-example-for-torch-multiprocessing/101010 
 
