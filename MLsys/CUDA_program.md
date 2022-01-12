@@ -22,9 +22,9 @@
 ## GPU 存储构架：global memory > shared memory > register/local memory
 
 
-* 每个 thread 都有自己的一份 register 
-* 一组 thread 构成一个 block，**`这些 thread 则共享一份 shared memory / L1 cache / Texture L1 cache `**
-* 不同 block 的所有 thread 都共享一份 global memory、constant memory
+* 每个 thread 都有自己的 register，最快（几个 cycle）
+* 一组 thread 构成一个 block，**`这些 thread 则共享一份 shared memory / L1 cache / Texture cache `** （每个 SM 都有自己的），约 20 个cycle
+* 不同 block 的所有 thread 都共享一份 global memory（多个 SM 共享），上百个 cycle
 * Server 和 Mobile GPU 也不同（See Romou Mobicom'22）
     * Server GPU 上 shared memory 和 L1 cache 几乎一样快，如上图最右边
     * Mobile GPU 上 shared memory 可能比 L1 cache 慢 
@@ -63,6 +63,8 @@ int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
 ## Loop Tiling
 将 global memory 中的数据 load 到每个 block 的 shared memory 中去，减少对低速存储（global memory）的访问次数
+
+Global Memory Access 从 2MNK 减少到 2MNK/P（假设 tiling 分成 p*p 份）。原本对于`A*B=C`，得到 C 的一个元素需要 2K 次访问，tiling 之后，得到 C 的一个元素只用 2K/p 次（每个小 block 对应的 “K” 变成 “K/p” 了）
 
 ### Without shared memory
 * `MatMulKernel<<<dimGrid, dimBlock>>>(d_A, d_B, d_C);`：invoke kernel，`dimGrid, dimBlock` 代表 thread grid 和 block 的数量，是 int 类型或者 dim3（3维向量，因为 grid 和 block 最多可以是3维）
@@ -374,7 +376,7 @@ int tid = blockIdx.x * blockDim.x + threadIdx.x;
 Shared Memory 的访问速度
 * Shared Memory 是一个 warp （32个threads）共享的，其中 Shared Memory 又分成 32 个 banks，每个 bank 里面又分很多个 words，每个 words 32 bits。如下图
     <p align="center" >
-    <img src="./Pictures/bank_word.png", width='500'>
+    <img src="./Pictures/bank_word.png", width='600'>
     </p>
 
 * 如果同时每个 thread 是存取不同的 bank，就不会产生任何问题，速度很快。但如果同时有两个（或更多个） threads 存取同一个 bank 的数据，就会发生 bank conflict，会降低 Shared Memory 读取速度。例如两个 thread 分别访问第 0，32，64，96 个words，就会发生 4-way bank block，读取速度会变为 1/4

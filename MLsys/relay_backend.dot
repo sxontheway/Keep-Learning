@@ -1,0 +1,48 @@
+digraph graphname {
+    
+    subgraph cluster_0 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+        main [label="mod, params = relay.frontend.from_pytorch(scripted_model, shape_list) \l with tvm.transform.PassContext(opt_level=3):\l         lib = relay.build(mod, target, params)\l"]
+		label = "main.py";
+	}
+
+    subgraph cluster_1 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+
+        build0 [label="bld_mod = BuildModule()
+        graph_json, runtime_mod, params = bld_mod.build(...)"]
+
+        build1 [label="class BuildModule(object): \l        def __init__(self): \l              self.mod = _build_module._BuildModule()"
+        labeljust=l]
+
+        main->build0 [label="invoke"]
+        build0->build1 [label="invoke"]
+
+        label = "tvm/python/tvm/relay/build_module.py"; 
+        }
+    
+    subgraph cluster_2 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+
+        build2 [label="tvm._ffi._init_api(\"relay.build_module\", __name__)"]
+        build1->build2 [label="invoke"]
+        label = "tvm/python/tvm/relay/_build_module.py"; 
+        }
+
+    subgraph cluster_3 {
+		style=filled;color=lightgrey;labeljust="l"
+        node [style=filled,color=white];
+
+        build4 [label="class RelayBuildModule()"]
+        build5 [label="RelayBuildModule::Build(...)"]
+        build6 [label="RelayBuildModule::BuildRelay(...)
+        // Include Optimize and Codegen"]
+        build2->build4 [label="invoke"]
+        build4->build5 [label="invoke"]
+        build5->build6 [label="invoke"]
+        label = "tvm/python/src/relay/backend/build_module.cc";
+        }
+}
