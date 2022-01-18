@@ -35,6 +35,12 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
+## screen 和 tmux
+* screen 滚轮：按 `ctrl+a`，再按 `[`；tmux：`set -g mouse on`
+* tmux
+  * 所有快捷键前都需要 `ctrl+b`；退出 tmux：`ctrl+b` + d
+  * 创建：`tmux new -s <session-name>`，恢复：`tmux at -t sx`，查看所有 tmux：`tmux ls`，https://www.ruanyifeng.com/blog/2019/10/tmux.html 
+
 
 ## Debug  
 * Ubuntu 开机循环输入密码无法进入桌面的解决办法：  
