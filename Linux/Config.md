@@ -125,7 +125,7 @@ WantedBy=multi-user.target
    * 可能因为远程主机发过来的公钥和之前本机存的公钥不一致，出现：`Host key verification failed.`，解决方法： `ssh-keygen -R 你要访问的IP地址`
    * SSH 能连，但是 vscode 连不上，尝试删除 `rm -rf ~/.vscode-server`
    * 显示公钥 Permission Denied：尝试将本地的 `~/.known_host` 清理一下
-   * 有可能是 server 由于网络原因不能从 vscode 源下到 vscode-server 插件，需要手动 scp 上传，见: [Remote-ssh服务器端vscode-server安装失败](https://blog.csdn.net/wyg1997/article/details/101460961)
+   * 有可能是 server 由于网络原因不能从 vscode 源下到 vscode-server 插件，需要手动 scp 上传，见: [Remote-ssh服务器端vscode-server安装失败](https://yimiandai.me/post/remote-vscode-server/)
 
 <br>
 
