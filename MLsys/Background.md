@@ -18,7 +18,8 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 
 * 不同的 data layout 使得最优的内存访问顺序不同。例如 PyTorch 用的是 NCHW，最后一维为W，也就是按照 W 的方向遍历最高效（NCHW遍历时，001是000朝W方向移动一个），能增加缓存命中  
 
-    * 例如下面：`(i.outer, j.outer, i.inner, j.inner)` 的顺序比 `(i.outer, i.inner, j.outer, j.inner)` 慢很多（i.e., cutting line之前的更快）。由于行主序，矩阵是按行顺序，而不是按 32*32 的块存储，所以 `(j.outer, j.inner)` 有更好的局部性（代表一整行）
+    * 例如下面：`(i.outer, j.outer, i.inner, j.inner)` 的顺序比 `(i.outer, i.inner, j.outer, j.inner)` 慢很多（i.e., cutting line之前的更快）。由于行主序，矩阵是按行顺序，而不是按 32*32 的块存储，所以 `(j.outer, j.inner)` 有更好的 locality（代表一整行）
+        * BTW，这里的 locality 都是 spatial locality；还有一种 locality 是 temporal locality，见 https://stackoverflow.com/a/16554721 
 
         ```python
 
@@ -115,7 +116,7 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 * 将 global memory 中的数据按照 block load 到 shared memory 中去，减少对低速存储的访问
 * 多个 block 的运算 GPU 上可以实现并行
 
-## 使用 Share memery 并避免 bank conflict
+## 避免 Shared Memory 的 bank conflict
 见 [Loop Tiling 的 CUDA 代码实现](./CUDA_Program.md#avoid-bank-conflict)
 
 ## Loop Unrolling
