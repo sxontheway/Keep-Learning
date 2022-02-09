@@ -43,3 +43,12 @@
     
 * Windows挂VPN并开热点
     * change adapter options -> 找到VPN那个connection -> properties -> sharing -> Allows sharing 并选择开热点对应那个connection
+
+
+# QT 打包程序
+> https://bkfish.github.io/2019/01/02/Qt%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E4%BB%A5%E5%8F%8A%E8%87%AA%E5%8A%A8%E6%89%93%E5%8C%85/ 
+
+* 下载安装：http://download.qt.io/official_releases/qt/  
+例如可以下载 qt-opensource-windows-x86-5.9.0.exe   
+* 编译运行
+* 打包：开始菜单打开 `QT-5.9 for Desktop (MinGW5.3.0)`等等，输入命令 `windeployqt <your_program>.exe`
