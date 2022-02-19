@@ -56,7 +56,8 @@
     conda install pytorch==1.1.0 torchvision==0.3.0 cudatoolkit=9.0 -c pytorch
     pip3 install tensorboard
     ```
-
+* conda 常用命令，查询/退出/激活/删除
+    * `conda env list`, `conda deactivate`, `conda activate $ENV_NAME`, `conda env remove -n $ENV_NAME`
 <br>
 
 
