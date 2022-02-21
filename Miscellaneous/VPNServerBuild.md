@@ -50,9 +50,9 @@
         </p>
 
 ## 实现2：用 SSH Tunnel
-适用于 PC1 用 ip 在国外的没有墙的服务器，因为不用代理了，只用 SSH Reverse Tunnel，对于 My PC 的配置就和普通 SSH 差不多
-> SSH Tunnel 介绍：https://pohsienshih.github.io/2019/SSH-Tunnel-Introduction/#%E4%B8%80%E8%88%AC%E6%83%85%E5%A2%83     
-在 GPU server 上输入：`autossh -M 3332 -CNR <port>:localhost:22 root@XXX.XXX.XXX.XXX` 即可  
+适用于 PC1 用 ip 在国外的没有墙的服务器（公网），因为不用代理了，只用 SSH Reverse Tunnel，对于 My PC 的配置就和普通 SSH 差不多
+> SSH Tunnel 介绍：https://zhuanlan.zhihu.com/p/112227542 
+在 GPU server 上输入：`autossh -M 3332 -CNR 2222:localhost:22 root@XX.XX.XX.XX` 即可：其中内网主机的 3332 端口负责监事 ssh 状态，负责出了问题自动重连；`2222:localhost:22`：表示将内网主机的 22 端口转发至公网主机的 2222 端口上；我们只要访问公网主机的2222 端口，就间接访问到 GPU server 了                                   
                                                       
 ```
 Host cpii_bj_zhang
