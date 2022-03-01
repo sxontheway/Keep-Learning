@@ -96,9 +96,25 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
 	<img src="./pictures/lstm.jpg" width=700>
 </p>
 
-* A被称作cell，LSTM的`cell`在每个`time_step`是复用的
-* `num_units` = `h_t` 和 `s_t` 的维度大小（两者相同维度）= 最后一个time step输出维度大小（输出为h） = 黄色框的输出维度大小 = `hidden_size`
+* LSTM 是一种 RNN，主要解决的是原始 RNN 丧失到连接到远处信息的能力；A 被称作cell，LSTM 的 `cell` 在每个 `time_step` 是复用的
+* `input_size` 也即 x 的维度，`hidden_size` 也即 h 和 s 的维度（两者相同维度）。每个黄色框里面都包含一个 FC 层，进行了从 `(input_size + hidden_size)` 到 `hidden_size` 的维度变换（h_{t-1} 先和 x_t 进行了 concat）
+    ```python
+    # input size: n*30*4096, output size: n*30*128, 30是 temporal size
+    self.lstm = nn.Sequential(
+        nn.LSTM(input_size=4096, hidden_size=128, num_layers=2, bidirectional=False, batch_first=True)
+    )
+
+    ...
+
+    out = self.lstm(x)[:, -1, :]    # output the feature of the last time step, n*128
+    ```
 * LSTM参数量：`(hidden_size * (hidden_size + x_dim ) + hidden_size) *4 `，因为 `f = sigma(W[h, x] + b)`，相当于将维度 `(hidden_size + x_dim)` 变到了 `hidden_size`
+
+* 双向 LSTM 主要的出发点是：预测可能需要由前面和后面输入共同决定。其输出是 backward RNN 和 Forward RNN 的结果 concat，所以输出 size 是单向 LSTM 的两倍
+<p align="center" >
+	<img src="./pictures/bilstm.png" width=600>
+</p>
+
 
 <br>
 <br>
@@ -163,6 +179,59 @@ Encoder
 ## 网络结构
 ### 做简单的视频检测：
 可以用 3DCNN：https://dl.acm.org/doi/pdf/10.1145/3213344.3213351
+```python
+class C3D_reduced(nn.Module):
+    """
+    conv1 input (n*1*16*112*112), conv5 output (n*512*1*4*4)
+    """
+    def __init__(self, num_classes):
+        super(C3D_reduced, self).__init__()
+
+        self.conv1 = nn.Sequential(
+            nn.Conv3d(1, 64, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
+            nn.BatchNorm3d(64),
+            nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2))
+            )
+        self.conv2 = nn.Sequential(
+            nn.Conv3d(64, 128, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
+            nn.BatchNorm3d(128),
+            nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)),
+            )
+        self.conv3 = nn.Sequential(
+            nn.Conv3d(128, 256, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
+            nn.BatchNorm3d(256),
+            nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)),
+            )
+        self.conv4 = nn.Sequential(
+            nn.Conv3d(256, 512, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
+            nn.BatchNorm3d(512),
+            nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)),
+            )
+        self.conv5 = nn.Sequential(
+            nn.Conv3d(512, 512, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
+            nn.BatchNorm3d(512),
+            nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2), padding=(0, 1, 1))
+            )
+        self.classifier = nn.Sequential(
+            nn.Linear(8192, 500),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(500, 128),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(128, num_classes),
+        )
+        
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = self.conv5(x)
+        x = x.view(-1, 8192)
+        out = self.classifier(x)
+        return out
+```
 
 ### ResNet 
 * 常规的用于 ImagenNet 的 Resnet 是 224*224
