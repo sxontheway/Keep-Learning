@@ -48,11 +48,11 @@
     # 在 ~/.bashrc 最后一行加 conda activate ml
 
     # 进入 (ml) 后
-    pip3 install matplotlib numpy scipy scikit-learn pandas pyyaml 
+    pip3 install matplotlib numpy==1.19.5 scipy==1.7.3 scikit-learn==1.0.2 pandas pyyaml 
 
     # 安装 nvidia driver 对应版本的 cuda/torch
     nvidia-smi
-    nvcc --version  # 发现是 9.0 版本，只能安pytocrh 1.1
+    nvcc --version  # 上pytorch官网查找对应版本安装命令；发现是 9.0 版本，只能安pytocrh 1.1
     conda install pytorch==1.1.0 torchvision==0.3.0 cudatoolkit=9.0 -c pytorch
     pip3 install tensorboard
     ```
