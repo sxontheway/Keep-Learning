@@ -182,3 +182,35 @@ IQ 调制的主要优势是能够非常轻松地将独立的信号分量 `Acos(�
 * 子空间法：MUSIC，ESPRIT  
 将信号分成两个子空间（信号空间、噪音空间）
 
+<br>
+
+## 四元数 quaternion
+> https://www.zhihu.com/question/23005815/answer/33971127  
+> https://www.cnblogs.com/WangHongxi/p/12357230.html   
+
+### 物理意义
+* 四元数相比于欧拉表示，能够避免万向锁的情况
+* 四元数可以表示一个坐标系到另外一个坐标系的变换。定义一个旋转轴和角度，例如假设旋转轴对应的单位向量 `v = (vx, vy, vz)`，旋转角度为 `θ`（右手法则的旋转)，那么四元数可以表述为 `q = (q1, q2, q3, q4) = (cos(θ/2), sin(θ/2)vx, sin(θ/2)vy, sin(θ/2)vz)`。  
+进一步用复数表示，`q = cos(θ/2) + i*sin(θ/2)*vx + j*sin(θ/2)*vy + k*sin(θ/2)*vz`，很显然，`qq^(-1) = qq* = 1`，所以 `q^(-1) = q*`
+* 假设一个坐标点在坐标系A中坐标是 `v = (0, vx, vy, vz)`，要求其在坐标系 B 中的坐标 `v'= (0, vx', vy', vz')`，其中从 A 到 B 坐标变换对应四元数是 q；那么 `v' = q * v * q^(-1)`，而右乘 `q^(-1)` 其实也可以准换成左乘（见：https://krasjet.github.io/quaternion/quaternion.pdf 的 3.1.5），所以 `v'` 最终可以表示为如下矩阵左乘：
+  <p align="center" >
+  <img src="./pictures/quaternion.png" width="600">
+  </p>
+
+  
+
+* 为什么是 `θ/2` 不是 `θ`？
+high-level 理解，因为四元数 `q` 将 `v` 投影到了四维空间，`q` 左乘等于做了 `θ/2` 的旋转，而右乘 `q^(-1)` 相当于对目标做了 `θ/2` 的旋转 
+
+### Mahony 算法求解姿态
+> https://nitinjsanket.github.io/tutorials/attitudeest/mahony
+目标是从6轴IMU数据中（3个加速度，3个角速度）估计位姿（角度）。分为以下几部：
+  * 绿色框：t+1 时刻的加速度乘上一个 t 时刻的变换矩阵（也即绿色框第一行），算出加速度对 t+1 时刻角速度各个方向上的影响
+  * 红色框：进行角速度的矫正，用了类似 PID 控制的补偿项，`K_P` 和 `K_i` 分别是误差和误差的积分的权重
+  * 蓝色框：输入矫正过后的角速度，左乘一个 t 时刻的四元数，得到 t+1 时刻的四元数的倒数
+  * 黄色框：对四元数的倒数积分，算出四元数（也即算出旋转角度，也即位姿）
+
+  <p align="center" >
+  <img src="./pictures/mahony.png" width="600">
+  </p>
+
