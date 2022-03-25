@@ -8,13 +8,45 @@
 <br>
 <br>
 
-# DDP
-* DP: 单机多卡，所有设备都负责计算和训练网络，除此之外， device[0] (并非 GPU 真实标号而是输入参数 device_ids 首位) 负责整合梯度，更新参数，是 parameter server 的构架
-* DDP：https://zhuanlan.zhihu.com/p/187610959, https://zhuanlan.zhihu.com/p/358974461 
+# pytorch多gpu并行训练  
+> https://zhuanlan.zhihu.com/p/105755472  
+> https://zhuanlan.zhihu.com/p/86441879  
+> https://zhuanlan.zhihu.com/p/95700549  
+> https://zhuanlan.zhihu.com/p/68717029   
 
-    * 单进程单卡，推荐
-    * 多进程多卡，每个进程都是 DP，对于 python 的 PIL 会有 CPU bound
-    * 单进程多卡，并行（model 太大放不下 batchsize=1）
+## High-level 介绍 DP 和 DDP
+> [Training Neural Nets on Larger Batches: Practical Tips for 1-GPU, Multi-GPU & Distributed setups  
+(里面关于DP的图有错误，DP中从loss计算梯度仍是并行的)](https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255)
+* DP: 
+    * 实现是单进程多线程，只能用于单机多卡；并且用的 parameter server 构架，会导致GPU之间通信是瓶颈；好处是代码改动很少      
+    * 并且其中一个 GPU 需要计算 loss 并整合梯度，会导致负载不均衡。具体，并行训练分以下四步  
+    （其中下图左下角的两步画错了，应该是GPU-1计算并分发loss，而不是分发梯度）：  
+    1：把每张卡的输出聚集到 GPU0  
+    2：只在 GPU0 在算 loss  
+    3：把 loss scatter 到其他 GPU 上  
+    4：每个 GPU 算各自的梯度，再把梯度汇总到 GPU0 上
+        <p align="center" >
+            <img src="./pictures/dp_torch.png" width=800>
+        </p>
+* 可以看到 loss 的计算始终在一个 GPU 上，所以会有负载不均衡，所以有类似 PyTorch Encoding 的包，使得 loss 的计算也能并行。也即每张卡算自己的 loss，然后再算自己的梯度，最后只需将梯度聚集就可以
+    * 但这种方法不适用于对比学习，因为对比学习 loss 计算本身就必须知道一个batch内所有样本的 output
+    * 这时普通的 DDP 也不适用，需要用 DDP2 来计算 NCE loss，见 https://pytorch-lightning.readthedocs.io/en/stable/advanced/multi_gpu.html#distributed-data-parallel-2  
+* DDP：实现是多进程，可用于单机多卡或多机多卡，用的 ring-all-reduce 构架
+    * 加速主要来源于3点：多进程，ring-all-reduce，负载均衡；可以见到没有聚合output在一张卡上计算梯度的步骤了，而是根据每张卡上的loss直接反传
+        <p align="center" >
+            <img src="./pictures/ddp_torch.png" width=800>
+        </p>
+    
+
+## DDP 具体用法
+
+* 三种方式   
+https://zhuanlan.zhihu.com/p/358974461  
+https://zhuanlan.zhihu.com/p/187610959  
+
+    * 每个进程负责一个GPU，推荐
+    * 每个进程多GPU，但每个进程都是 DP，但 python 的 PIL 会造成 CPU bound
+    * 每个进程调用多个GPU，主要用于 model 太大 batchsize=1 都放不下的情况 
 
     ```python
     import os
@@ -78,7 +110,7 @@
     
 * torch.distributed.init_process_group() 默认 `env://` 的初始方法，也可以使用 tcp 和 file
 * 多机分布式启动方式： 用 torch.distributed.launch。假设一共有两台机器（节点1和节点2），每个节点上有8张卡，节点1的IP地址为192.168.1.1，占用的端口12355（端口可以更换），启动的方式如下：
-
+    > 其中 torch.distributed.launch 将会被 torchrun 代替：https://pytorch.org/docs/stable/elastic/run.html#launcher-api
     ```bash
     # 节点1
     python -m torch.distributed.launch --nproc_per_node=8
@@ -89,7 +121,13 @@
             --nnodes=2 --node_rank=1 --master_addr="192.168.1.1"
             --master_port=12355 MNIST.py
     ```
-    * 其中 torch.distributed.launch 将会被 torchrun 代替：https://pytorch.org/docs/stable/elastic/run.html#launcher-api
+
+* 按模块启动：`python -m torch.distributed.launch main.py`
+    > https://www.cnblogs.com/xueweihan/p/5118222.html
+    
+    * 直接启动 `python xxx.py` 是把 `xxx.py` 文件所在的目录放到了sys.path属性中
+    * 按模块启动 `python -m xxx.py` 是把你输入命令的目录（也就是当前路径），放到了sys.path属性中
+
 <br>
 <br>
 
@@ -149,27 +187,6 @@ if __name__ == "__main__":
 
 * 报错的的原因应该是来源于 Pytorch 内部的内存管理机制，tensor 和 tensor 之间是自动共享内存的。试过 `copy.deepcopy(data)` 不起作用，必须要用 `.clone()`
 * 为什么 windows 不报错而 linux 报错，可能和两个平台的多进程实现机制有关，windows没有fork，所以为新进程强行开了新的存储空间
-
-<br>
-<br>
-
-# pytorch多gpu并行训练  
-> https://zhuanlan.zhihu.com/p/105755472
-> https://zhuanlan.zhihu.com/p/86441879  
-> https://zhuanlan.zhihu.com/p/95700549  
-> https://zhuanlan.zhihu.com/p/68717029   
-
-Use single-machine multi-GPU `DataParallel`, if there are multiple GPUs on the server, and you would like to speed up training with the minimum code change.
-
-Use single-machine multi-GPU `DistributedDataParallel`, if you would like to further speed up training and are willing to write a little more code to set it up.
-
-Use multi-machine `DistributedDataParallel` and the launching script, if the application needs to scale across machine boundaries.
-
-* `python -m torch.distributed.launch main.py`
-    > 按模块启动：https://www.cnblogs.com/xueweihan/p/5118222.html
-    
-    * 直接启动 `python xxx.py` 是把 `xxx.py` 文件所在的目录放到了sys.path属性中
-    * 按模块启动 `python -m xxx.py` 是把你输入命令的目录（也就是当前路径），放到了sys.path属性中  
 
 <br>
 <br>
