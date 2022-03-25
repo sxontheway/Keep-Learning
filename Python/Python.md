@@ -9,9 +9,22 @@
    | 命令 | python包安装路径 | 说明 |
    | :------------ |:---------------|:---|
    | sudo apt-get install | /usr/lib/python2.7/dist-packages |apt-get install必须要sudo|
-   | sudo pip install | /usr/local/lib/python2.7/site-packages |用sudo可能会报错：cannot import name 'main'|
-   | pip install | ～/.local/lib/python2.7/site-packages |可能会报错： Permission denied|
+   | sudo pip install | /usr/local/lib/python2.7/site-packages | 用sudo可能会报错：cannot import name 'main'|
+   | pip install | ～/.local/lib/python2.7/site-packages |作用同下，但可能会报错： Permission denied|
    | pip install --user| ～/.local/lib/python2.7/site-packages |--user 使包安装在当前用户文件夹下|
+
+* 批注：
+  * `usr` 很多人都认为是 `user` 缩写，其实不是，是 `unix system resource` 缩写
+  * `/lib` 是内核级的；`/usr/lib` 是系统级的；`/usr/local/lib` 是用户级的，主要存放一些用户自己安装的软件
+  * `sudo pip install` 是为所有用户安装，`pip install --user` 是只为本用户安装
+
+* 安装有多个python版本时，每个版本可能都对应一个pip库，导致环境混乱
+  > 此时可以手动指定使用哪个python版本进行包安装：`python3.6 -m pip install XXXX` 
+  
+  * 常见命令：
+    * `pip list -V`：查看所有pip包安装路径
+  * 如果确实有多个版本 python，例如同时有 3.6 和 3.8，可以用如下方法指定 `pip3 install XXX` 对应的 python 版本
+    * 查看 `which pip3`，`which python3`；将 `which pip3` 的输出 `/home/xxx/.local/bin/pip3` 文件中第一行改为想要的 python 版本路径，例如 `/usr/bin/python3.6`，即指定了 pip3 默认的 python 版本。见 https://blog.csdn.net/toopoo/article/details/99956326  
 
 * 在.py中输入
   ```python
