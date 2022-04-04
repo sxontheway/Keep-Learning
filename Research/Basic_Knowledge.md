@@ -239,3 +239,27 @@ class C3D_reduced(nn.Module):
     * 变种包括：`Resnet-18/34/50/101/152`，编号的数字基本代表有多少个conv层（Resnet-18有17层，Resnet-50有49层）。Resnet-18/34用的是Basic Block，Resnet-50及以上用的是 BottleNeck Block
 * ResNet for CIFAR：
     * 输入尺寸是 32*32，一共经历两次 `stride=2`，在 avg pooling 之前的输出尺寸是 `(N, feat_dim, 8, 8)`，参见：[链接1](https://github.com/KaihuaTang/Long-Tailed-Recognition.pytorch/blob/master/classification/models/ResNet32Feature.py)，[链接2](https://zhuanlan.zhihu.com/p/144665196)
+
+
+### ViT, mobileVit
+> 见 [mobileVit PyTorch 代码](./mobileVit.py)
+
+Transformer 输出尺寸和输入是相等的，VIT 可以处理任意大小的图片
+* 例如输入 X，size 是 (b, ph\*pw, h\*w, d0)，ph*pw 是一个patch里面的像素数， h\*w 是一张图被分成了多少个 patch，d 是 feature dimension
+* X 通过一层无 bias 的 linear 层得到 QKV，尺寸都是 (b, ph\*pw, h\*w, d1)
+* Multi-Head：假设是4个head，那 QKV 尺寸变换为 (b, ph\*pw, 4, h\*w, d1/4)
+* Attention：
+    * Q 和 K 得到 relationship matrix，然后再乘 V
+    * multi-head 分别各自得到输出然后 concat 起来
+    * mulit-head 之间得到 QKV 的 linear 层的权重不是共享的
+    ```python
+    # q, k, v 和输出尺寸都是 (b, p, h, n, d1/h)
+    scale = dim_head ** -0.5   # dim_head 也即 d1/h
+    dots = torch.matmul(q, k.transpose(-1, -2)) * scale # (b, p, h, n, n)
+    attn = nn.Softmax(dim = -1)(dots)
+    out = torch.matmul(attn, v)
+    ```
+
+<p align="center" >
+<img src="./pictures/multi-head.png"  width="600">
+</p>
