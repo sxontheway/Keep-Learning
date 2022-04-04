@@ -242,7 +242,8 @@ class C3D_reduced(nn.Module):
 
 
 ### ViT, mobileVit
-> 见 [mobileVit PyTorch 代码](./mobileVit.py)
+> 见 [mobileVit PyTorch 代码](./mobileVit.py)  
+> [深度学习模型如何处理大小可变的输入](https://cloud.tencent.com/developer/article/1840259)  
 
 Transformer 输出尺寸和输入是相等的，VIT 可以处理任意大小的图片
 * 例如输入 X，size 是 (b, ph\*pw, h\*w, d0)，ph*pw 是一个patch里面的像素数， h\*w 是一张图被分成了多少个 patch，d 是 feature dimension
