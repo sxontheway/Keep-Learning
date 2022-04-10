@@ -20,17 +20,24 @@
     wget http://developer.download.nvidia.com/compute/cuda/10.1/Prod/local_installers/cuda_10.1.243_418.87.00_linux.run
     sudo sh cuda_10.1.243_418.87.00_linux.run
     ```
-    Installer中可选择是否安装driver，如果已经安装过了那就不安装driver
+    * Installer中可选择是否安装driver，如果已经安装过了那就不安装driver  
+    * 有时用toolkit安装驱动会报错，是版本问题（toolkit默认安装的驱动版本系统不支持），可以先下驱动安装了，再用toolkit安装cuda等  
 
-## cuDNN 
-* 下载需要的版本 https://developer.nvidia.com/rdp/cudnn-archive
-* 解压下载的文件，可以看到cuda文件夹。做两件事：（1）将解压所得的cuda内的文件复制到cuda安装目录。（2）改权限
+## cuDNN / TensorRT
+* cuDNN 
+    * 下载需要的版本 https://developer.nvidia.com/rdp/cudnn-archive
+    * 解压下载的文件，可以看到cuda文件夹。做两件事：（1）将解压所得的cuda内的文件复制到cuda安装目录。（2）改权限
     ```bash
     sudo cp cuda/include/cudnn.h /usr/local/cuda/include/ 
     sudo cp cuda/lib64/libcudnn* /usr/local/cuda/lib64/
     sudo chmod a+r /usr/local/cuda/include/cudnn.h
     sudo chmod a+r /usr/local/cuda/lib64/libcudnn*
     ```
+* TensorRT
+> https://blog.csdn.net/zong596568821xp/article/details/86077553  
+
+* 用 tar 安装，下载后解压并配置环境变量，https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html#installing-tar  
+* 验证：`cd TensorRT-8.2.4.2/samples/sampleMNIST`, `make CUDA_INSTALL_DIR=/usr/local/cuda` （报错后再编译前先 make clean），生成的可执行文件在 `bin` 中  
 
 ## Conda 创建环境安装 Torch
 * tensorflow 和 CUDA/cuDNN 版本兼容性：https://www.tensorflow.org/install/source_windows#gpu 
