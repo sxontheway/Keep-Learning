@@ -244,22 +244,32 @@ class C3D_reduced(nn.Module):
 ### ViT, mobileVit
 > 见 [mobileVit PyTorch 代码](./mobileVit.py)
 
-Transformer 输出尺寸和输入是相等的，VIT 可以处理任意大小的图片
-* 例如输入 X，size 是 (b, ph\*pw, h\*w, d0)，ph*pw 是一个patch里面的像素数， h\*w 是一张图被分成了多少个 patch，d 是 feature dimension
-* X 通过一层无 bias 的 linear 层得到 QKV，尺寸都是 (b, ph\*pw, h\*w, d1)
-* Multi-Head：假设是4个head，那 QKV 尺寸变换为 (b, ph\*pw, 4, h\*w, d1/4)
-* Attention：
-    * Q 和 K 得到 relationship matrix，然后再乘 V
-    * multi-head 分别各自得到输出然后 concat 起来
-    * mulit-head 之间得到 QKV 的 linear 层的权重不是共享的
-    ```python
-    # q, k, v 和输出尺寸都是 (b, p, h, n, d1/h)
-    scale = dim_head ** -0.5   # dim_head 也即 d1/h
-    dots = torch.matmul(q, k.transpose(-1, -2)) * scale # (b, p, h, n, n)
-    attn = nn.Softmax(dim = -1)(dots)
-    out = torch.matmul(attn, v)
-    ```
+* 将 Transformer 用于 NLP 中，一个 batch 的句子经过 embedding 层后，维度会变为 [batch_size, seq_length, embedding_dim]；不同 batch 之间的 seq_length 可以不同，同一个 batch 内一般 padding 成相同长度。Transformer 能处理任意长度的序列，将序列里每一个时间点的数据叫做一个 token，transformer 对每一个 token 都做的是相同的操作。但 embedding_dim 是根据模型定死的。
+
+* Transformer 的输出尺寸和输入是相等的，VIT 可以处理任意大小的图片
+    * 例如输入 X，size 是 (b, ph\*pw, h\*w, d0)，ph*pw 是一个patch里面的像素数， h\*w 是一张图被分成了多少个 patch，d 是 feature dimension
+    * X 通过一层无 bias 的 linear 层得到 QKV，尺寸都是 (b, ph\*pw, h\*w, d1)
+    * 如果有 multi-head：假设是4个head，那 QKV 尺寸变换为 (b, ph\*pw, 4, h\*w, d1/4)
+    * Attention：
+        * Q 和 K 得到 relationship matrix，然后再乘 V
+        * multi-head 分别各自得到输出然后 concat 起来
+        * 计算 QKV 的 linear 层 `self.to_qkv()`，在 mulit-head 不共享；计算 Q，K，V 三者用的权重也是各自不同的
+        ```python
+        # 计算 qkv，尺寸均为 (b, p, h, n, d1/h)
+        from einops import rearrange
+        self.to_qkv = nn.Linear(d0, d1 * 3, bias = False)
+        qkv = self.to_qkv(x).chunk(3, dim=-1)
+        q, k, v = map(lambda t: rearrange(t, 'b p n (h d) -> b p h n d', h = 4), qkv)
+
+        # q, k, v 和输出尺寸都是 (b, p, h, n, d1/h)
+        scale = d1 ** -0.5   # dim_head 也即 d1/h
+        dots = torch.matmul(q, k.transpose(-1, -2)) * scale # (b, p, h, n, n)
+        attn = nn.Softmax(dim = -1)(dots)
+        out = torch.matmul(attn, v)
+        ```
 
 <p align="center" >
 <img src="./pictures/multi-head.png"  width="600">
 </p>
+
+
