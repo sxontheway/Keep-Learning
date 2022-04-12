@@ -242,7 +242,8 @@ class C3D_reduced(nn.Module):
 
 
 ### ViT, mobileVit
-> 见 [mobileVit PyTorch 代码](./mobileVit.py)
+> 见 [mobileVit PyTorch 代码](./mobileVit.py)  
+> [深度学习模型如何处理大小可变的输入](https://cloud.tencent.com/developer/article/1840259)  
 
 * 将 Transformer 用于 NLP 中，一个 batch 的句子经过 embedding 层后，维度会变为 [batch_size, seq_length, embedding_dim]；不同 batch 之间的 seq_length 可以不同，同一个 batch 内一般 padding 成相同长度。Transformer 能处理任意长度的序列，将序列里每一个时间点的数据叫做一个 token，transformer 对每一个 token 都做的是相同的操作。但 embedding_dim 是根据模型定死的。
 
@@ -271,5 +272,3 @@ class C3D_reduced(nn.Module):
 <p align="center" >
 <img src="./pictures/multi-head.png"  width="600">
 </p>
-
-
