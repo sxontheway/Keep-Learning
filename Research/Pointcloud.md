@@ -25,10 +25,10 @@
   * 对 3D Frustum 内的 point 进行 segmentation
   * 对 a subset of segmented point cloud 进行 3D bbox regression：Pointnet(Feature Extractor) + FC(Head)  
   （类比 Faster-RCNN 的 bbox regression）
-  <p align="center" >
-	<img src="./pictures/fpointnet.jpg" width="800">
-  </p>
-  
+    <p align="center" >
+    <img src="./pictures/fpointnet.jpg" width="800">
+    </p>
+    
 * PointRCNN: https://zhuanlan.zhihu.com/p/84335316
   * Stage 1
     * 用了 PointNet++ 先逐点进行 segmentation（foreground or background)：Focal Loss
@@ -40,9 +40,9 @@
     * 先在xyz轴上扩大每个Proposal（框住更大的体积）
     * concat之前的 Semantic feature 和新得到的 local feature 
     * PointNet++ 进行 regression
-  <p align="center" >
-	<img src="./pictures/pointrcnn.jpg" width="800">
-  </p>
+    <p align="center" >
+    <img src="./pictures/pointrcnn.jpg" width="800">
+    </p>
 # Radar 
 ## Mapping
 * See Through Smoke: Robust Indoor Mapping with Low-cost mmWave Radar_Mobisys20
