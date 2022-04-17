@@ -71,16 +71,12 @@ y = np.cov(x.T)   # shape (2,2)，先转置，才能求维度和维度之间的 
 能被学习函数 h 打散的最大样本数，例如 R^2 平面中所有线性划分构成的假设空间的 VC 维为3  
 如图所示, 当学习算法的 VC 维较低时, 训练误差和 ***泛化误差（也即 out-of-sample error）*** 之间的差异较小，但是对训练数据拟合能力较弱（in-sample error）；当学习算法的 VC 维过高时, 其对训练数据拟合的比较好, 但是将有很高的泛化误差界。
 <p align="center" >
-<img src="./pictures/vc.png" width="500">
+<img src="./pictures/vc.png" width="1000">
 </p>
 
 这里总的误差可以分为三部分：偏差，方差，噪音。   
 如右图，***泛化误差*** 由偏差和方差（bias and variance）组成。bias 随着训练减少，variacne 则是慢慢增加（因为在训练不足时, 学习器的拟合能力
 不够强, 训练数据的扰动不足以使学习器产生显著变化）。噪音是由于数据集标注 y 和真实本应该的标注 f(x) 之间有偏差造成的。
-<p align="center" >
-<img src="./pictures/error.png" width="500">
-</p>
-
 
 <br>
 
@@ -100,7 +96,7 @@ y = np.cov(x.T)   # shape (2,2)，先转置，才能求维度和维度之间的 
 * Softmax 回归 (用于多分类任务)
 * 朴素贝叶斯分类器 (用于多分类任务)：是生成式模型
 
-    下表中的概率假设和下下表中的噪声分布是一个东西，假设函数 h(x) 也即是回归的模型。softmax 回归的 `l(θ)` 其实可以简化为 `-log(q_c)`，其中 `q_c` 为 ground truth 类别所对应的 logit 
+    假设函数 h(x) 是产生回归的模型，概率假设是输出的概率。softmax 回归的损失形式 `l(θ)` 其实可以简化为 `-log(q_c)`，其中 `q_c` 为 ground truth 类别所对应的 logit 
         <p align="center" >
         <img src="./pictures/regression.png" width="800">
         </p>
@@ -212,7 +208,8 @@ GradientBoosting：
 * 相比于 adaboost，gradient boost 能适用于任何损失函数
 * 对 36 式的内层进行一阶泰勒展开，得到定理 8，也即 `h(x_i)` 需要去拟合的目标
     * 第5行：拟合了学习器 h_t
-    * 第6行，使用 line search 找到最好的学习率使得loss最小
+    * 第6行，使用 line search 找到对学习器 h_t 最好的权重，使得 loss 最小
+    
         <p align="center" >
         <img src="./pictures/gradientboost.png" width="1000">
         </p>
