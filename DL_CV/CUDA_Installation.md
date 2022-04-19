@@ -28,9 +28,9 @@
     * 下载需要的版本 https://developer.nvidia.com/rdp/cudnn-archive
     * 解压下载的文件，可以看到cuda文件夹。做两件事：（1）将解压所得的cuda内的文件复制到cuda安装目录。（2）改权限
     ```bash
-    sudo cp cuda/include/cudnn.h /usr/local/cuda/include/ 
+    sudo cp cuda/include/cudnn*.h /usr/local/cuda/include/ 
     sudo cp cuda/lib64/libcudnn* /usr/local/cuda/lib64/
-    sudo chmod a+r /usr/local/cuda/include/cudnn.h
+    sudo chmod a+r /usr/local/cuda/include/cudnn*.h
     sudo chmod a+r /usr/local/cuda/lib64/libcudnn*
     ```
 * TensorRT
