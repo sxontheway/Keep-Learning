@@ -1,10 +1,11 @@
 # 将笔记本 wifi 通过有线共享给多个设备，并能 ssh remote
 > [win10将wlan网络共享给以太网](https://cloud.tencent.com/developer/article/1678119)  
 
+* 用笔记本连wifi，然后将两个设备用交换机通过网线连起来 
 * 笔记本上
     * 允许wifi的连接共享
     * 配置以太网 ip，dns
-* 在设备上：配置ip和dns
+* 在设备上：ifconfig查看ip，应该就能ping上；如果不行，手动配置ip和dns
 
 <br>
 
