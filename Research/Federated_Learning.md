@@ -145,7 +145,15 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
 * ***`Federated Learning on Non-IID Data Silos: An Experimental Study`*** (挺有启发的一篇文章)：比较了 FedAvg, FedProx,  SCAFFOLD, FedNova 几种算法，有几个观察：
     * IID 时，FedAvg 不比其他3个方法差；Feature distribution skew, quantity skew 情况下，准确率下降不明显，并且 FedAvg 甚至比其他三个更好（The state-of-the-art algorithms signifi-cantly outperform FedAvg only in several cases）
     * Label distribution skew（也即 label non-iid）确实会带来巨大准确率下降。极端 non-iid 情况下，FedProx 比 FedAvg 稍好
-    * SCAFFOLD, FedNova 在很多情况下不稳定（可以排除掉了）。Scaffold 这篇文章的出发点还是有意思的，它每个 FL round，每个节点都会计算一个 c_i，也即同一个 global model 在 local 数据上的梯度，这个梯度当然能体现数据的异质性。然后在 fedavg 的基础上，每次梯度都扣除了一个 c_i-c，其中 c 可以理解成 c_i 上一轮的平均。所以在 fedavg 基础上，加了一个和数据相关的纠正项目   
+    * SCAFFOLD, FedNova 在很多情况下不稳定（可以排除掉了）
+        * 虽然感觉实现上不太优雅对称，scaffold 这篇文章的出发点还是有意思的
+            <center class="left">
+                <img src="./pictures/scaffold.png" width="800"/>
+            </center>
+
+            这篇文章有两个假设：
+            * 数据的异质性可以由 global model 在 local data 上的梯度来得到描述（第12行）  
+            * 第12行从（i）到（ii）的近似假设了每一步的梯度都近似相等。(ii) 中，第二项是 teacher model 减去 new model，再除以更新的步数。第一项 `c_i-c` 是用来补偿第10行中的 `-ci+c`。将 (ii) 带入第17行，可以得到新的 `c` 其实是 (ii) 中的第二项的平均，也即所有 client 的一步梯度更新值的平均
     * Dirichlet 分布产生的 Label distribution skew 相比每个 client 只有一类这种极端情况，要稍微好一点。另外这篇文章也提到，只有一类这种极端情况在现实中也可能存在，比如 speaker recognition
 * `FedMA_Federated learning withmatched averaging_ICLR20`：对于每一层（以FC为例），local dataset 训练得到的 weight 是 optimal 乘上一个 L*L 的矩阵，其中 L 是 hidden unit 数量。在 server 端，可以先求出来每一层的这个变换矩阵（通过迫使 global model 和 local model 变换后接近），再 aggregate；缺点是不支持 BN 层
 * `FedBN: Federated Learning on Non-IID Features via Local Batch Normalization_ICLR21`：server does not aggregate BN layers，探索的是 BN 层怎么 aggregate 的问题
