@@ -1,3 +1,15 @@
+# 计算机的一些基本概念
+## 图灵机和图灵完备
+* 图灵机：https://www.bilibili.com/video/BV1br4y1N762/?spm_id_from=333.788.recommend_more_video.0  
+它可以模拟计算机的任何算法，无论这个算法有多复杂。原型是一个只带，由非常多01构成。然后有一个读写头，它可以在纸带上左右移动，能读出当前所指的格子上的符号，并能改变它。还有一个控制表，它根据当前机器所处的状态以及当前读写头所指的格子上的符号来确定读写头下一步的动作，并改变状态寄存器的值  
+
+* 图灵完备：https://www.bilibili.com/video/BV18L4y15786/?vd_source=93c3a9b0afc9334d69915ec59d8c3a87   
+图灵完备是针对语言的，一个语言图灵完备意味着用这个语言，能实现图灵机所有的功能。 
+C，C++，java 这些高级语言都是图灵完备的，有 if else / for / go to 这些逻辑（底层汇编语言是离不开 go to 的）。
+
+<br>
+
+# 深度学习相关
 ## Optimizer
 ### Adam，L2, weight decay 和 AdamW
 > https://www.jiqizhixin.com/articles/2018-07-03-14   
@@ -272,3 +284,4 @@ class C3D_reduced(nn.Module):
 <p align="center" >
 <img src="./pictures/multi-head.png"  width="600">
 </p>
+

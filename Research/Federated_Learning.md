@@ -146,7 +146,7 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
     * IID 时，FedAvg 不比其他3个方法差；Feature distribution skew, quantity skew 情况下，准确率下降不明显，并且 FedAvg 甚至比其他三个更好（The state-of-the-art algorithms signifi-cantly outperform FedAvg only in several cases）
     * Label distribution skew（也即 label non-iid）确实会带来巨大准确率下降。极端 non-iid 情况下，FedProx 比 FedAvg 稍好
     * SCAFFOLD, FedNova 在很多情况下不稳定（可以排除掉了）
-        * 虽然感觉实现上不太优雅对称，scaffold 这篇文章的出发点还是有意思的
+        * 虽然感觉实现上相比 fedavg，fedprox 不太优雅对称，scaffold 这篇文章的出发点还是有意思的
             <center class="left">
                 <img src="./pictures/scaffold.png" width="800"/>
             </center>
