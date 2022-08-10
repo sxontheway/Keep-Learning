@@ -189,3 +189,20 @@ Distribution for Federated Visual Classification`：人为产生 Non-iid 的数�
     * `Federated Visual Classification with Real-World
 Data Distribution_ECCV20`
 
+## 安全
+> 联邦学习的隐忧：来自梯度的深度泄露 ：https://www.secrss.com/articles/30410 
+
+对于FL的attack主要可以server端的和client端的
+
+### Server端
+* 成员推断：给定一个数据点和一个预训练过的模型，判断该数据点是否被用于训练该模型
+* 属性推断：给定一个预训练过的模型，判断其对应的训练集是否包含一个带有特定属性的数据点（条件限制比成员推断更弱）
+* 模型反演：thread model和属性推断一样，但用GAN来尝试生成原始图像（得到的只是视觉上相似的替代品(并非原始数据)，且仅在所有分类的数据都看起来相似的情况下有效）
+* 从梯度无中生有训练数据
+    * DLG：Deep Leakage from Gradients_NIPS19，基于梯度直接重建私有数据集（对于大batch例如512/更复杂的数据集还需再看）
+    * Inverting Gradients_How easy is it to break privacy_NIPS20，设计了另外一种 loss：cosine similarity + TV loss
+        * 对于 batch size 或者 local epoch number 不为1的情况，都能不分恢复，原理也是用新数据的梯度去逼近原有梯度，反向传播来更新数据和标签
+    * 解决方法：secure aggregation （简称SA，MPC的一种），服务端只能拿到合并后的结果。DP+SA 一般可以确保 server 端安全了
+
+## client端
+如何将不贡献/贡献恶意数据的节点（outlier）筛选出来？
