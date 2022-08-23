@@ -69,6 +69,32 @@ figure,plot(f,P1)   % frequency spectrum: (0, Fs/2)
   </p>
 
 <br>
+
+# 音频序列处理
+> 理解梅尔倒频谱系数MFCC：https://zhuanlan.zhihu.com/p/350846654
+## 梅尔频谱  
+时序信号 --> Mel滤波器组 --> 对数运算    
+
+示例代码：
+```python
+# waveform是一维时序信号
+mel_spectrogram = transforms_au.MelSpectrogram(
+    sample_rate=sample_rate,
+    n_fft=n_fft,
+    win_length=None,
+    hop_length=hop_length,
+    power=2.0,
+    n_mels=32,  # how many rows
+)
+melspec = librosa.power_to_db(mel_spectrogram(waveform))
+```
+
+
+## MFCC
+在梅尔频谱的基础上，多了一个倒谱分析 Cepstrum Analysis，目的是得到频谱的包络。
+* 在没有深度学习的时代，MFCC 有助于语音识别。但深度学习有了之后可能用 Mel Spectrum 更好，将特征提取交给 NN
+
+<br>
 <br>
 
 # 波和信号
