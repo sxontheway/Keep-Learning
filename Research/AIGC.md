@@ -1,4 +1,4 @@
-# 一些 MileStone & 背景知识
+# 一些 MileStones & 背景知识
 ## 重要工作
 * 2017：VQ-VAE -- Deep Mind NIPS17
 * 2020：
@@ -23,38 +23,52 @@
         将类别条件的变为以 CLIP 输出的语言条件
 * 2022：
     * DALLE2 -- OpenAI
+        * 上半部分是预训练的 CLIP
+        * 不是从 noise 开始逆扩散，而是从 CLIP image encoding 开始，其余类似 GLIDE，用了 **up-sampling diffusion model**
+        * 像是 GLIDE，而非 DALLE2
+
     * Stable Diffusion：文章名 High-Resolution Image Synthesis with Latent Diffusion Models
         * 一作和 Patrick Esser 一样，也来自海德堡大学；stability.AI 做了该模型的开源
     * Imagen：文章名 Photorealistic Text-to-Image Diffusion Models
 with Deep Language Understanding 
         * from Google Brain，比 stable diffusion 晚，但未开源
-        * 文本编码器用了 T5 (**11B 参数**)，训练中固定；改了 U-Net，用了超分辨率 classifier-free diffusion。总的来说对于文字中复杂的逻辑理解更好 https://zhuanlan.zhihu.com/p/522381808
+        * 用了更轻量化的 U-Net，和更强的文本编码器 T5 (**11B 参数**，训练中固定），对比 Stable diffusion 用的 Bert。总的来说对于文字中复杂的逻辑理解更好 https://zhuanlan.zhihu.com/p/522381808
+        * 同 DALLE2，用了 **upsampling classifier-free diffusion**
+    * Parti：文章名 Scaling Autoregressive Models for Content-Rich Text-to-Image Generation  
+        * from Google Brain，基于 VQGAN
+        * **Autoregressive model** 也能达到和 diffusion model 一样好的效果（对于 256*256 的生成），再 upsampling 可以借助 diffusion model
+
+    
 * 总结一下：
 分为三派：Deepmind，OpenAI 和 其他
-    * Google Brain：DDPM，Classifier-free Diffusion Guidance，Imagen 
+    * Google Brain：DDPM，Classifier-free Diffusion Guidance，Imagen，Parti
         * BTW，Deepmind 是 google 亲儿子，Brain 是买来的；Alpha Zero 这些是 Deepmind 的成果
-    * OpenAI：CLIP，DALLE系列，GLIDE
+    * OpenAI：GPT系列，CLIP，DALLE系列，GLIDE
     * 海德堡大学/Runway.ML/stability.AI：VQGAN，Stable Diffusion  
     
     
 
 ## Repo 及模型参数量
-* 顶级
+* 重要
     * CLIP：https://github.com/openai/CLIP
         * text encoder 是传统的 12 层 transformer，**63M 参数**
     * Disco Diffusion：https://github.com/alembics/disco-diffusion
         * CLIP + Guided Diffusion
-    * DALLE from OpenAI / Imagen from Google 系列闭源
+    * DALLE from OpenAI
         * DALLE （非官方实现）：https://github.com/lucidrains/DALLE-pytorch 
             * **12B 参数**
-        * DALLE-mini：https://github.com/borisdayma/dalle-mini
+        * DALLE-mini：https://github.com/borisdayma/dalle-mini 
+            * DALLE mini 使用预训练好的模型（VQGAN、BART，CLIP)，而 DALLE 从头开始训练；训练数据对数 15M vs. 0.25B
+
             * **0.4B 参数**，媒体：https://www.leiphone.com/category/academic/lrCG1TvFt2SuHAuv.html 
+        * DALLE2：大小基本同 GLIDE，**3.5B 参数**
     * GLIDE：https://github.com/openai/glide-text2im
         * **3.5B 参数**
     * Stable Diffusion：https://github.com/CompVis/latent-diffusion 
-        > **1.45B 参数**，媒体：  
+        * **1.45B 参数**，媒体：  
         https://mp.weixin.qq.com/s/QLAwtrVeCx5vLOELr6cXUQ   
         https://mp.weixin.qq.com/s/Q4ZYjUxt22Jsx2W2179C8Q
+    * Imagen **300M~2B餐参数**，Parti **20B 参数** 都比较封闭
 * 其他
     * 中文 
         * CogView（**4B 参数**）
@@ -71,10 +85,12 @@ with Deep Language Understanding
 
 ## ELBO 和变分推断
 > https://zhuanlan.zhihu.com/p/91640654  
+
 * 目标及背景：  
 想从一系列数据 x 中推理出隐变量 `z` 的分布，也即想求解条件概率：`p(z|x) = p(z,x)/p(x)`   
 其中 `p(z,x)` 可以由专家根据他们的知识给出。例如 GMM 模型中，每个点属于哪个高斯分布就是隐变量，`p(z,x)` 代表每个点属于某一个高斯分布的概率，这个由正态分布根据距中心的距离即可给出。  
 但实际中，从 `p(x|z)` 积分来计算分母 `p(x)` 很困难（假设k个隐变量，积分需要k重，计算复杂度 k^n 会随着数据量 n 指数增长）。所以要用到变分推断，想用一个比较容易实现的分布 `q_θ(z)` 去逼近 `p(z|x)`。所以在这个过程中，我们的关键点转变了，从求分布的推断问题，变成了缩小距离的优化问题。
+
 * 用KL散度衡量两个分布的相似度：  
 `KL(q(z)||p(z|x)) = E_q[log q_θ(z)] - E_q[log p(z,x)] + log p(x)`，其中 `ELBO(q_θ) = E_q[log p(z,x)] - E_q[log q(z)]`  
  可以看到 **`log p(x) = ELBO(q_θ) + KL(q(z)||p(z|x)) >= ELBO(q_θ)`** 恒成立（KL 散度永远大于0），  
@@ -85,6 +101,7 @@ with Deep Language Understanding
     * 带入公式 `ELBO(q_θ) = E_q[log p(z,x)] - E_q[log q(z)]`  
     实际中，求期望这一步有挺多技巧，可能还会用到指数簇分布，用累积函数 A 的导数作为期望值：https://qianyang-hfut.blog.csdn.net/article/details/87247363 
     * 将 `ELBO(q_θ)` 对 `θ` 求偏导，且使偏导等于0，最大化 ELBO
+
 * 为什么叫变分推断？  
 其实和求泛函（最速曲线）用的变分法其实有相关性。求 `ELBO(q_θ)` 的极值需要对 `θ` 的偏导，其实相当于是对一个函数求导数
 
@@ -95,6 +112,7 @@ with Deep Language Understanding
 
 EM算法分为 E-step 和 M-step。和变分推断原理一样，不断迭代提高 ELBO，直到KL散度接近于0（KL恒大于零），也即 `q(z)` 逼近了 `p(z|x)`    
 总结来讲 EM 算法是变分推断的一个特例，K-means是一种 EM 算法。EM 算法在 E-step 时，认为 `q_θ(z)` 是给定的（由于迭代更新）
+
 * E-step：给定参数 `θ_t`，求出最合适的隐变量 `z_(t+1)`  
 比如 k-means 中隐变量 `z_(t+1)` 确定每个点属于哪个聚类  
 * M-step：给定隐变量 `z_(t+1)`，用极大似然估计来计算 `θ_(t+1)`  
@@ -124,7 +142,9 @@ EM算法分为 E-step 和 M-step。和变分推断原理一样，不断迭代提
 <br><br>
 
 # Diffusion Model
-> https://zhuanlan.zhihu.com/p/513387691 
+> 主要有：DDPM，GLIDE，DALLE2，Stable Diffusion，IMAGEN    
+https://zhuanlan.zhihu.com/p/513387691 
+
 
 Diffusion model 与其他生成方法不同点是：在时序上需要运行多步，且隐变量 z 的维度和 x 原始尺寸相同
 
@@ -155,8 +175,12 @@ Diffusion model 与其他生成方法不同点是：在时序上需要运行多�
         <img src="./pictures/ddpm4.png" width="700">
         </p>
 
-    * 网络训练方法如下，上面公式推导的 `e(x_t, t)` 代表的就是 U-Net 网络，输入图像 x_t，输出用于逆扩散的噪音（每一个时间 t 网络都是复用的，类比RNN）
+    * 网络训练方法如下，上面公式推导的 `ε_θ(...)` 一项就代表的是 U-Net 网络，loss定义如下：
         <p align="center" >
+        <img src="./pictures/ddpm_loss.png" width="500">
+        </p>
+        也即在已知 x_0 和 ε （也即 x_t）的情况，用 U-net 去拟合 ε（每一个时间 t 网络都是复用的，类比RNN）。Sampling 阶段第 4 行的由来见上面推导的公式浅蓝色部分
+        <p align="center" > 
         <img src="./pictures/ddpm3.png" width="700">
         </p>
 
@@ -173,11 +197,20 @@ Diffusion model 与其他生成方法不同点是：在时序上需要运行多�
 <img src="./pictures/stable_diffusion.png" width="600">
 </p>
 
+<br>
+
+## DALLE2 和 Imagen
+<p align="center" >
+<img src="./pictures/dalle2.jpg" width="600">
+</p>
+
 
 <br><br>
 
-# Auto-regressive Model：CLIP 和 DALLE（both from OpenAI）
-> [介绍：DALL·E—从文本到图像，超现实主义的图像生成器](https://zhuanlan.zhihu.com/p/394467135)
+# Auto-regressive Model
+> 主要有 CLIP 和 DALLE（both from OpenAI），还有 Parti (Google)  
+[介绍：DALL·E—从文本到图像，超现实主义的图像生成器](https://zhuanlan.zhihu.com/p/394467135)
+
 
 ## CLIP：Contrastive Language-Image Pre-training
 
@@ -227,6 +260,8 @@ Diffusion model 与其他生成方法不同点是：在时序上需要运行多�
 
     * 按 patch 采样完毕，通过 decoder
     * DALLE 用了 CLIP 用于选择最佳生成的图像
+
+<br>
 
 ## CLIP-GEN
 > https://www.high-flyer.cn/blog/clip_gen/   
