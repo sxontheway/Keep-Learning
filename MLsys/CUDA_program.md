@@ -16,11 +16,14 @@
 </p>
 
 > 与上面3个硬件概念是相对的 
+* **一个 kernel 可能包含多个 block，每个 block 包含很多个 thread。每个 kernel 可以运行在多个 SM 上，但每个 block 只能运行在一个 SM 上，且一个 SM 可以同时执行多个 kernel 的 block。下图是 TX2 GPU 的事例任务调度图**
 * 由于 warp 的大小一般为32，所以 block 所含的 thread 的大小一般要设置为32的倍数 (软件的 block 对应于硬件上的 warp)
 * 同一个 block 中的 thread 可以同步（上文 SIMT），也可以通过 shared memory 进行通信
+    <p align="center" >
+    <img src="./Pictures/kernel_running.png", width='600'>
+    </p>
 
 ## GPU 存储构架：global memory > shared memory > register/local memory
-
 
 * 每个 thread 都有自己的 register，最快（几个 cycle）
 * 一组 thread 构成一个 block，**`这些 thread 则共享一份 shared memory / L1 cache / Texture cache `** （每个 SM 都有自己的），约 20 个cycle
