@@ -17,8 +17,8 @@
 ### Reverse Proxy 反向代理
 > https://segmentfault.com/a/1190000018262215  
 
-    正向代理代理的对象是客户端，例如 VPN，多（客户端）对一（服务端）
-    反向代理代理的对象是服务端，例如服务器的负载均衡（后端有很多台机器），一（客户端）对多（客户端）
+正向代理代理的对象是客户端，例如 VPN，多（客户端）对一（服务端）  
+反向代理代理的对象是服务端，例如服务器的负载均衡（后端有很多台机器），一（客户端）对多（客户端）
 
 ### Reverse Tunnel 反向隧道
 > https://www.howtogeek.com/428413/what-is-reverse-ssh-tunneling-and-how-to-use-it/   
@@ -60,23 +60,27 @@
             <img src="./Pictures/vpn4.png", width=490'>
         </p>
 
-## 实现2：用 SSH Tunnel
+## 实现2：用 SSH Tunnel（更简单）
 
-* 适用于 PC1 用 ip 在国外的没有墙的服务器（公网），因为不用代理了，只用 SSH Reverse Tunnel，对于 My PC 的配置就和普通 SSH 差不多：                                                                            
+* 适用于 PC1 用 ip 在国外的没有墙的服务器（公网），因为不用代理了，只用 SSH Reverse Tunnel 即可。对于 My PC 的配置就和普通 SSH 差不多：                                                                            
     ```
     Host cpii_bj_zhang
     HostName XXX
-    Port XXX
+    Port 2222   # 访问公网主机的 2222 端口
     User XXX
     IdentityFile ~/.ssh/cpii_id_rsa # 访问公网PC的私钥
     ForwardX11 Yes
     ```
+* 公网 PC 上的 setting
+    * 这里可以白嫖一下阿里云服务器，1vCPU  1G内存即可：https://www.cfanpc.com/hd/20200420/2450.html，实例随便什么系统，按个 Ubuntu 18.04 就 OK
+    * 在阿里云的公网 PC 上配置实例
+        * 把公钥放在 `~/.ssh/authorized_keys` 里面（被连的存公钥），然后 My PC 和内网 PC 存私钥，相当于 My PC 和内网 PC 都是在访问公网 PC。内网 PC 和 My PC 的私钥可以一样（因为都是通过 SSH 访问公网 PC）  
+        * 在安全组里面开启端口，例如 2222，2223 等等
+        * 将 `/etc/ssh/sshd_config` 中的 GatewayPorts 设为 yes，保存后重启 sshd 服务：`systemctl restart sshd`
 * 内网 PC（GPU server）上输入：`autossh -M 3332 -CNR 2222:localhost:22 root@XX.XX.XX.XX`，启动反向 SSH Tunnel，其中：
-    * 内网主机的 3332 端口负责监事 ssh 状态，负责出了问题自动重连；
-    * `2222:localhost:22`：表示将内网主机的 22 端口转发至公网主机的 2222 端口上；我们只要访问公网主机的2222 端口，就间接访问到 GPU server 了   
+    * 内网主机的 3332 端口负责监事 ssh 状态，负责出了问题自动重连，这个随便选个没用的端口就行
+    * `2222:localhost:22`：表示将公网主机的 2222 端口的流量转发到内网主机的 22 端口上（通过不断监听）。所以我们只要访问公网主机的2222 端口，就间接访问到 GPU server 了。2222 这个端口号在三个 PC 上要配置成一致的   
     * SSH Tunnel 介绍：https://zhuanlan.zhihu.com/p/112227542
-
-* 由于公网 PC 是被内网 PC SSH，所以公网 PC 是需要在 `authorized_keys` 中放公钥，然后内网 PC 需要在 `~/.ssh/id_rsa` 里面放私钥，这个私钥和 My PC 的私钥一样（因为两者都是 SSH 访问公网 PC）
 
 * 知识点补充：
 `~/.ssh` 文件夹里，有几个文件 `authorized_keys`, `id_rsa`, `id_rsa.pub`, `known_hosts`。分别功能如下：
