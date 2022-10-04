@@ -74,12 +74,12 @@
 * 公网 PC 上的 setting
     * 这里可以白嫖一下阿里云服务器，1vCPU  1G内存即可：https://www.cfanpc.com/hd/20200420/2450.html，实例随便什么系统，按个 Ubuntu 18.04 就 OK
     * 在阿里云的公网 PC 上配置实例
-        * 把公钥放在 `~/.ssh/authorized_keys` 里面（被连的存公钥），然后 My PC 和内网 PC 存私钥，相当于 My PC 和内网 PC 都是在访问公网 PC。内网 PC 和 My PC 的私钥可以一样（因为都是通过 SSH 访问公网 PC）  
+        * 把公钥放在 `~/.ssh/authorized_keys` 里面（被登录的存公钥），然后 My PC 和内网 PC 存私钥，相当于 My PC 和内网 PC 都是在访问公网 PC。内网 PC 和 My PC 的私钥可以一样（因为都是通过 SSH 访问公网 PC）  
         * 在安全组里面开启端口，例如 2222，2223 等等
-        * 将 `/etc/ssh/sshd_config` 中的 GatewayPorts 设为 yes，保存后重启 sshd 服务：`systemctl restart sshd`
+        * 将 `/etc/ssh/sshd_config` 中的 GatewayPorts 设为 yes（确保外网 PC 也能监听本机的端口），保存后重启 sshd 服务：`systemctl restart sshd`
 * 内网 PC（GPU server）上输入：`autossh -M 3332 -CNR 2222:localhost:22 root@XX.XX.XX.XX`，启动反向 SSH Tunnel，其中：
     * 内网主机的 3332 端口负责监事 ssh 状态，负责出了问题自动重连，这个随便选个没用的端口就行
-    * `2222:localhost:22`：表示将公网主机的 2222 端口的流量转发到内网主机的 22 端口上（通过不断监听）。所以我们只要访问公网主机的2222 端口，就间接访问到 GPU server 了。2222 这个端口号在三个 PC 上要配置成一致的   
+    * `2222:localhost:22`：内网 PC 通过监听，不断地将公网主机的 2222 端口的流量转发到内网主机的 22 端口上。所以 My PC 只要访问公网主机的 2222 端口，就间接访问到内网 GPU server 了。2222 这个端口号在三个 PC 上要配置成一致的   
     * SSH Tunnel 介绍：https://zhuanlan.zhihu.com/p/112227542
 
 * 知识点补充：
@@ -87,6 +87,9 @@
     * `authorized_keys`：存的是公钥。例如 A 想 SSH 连接 B，A 就需要把公钥发给 B，然后 B 存在 authorized_keys 里面即可。换句话说，被访问的设备将别人给的公钥放在这个文件中，使得其他设备可以免密访问自己。
     * `id_rsa`和`id_rsa.pub`就是自己的私钥和公钥，私钥自己保存，公钥可以分发，例如可以发给 server，以实现免密登录呀。
     * `known_hosts`：记录每个访问过的ip的公钥，删除后可以重新自动建立
+
+* 安全性
+    * 因为公网 PC 直接暴露于整个互联网，所以应该设置成只允许秘钥登录。因为在内网 PC 已经连上了公网 PC 时，一旦再有黑客在连上了 2222 端口，就相当于 SSH 到了内网 PC，会造成危险
 
 <br>
 
