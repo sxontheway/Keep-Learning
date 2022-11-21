@@ -18,20 +18,21 @@
 
 已经有本地的工程文件，同步到 git 的一般步骤是这样的：
 1. 将目录变成 git 可以管理的仓库：在本地工程目录下执行 `git init`，`git add .`（建立git并开始跟踪文件） 
-2. 建立和连接远程仓库。如果使用github，那么就是新建 Repository，假设想叫做myProject。这时候，github告诉你，可以通过一下两者之一:  
+2. 建立和连接远程仓库。如果使用github，那么就是新建 Repository，假设想叫做 myProject。这时候，github 告诉你，可以通过一下两者之一:  
     * `git remote add origin git@github.com:sxontheway/myProject.git`，  
     * `git remote add origin https://github.com/sxontheway/myProject.git`  
     
     add 之后，可输入 `git remote` 验证
 3. Push 代码：`git push origin <分支名>`
 
-### Debug
+#### Debug
 * VSCode 用 git 报错类似：`Failed to connect to 127.0.0.1 port 10808: Connection refused`，是由于设置了全局代理  
 查询是否全局代理：`git config --global http.proxy `  
+* 如果出现错误 `failed to push som refs to……`，则先把远程服务器github上面的文件拉先来，再push 上去：`git pull origin <branch>`
 
 
 ## git 命令
-* `git status`：查看状态
+* `git status`：查看状态，可有看到哪些 change 还没有 staged
 * `git config`：打印 config
     * `git config --local  --list`
     * `git config --global  --list`
