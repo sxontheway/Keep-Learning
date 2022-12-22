@@ -17,14 +17,14 @@
 <br>
 
 ## Prompt tuning
-### Whit Box: 时间顺序，有以下文章 
+### Whit Box: 按时间顺序，有以下文章 
 
 * `Prefix Tuning：Optimizing continuous prompts for generation_ACL21` ***(关注的是用 GPT/BART 做 NLG 任务)***
     * 在每一层 transformer layer 前都加一个前缀
 
 * `P-Tuning: GPT Understands, Too` ***(NLU 任务)***
-    * 提出 GPT 这种 decoder only 也可以做 NLU 任务，但之前人工模板构造不够好
-    * 提出了 `P-Tuning`，用了 pseudo prompts 和 prompt encoder。encoder 可以生成 learnable continuous prompts，但怎样 interleaved 在 input 中，还是用了一些 human design  
+    * 提出 GPT 这种 decoder only 也可以做 NLU 任务，但由于人工模板构造不好构造，之前工作没做到
+    * 提出了 `P-Tuning`，用了 pseudo prompts 和 prompt encoder；encoder 可以生成 learnable continuous prompts，但怎样 interleaved 在 input 中，还是用了一些 human design  
 
 
 * `The Power of Scale for Parameter-Efficient Prompt Tuning_EMNLP21`：第一篇文章正式 ***term prompt tuning (NLU 任务)***
@@ -32,11 +32,11 @@
     * 相比 P-Tuning：prompt 不经过人工设计插在 input 中了，直接 prepend 即可；另外 P-Tuning 和 model tuning 一起用以达到效果
 
 * `P-Tuning v2: Prompt Tuning Can Be Comparable to Fine-tuning Universally Across Scales and Tasks_ACL22` ***(NLU 任务)***
-    * 把 P-Tuning 的思想拓展到了每一层
-    * 把 tunable token 从 interleaving 变成了 prefix
+    * 对 330M 大小的模型也有用（P-tuning v1 在 10B 大小模型和一些 tasks 上才能和 finetuning 可比）
+    * 把 P-Tuning 的思想拓展到了每一层，把 tunable token 从 interleaving 变成了 prefix
 
         <p align="center" >
-        <img src="./pictures/p-tuning.png" width="700">
+        <img src="./pictures/p-tuning.png" width="800">
         </p>
 
 * `SPoT: Better Frozen Model Adaptation through Soft Prompt Transfer_ACL22` ***(NLU 任务)***
@@ -44,7 +44,7 @@
     * 预先训练很多个 source tasks 的 prompt，然后在 validation set 上选一个最好的，来初始化 target task 的 prompt 训练。然后根绝 prompt tokens 比对看哪个 source task 和 target task 最接近。最后再用选中的这个 source prompt 做为初始化训练，得到 target prompt
     
         <p align="center" >
-        <img src="./pictures/spot.png" width="700">
+        <img src="./pictures/spot.png" width="800">
         </p>
 
 <br>
@@ -53,17 +53,20 @@
 > 会用到一些无梯度优化，很多都来源于对一些自然现象的总结，例如遗传算法，见：  
 [无梯度优化算法（上）](https://www.bilibili.com/video/BV1d5411475Y/?from=seopage&vd_source=93c3a9b0afc9334d69915ec59d8c3a87)  [无梯度优化算法（下）](https://www.bilibili.com/video/BV1uC4y1s7AQ/?vd_source=93c3a9b0afc9334d69915ec59d8c3a87)    
 
-* Black-Box Prompt Learning for Pre-trained Language Models
-    * 不需要 LLM 反传梯度，用 policy gradient 算法直接优化 prompt；prompt 作为 input sentence 前缀
-* BBT：Black-Box Tuning for Language-Model-as-a-Service
-* BBTv2：Towards a Gradient-Free Future with Large Language Models 
+* Discrete
+    * Black-Box Prompt Learning for Pre-trained Language Models
+        * 不需要 LLM 反传梯度，用 policy gradient 算法直接优化 prompt；prompt 作为 input sentence 前缀
+    * RLPROMPT: Optimizing Discrete Text Prompts with Reinforcement Learning
+* Continuous
+    * BBT：Black-Box Tuning for Language-Model-as-a-Service
+    * BBTv2：Towards a Gradient-Free Future with Large Language Models 
 
 
 <br>
 
 
-### LLM 的 few-shot 能力：In-Context Learning（ICL）
-> [How does in-context learning work?](http://ai.stanford.edu/blog/understanding-incontext/)  
+## In-Context Learning（ICL）：提升 LLM 的 few-shot 能力
+> 算是 prompt tuning 的一种：[How does in-context learning work?](http://ai.stanford.edu/blog/understanding-incontext/)  
 Paper: Rethinking the Role of Demonstrations:
 What Makes In-Context Learning Work?
 
@@ -82,7 +85,7 @@ What Makes In-Context Learning Work?
 
 <br>
 
-## 提升 LLM 的推理能力
+## CoT：提升 LLM 的推理能力
 > CoT Paper List：https://github.com/Timothyxxx/Chain-of-ThoughtsPapers   
 > 解读：https://zhuanlan.zhihu.com/p/589087074   
 
@@ -112,7 +115,6 @@ What Makes In-Context Learning Work?
             * 用一些模板，例如 `To solve {problem}, we need to {XXX}` 等
             * 该阶段可以用上文的 CoT 
         * 第二个阶段做 problem solving  
-
             * 把 CoT 的输出作为输入    
 
         <p align="center" >
@@ -122,12 +124,14 @@ What Makes In-Context Learning Work?
 <br>
 
 ## Instruction Tuning / RLHF
-* 仍然在预训练语言模型的基础上，先在多个已知任务上进行微调（通过自然语言的形式），然后再推理某个新任务上进行 zero-shot
+* 通过自然语言的形式，把预训练模型在多个已知任务上进行微调，然后再在某个 **新任务** 上进行 zero-shot 推理。所以主要是解决 **cross-task** 问题，其中微调是要模型学会理解指令，指令很大程度上有共通之处，这也是能 zero-shot 的缘由
     * FLAN: Finetuned Language Models Are Zero-Shot Learners 
     * NatInst: Cross-Task Generalization via Natural Language Crowdsourcing Instructions
+    * MiltiInstruct: Improving Multi-Modal Zero-Shot Learning via Instruction Tuning  
 
 * 引入 reward model，RL 进行模型训练 
     * WebGPT
     * InstructPT
 
 <br>
+
