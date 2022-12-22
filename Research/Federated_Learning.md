@@ -157,6 +157,8 @@ MAML 偏好需要很多 task，每个task的 data point 可以比较少，而 re
     * Dirichlet 分布产生的 Label distribution skew 相比每个 client 只有一类这种极端情况，要稍微好一点。另外这篇文章也提到，只有一类这种极端情况在现实中也可能存在，比如 speaker recognition
 * `FedMA_Federated learning withmatched averaging_ICLR20`：对于每一层（以FC为例），local dataset 训练得到的 weight 是 optimal 乘上一个 L*L 的矩阵，其中 L 是 hidden unit 数量。在 server 端，可以先求出来每一层的这个变换矩阵（通过迫使 global model 和 local model 变换后接近），再 aggregate；缺点是不支持 BN 层
 * `FedBN: Federated Learning on Non-IID Features via Local Batch Normalization_ICLR21`：server does not aggregate BN layers，探索的是 BN 层怎么 aggregate 的问题
+   * 本质上也是一种 personalized 的方法，最后参与训练的每个节点得到的是不同的模型：https://blog.csdn.net/weixin_42534493/article/details/120421453  
+   * BN 层的 mean 和 var 是统计量，gamma 和 beta 为训练得到的缩放参数。FedBN 中这四个参数都由节点私有，不上传。但如果要将 FedBN adapt 到得到一个 global model 的情况，可以用 FL aggregate 得到的 gamma 和 beta，但用统一测试集去得到 mean 和 var  
 
 * `FedDF_Ensemble Distillation for Robust Model Fusion in Federated Learning_NIPS20`
     * 最终目标还是产生一个 model，不是 personalized FL；其中知识蒸馏在 server 端进行，client 还是只需要上传 model
