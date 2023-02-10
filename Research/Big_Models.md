@@ -1,3 +1,19 @@
+# 大模型训练
+## 基础知识
+* Communication Primitives 通信原语：Broadcast, Scatter, Gather, Reduce, Reduce-Scatter, All-gather, All-reduce, All-scatter, All-to-All (MoE 中数据 dispatch 用到), Barrier
+    * [这个链接](https://www.cnblogs.com/marsggbo/p/11497780.html) 和 GShard 论文有解释 
+* 并行方法：数据并行，模型并行，tensor并行，Pipeline并行
+* SPMD, MPMD
+* 各种工具 Overview
+    <p align="center" >
+    <img src="./pictures/DDL.png" width="800">
+    </p>
+
+
+
+<br>
+<br>
+
 # 模型
 * GPT 
     * [各代之间区别见 PDF 文档](./pictures/GPTS.pdf)    
@@ -5,6 +21,7 @@
     * Chinese CLIP：https://github.com/billjie1/Chinese-CLIP 
     * mCLIP：https://github.com/FreddeFrallan/Multilingual-CLIP 
 
+<br>
 <br>
 
 # LLM Tuning 方法
@@ -131,7 +148,7 @@ What Makes In-Context Learning Work?
 
 * 引入 reward model，RL 进行模型训练 
     * WebGPT
-    * InstructPT
+    * InstructPT：有一个测试关于 truthfulQA
 
 <br>
 

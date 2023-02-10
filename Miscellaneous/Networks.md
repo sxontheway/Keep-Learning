@@ -10,6 +10,7 @@
 <br>
 
 # 自建跳板机直连 GPU Server
+> [SSH Tunnelling 讲解](https://johnliu55.tw/ssh-tunnel.html)
 ## 背景
 实验室给我们分了几台多卡 GPU Server，但是必须通过网页的跳板机才能连接，而且不支持 Vscode Remote，所以调试和传文件很不方便。于是我想绕开它的跳板机，而用自己的电脑搭建一个跳板机，这样就可以实现 Vscode Remote 和 Winscp 传文件等功能
 
