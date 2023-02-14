@@ -6,6 +6,6 @@
 1. [Hardware](./Hardware_Related)
 1. [高翔VSLAM14_ROS](./SLAM14)
 1. [Research](./Research)
-1. [Stock](./Stock)
+1. [Finance](./Stock)
 1. [Miscellaneous](./Miscellaneous)
 1. [MLsys](./MLsys)
