@@ -69,7 +69,8 @@
                 <img src="./pictures/train_token_chatGPT.png" width="600">
                 </p>
         
-            * 效果：
+            * 结论：
+                * code-davinci-002 的基础模型可能不是 initial GPT-3 davinci 模型，而是可能经过如图所示技术路线改造过的 
                 * code-davinci-002 推理能力很强（很强的基础模型），但与人的 alignment 不够  
                 text-davinci-002 alignment 能力增强了，但在很多任务上跑分变低（上下文 ICL 能力变弱）  
                 text-davinci-003 加上了 RLHF，普遍的生成通常比 text-davinci-002 长，然后上下文能力有所恢复     
@@ -77,34 +78,38 @@
                 * 1.3B 的经过 RLHF 的 InstructGPT （模型来源于 GPT-3 XL，见 GPT-3 论文 Table E1）就可优于原始 175B GPT-3
 
 
-* 并行方法：数据并行、Pipeline并行、tensor并行
+* 并行方法：数据并行、Pipeline 并行、tensor 并行
     * Pipeline并行、tensor并行 都属于模型并行。对带宽需求：Tensor并行 > 数据并行 > pipeline并行
     * 带宽：NVLink > PCIE Switch > infiniband > EtherNet  
+    * tensor并行
+        * 1d: Megatron-LM (NVIDIA)
+        * 2d: Optimus (An Efficient 2D Method for Training Super-Large Deep Learning)
+        * 3d: Maximizing Parallelism in Distributed Training for
+Huge Neural Networks
+
     * 如下图，两个八卡 node，那么：
-        * node 之间优先 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行。但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
+        * node 之间先做了 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行。但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
 
             <p align="left" >
             <img src="./pictures/megatron_parr.jpg" width="600">
             </p>
 
-    * tensor并行
-        * 1d: Megatron-LM (NVIDIA), Deepspeed (MicroSoft)，两者简单比较：
-            * DeepSpeed 本质上是一种“节省显存”的数据并行，即：数据并行的优化版。DeepSpeed 假设了单层参数量可以在单张显卡上放得下，如果不满足这个假设，那么仍然需要使用模型并行，而且 DeepSpeed 的模型并行是通过调用 Megatron 来实现的
-            * 根据 NVIDIA 最新的那篇论文（链接：https://arxiv.org/abs/2104.04473），Megatron 在大规模训练的效率是超过 DeepSpeed 不少的。
-            * DeepSpeed 的论文一直强调：可以用更少机器训练更大的模型，但没有突出过在效率上的优势。DeepSpeed 后来又出了一篇论文：ZeRO-Infinity（链接：https://arxiv.org/abs/2104.07857），当单层参数量在单张显卡上放不下的时候，它通过对这一层算子切片，一片一片来执行，使得单卡也能跑起来一个巨大的层，可以理解成一种 “时间”轴上展开的模型并行。
-
-        * 2d: Optimus (An Efficient 2D Method for Training Super-Large Deep Learning)
-        * 3d: Maximizing Parallelism in Distributed Training for
-Huge Neural Networks
-
-    * **总结一下，一般而言，通信速度从慢到快，切分顺序是： 1) pipeline 并行，2）数据并行，3）tensor 并行**
+    * 总结一下，一般而言，**首先考虑 tensor并行，g-gpus server 用 g 维的 tensor 并行；然后用 pipeline 并行把模型切分，使得能够适应 GPU memory（对于超大模型）；最后考虑数据并行，主要用于 server 之间**
+        * 见 Paper：Efficient Large-Scale Language Model Training on GPU Clusters
 
 <br>
 
-## Megatron
-* Docker pull 和 执行
-* 数据处理，改造 Tokenizer
-* Megatron 自带 Tokenizer：BertWordPieceLowerCase, BertWordPieceCase, GPT2BPETokenizer
+## 框架
+### Megatron
+> https://github.com/nvidia/megatron-lm 
+
+* 步骤
+    * Docker pull 和 执行
+    * 数据处理，改造 Tokenizer
+    * Megatron 自带 Tokenizer：BertWordPieceLowerCase, BertWordPieceCase, GPT2BPETokenizer
+    * Compiling dataset index
+    * Compiling (only the first time) and loading fused kernels
+
 * Megatron 代码学习
     * Tokenizer 及并行原理：https://zhuanlan.zhihu.com/p/388830967 
     * 代码：https://zhuanlan.zhihu.com/p/470279673 
@@ -112,7 +117,18 @@ Huge Neural Networks
     * 第一个线性层：input broadcast 到每一个设备上，权重竖切，`XW = X[W1, W2] = [XW1, XW2]`
     * 第二个线性层：横切（结果需要 all-reduce 相加）
 
+### Deepspeed 
+Deepspeed (MicroSoft) 和 Megatron，两者简单比较：
+* DeepSpeed 本质上是一种 “节省显存” 的 **数据并行**，即：在数据并行下如何以更少的机器去跑更大的模型。DeepSpeed 假设了单层参数量可以在单张显卡上放得下，如果不满足这个假设，那么仍然需要使用模型并行，DeepSpeed 的模型并行是通过调用 Megatron 来实现的
+* 根据 NVIDIA 最新的那篇论文（链接：https://arxiv.org/abs/2104.04473 )，Megatron 在大规模训练的效率是超过 DeepSpeed 不少的。
+* DeepSpeed 的论文一直强调：可以用更少机器训练更大的模型，但没有突出过在效率上的优势。DeepSpeed 后来又出了一篇论文：ZeRO-Infinity（链接：https://arxiv.org/abs/2104.07857 ），当单层参数量在单张显卡上放不下的时候，它通过对这一层算子切片，一片一片来执行，使得单卡也能跑起来一个巨大的层，可以理解成一种 “时间”轴上展开的模型并行。
 
+### Megatron-Deepspeed 
+> https://github.com/microsoft/Megatron-DeepSpeed  
+
+DeepSpeed version of NVIDIA's Megatron-LM that adds additional support for several features such as MoE model training, Curriculum Learning, 3D Parallelism, and others.   
+模型并行还是调用的 Deepspeed  
+**一般经验：借鉴 deepspeed 的写法，然后作为 extension 加在 Megatron-LM 上**
 
 <br>
 <br>

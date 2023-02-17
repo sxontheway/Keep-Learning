@@ -1,4 +1,5 @@
 # Vscode
+* github 网页上可以按 `>` 进入 online vscode
 * 在 windoes 中运行 python
     * 不同于linux，可以尝试 `python`，`py`，例如 `py a.py`
 

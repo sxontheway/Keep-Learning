@@ -1,4 +1,4 @@
-# 1. Bash语法
+# Bash语法
 1. 文件开头第一行`#!/bin/bash`，表示使用bash解释器
 1. For 循环例子
     ```bash
@@ -17,7 +17,7 @@
 
 <br>
 
-# 2. Bash命令
+# Bash命令
 1. `cat`：连接文件
     * `cat test.txt`：打印整个文件到屏幕
     * `cat /dev/null > test.txt`：清空text.txt文件
@@ -89,10 +89,16 @@
 
 <br>
 
-# 3.Bash符号
-参见：https://www.cnblogs.com/balaamwe/archive/2012/03/15/2397998.html
+# Bash 上手
+> https://www.cnblogs.com/balaamwe/archive/2012/03/15/2397998.html
 
-* 其中  `$() ` 和` `` `(反引号)作用相同，是把括号内命令的输出再作为命令执行
-* `${}`括号中放的是变量，`$()`中放的是命令
-
-
+* 符号
+    * 其中  `$() ` 和` `` `(反引号)作用相同，是把括号内命令的输出再作为命令执行
+    * `${}`括号中放的是变量，`$()`中放的是命令
+* 用法
+    * `2>&1 | tee XXX.log`
+        ```bash
+        # 其中 2>&1 means "send any error messages (aka 'stderr') to the same output as any informational messages (aka 'stdout")." 
+        # | tee XXX.log means "whatever output there is should also be sent to the file XXX.log"
+        ```
+    * 
