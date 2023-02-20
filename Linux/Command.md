@@ -87,6 +87,8 @@
 1. `wget`：和curl功能相似，但更偏重于下载的功能
     * `wget -c http://cn.wordpress.org/wordpress-3.1-zh_CN.zip`：断点续传，下载到当前目录
 
+1. ：端口查看；`lsof -i`，`lsof -i:<Port_Num>`，`kill -9 <PID>`杀掉端口
+
 <br>
 
 # Bash 上手
@@ -101,4 +103,55 @@
         # 其中 2>&1 means "send any error messages (aka 'stderr') to the same output as any informational messages (aka 'stdout")." 
         # | tee XXX.log means "whatever output there is should also be sent to the file XXX.log"
         ```
-    * 
+    * 在 `bashrc` 中设置代理：  
+    `export http_proxy = http://proxyAddress:port`，  
+    `export http_proxy = https://proxyAddress:port`  
+    密码可能需要 encode to URL-encoded format 转义
+
+<br>
+
+# Docker
+## 查看
+* 查看镜像：`docker images`
+* 查看容器状态：`docker ps -a`，不加 `-a` 就只查看运行中的，`-l` 看最近的
+
+## 创建/启动/停止
+* 创建并启动容器：`docker run --name pytest <Repository>:<TAG> cal`
+    * 其中 `pytest` 是容器名；`<Repository>:<TAG>` 是镜像名，可以通过 `docker images` 查看；`cal` 是一个命令（打印日历表），可以换成其他的如 `/bin/bash`
+    * `docker run -it <Repository>:<TAG> /bin/bash`，直接进入容器的 bash，`-i` 是交互模式，`-t` 是命令行
+    * `docker exec -it <container_id>或<name> bash`：在现有容器中运行命令
+* 启动：`docker start/stop/lill/restart <container_id>或<name>`，其中 `start` 可以加 `-it` 进入命令行
+* 区别
+    * docker run 只在第一次运行时使用，将镜像放到容器中，以后再次启动这个容器时，只需要使用命令 docker start 即可
+    * docker run 相当于执行了两步操作：将镜像放入容器中（docker create）,然后将容器启动，使之变成运行时容器（docker start）
+    * docker start 的作用是，重新启动已存在的镜像。也就是说，如果使用这个命令，我们必须事先知道 `<container_id>或<name>`（用`docker ps`查看）
+
+## 导入导出/保存载入
+* 导出/导入 容器快照
+    * `docker export container_ID > XXX.tar`
+    * 下载一个 `rocketmq-3.2.6.tar.gz` 镜像，导入镜像并命名： `cat rocketmq-3.2.6.tar.gz | docker import - <Repository>:<TAG>`
+* 保存/载入 镜像
+    * `docker save -o rocketmq.tar rocketmq`：将 `rocketmq` 镜像（`docker images` 查看）保存成 `rocketmq.tar`
+    * 载入镜像：`docker load < rocketmq.tar`，用法：将另外一台机器上拷贝过来的 .tar 读入成本机的镜像
+* docker load-save / import-export 区别
+    * `save/load`：会保存该镜像的的所有历史记录，导出的文件大。用于载入镜像
+    * `docker export/import container_id`：仅保存容器当时的状态，相当于虚拟机快照，文件小。用于载入容器
+
+## 完整例子
+* 先查看有哪些镜像：`docker images`
+* 启动容器：用 `test:cuda10.2-torch1.12-ubuntu18.04-python3.8` 这个镜像，把宿主的 `/mnt/ssd_host` 挂载到镜像中的 `/mnt/ssd` 路径上，创建一个叫 `hello_world` 的容器，并进入命令行：  
+    ```bash
+    docker run -it \
+    -v /mnt/ssd_host:/mnt/ssd \
+    --name hello_world test:cuda10.2-torch1.12-ubuntu18.04-python3.8 \ 
+    /bin/bash
+    ```
+    * 其中文件挂载：`docker run -it --name <container_name> -v /test1:/test2`，是将 host 的` /test1` 目录挂载到容器的 `/test2` 目录
+
+* 传文件进容器：`docker cp <本地文件路径> ID:<容器文件路径>`
+* 在容器中配置好环境，例如 pip 安装等
+* 打包保存，和跨机器的读取
+    > https://blog.csdn.net/github_38924695/article/details/110531410
+    * 把容器打包，使得在 `docker images` 中能看见  
+        * `docker commit -a "eric" -m "my python test" 80cdd11f9b60  hello:v1`，其中 -a 提交的镜像作者，-m 提交时的说明文字，`hello:v1` 是镜像的 name 和 tag
+    * 跨机器：本机上 docker save，另一台设备上 docker load
