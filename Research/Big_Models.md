@@ -89,7 +89,8 @@
 # 分布式训练
 > https://mp.weixin.qq.com/s/cr-lYVvn1AQ7BN1VfzfuNg
 
-## 训练并行方法：数据并行、Pipeline 并行、tensor 并行
+## 训练并行方法
+* 主要的并行方法：数据并行、Pipeline 并行、tensor 并行。后两者可以笼统归为模型并行
 * 带宽：NVLink > PCIE Switch >= infiniband > EtherNet  
 * Tensor并行，有多种方法
     * 1d: Megatron-LM (NVIDIA)，权重竖切
@@ -127,8 +128,6 @@ Huge Neural Networks
             <img src="./pictures/data_p_opt.png" width="600">
             </p>
 
-* Pipeline并行、tensor并行 都属于模型并行。
-
 
 * 总结：
     * 一般而言对通信量：Tensor并行 > 数据并行 > pipeline并行
@@ -136,7 +135,7 @@ Huge Neural Networks
     * 步骤：
         * **首先满足 tensor并行，把最高速的 intra-server gpu 通信留给 tensor并行**
         * 然后考虑 数据并行 / pipeline并行，其中 pipeline并行 是为了使得能够适应 GPU memory（对于超大模型）
-    * 例子：如下图两个八卡 node，那么
+    * 例子一：如下图两个八卡 node，那么
         * node 之间做的是 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行  
         * 但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
 
@@ -144,14 +143,14 @@ Huge Neural Networks
             <img src="./pictures/megatron_parr.jpg" width="600">
             </p>
 
-        * Pangu-Alpha 训练的并行方式：
-            * 同一个 server 的卡之间，tensor并行
-            * 一个 rack 的 server 之间，pipeline 并行
-            * 不同 rack 之间，数据并行
-            * PS：pangu 的训练是用带宽最小的 Cross-Rack 通信做了数据并行，看起来和上面说的 `数据并行通信量一般 > pipeline并行` 矛盾了
-                * **Paper 里面做了解释，数据并行的通信 可以和BP 在时间上重叠，所以不紧要，怎么方便怎么来**：Deploying data parallelism and optimizer parallelism across racks is due to that the induced communication operators are not on the critical path of the training iteration, which could be fused and overlapped with backward propagation to improve the performance
-                
-
+    * 例子二：Pangu-Alpha 训练的并行方式：
+        * 同一个 server 的卡之间，tensor并行
+        * 一个 rack 的 server 之间，pipeline 并行
+        * 不同 rack 之间，数据并行
+        * PS：pangu 的训练是用带宽最小的 Cross-Rack 通信做了数据并行，看起来和上面说的 `数据并行通信量一般 > pipeline并行` 矛盾了
+            
+            * **Paper 里面做了解释，数据并行的通信 可以和BP 在时间上重叠，所以不紧要，怎么方便怎么来**：Deploying data parallelism and optimizer parallelism across racks is due to that the induced communication operators are not on the critical path of the training iteration, which could be fused and overlapped with backward propagation to improve the performance
+        
             <p align="left" >
             <img src="./pictures/pangu-alpha-parral.png" width="800">
             </p>
@@ -216,13 +215,15 @@ Tensor 并行还是调用的 Deepspeed
 ### PyTorch / Mindspore 框架内实现的并行训练
 * PyTorch 
     * Tensor Parallelism：Megatron 已经实现了
-    * [PyTorch 官方 Pipeline Parallelism API](https://pytorch.org/docs/stable/pipeline.html)，基于 touchgpipe
+    * Pipeline 并行：[官方 Pipeline Parallelism API](https://pytorch.org/docs/stable/pipeline.html)，基于 touchgpipe
     * Data Parallelism
         * 之前的 DP/DDP
         * 和 V1.11 推出的 [PyTorch Fully Sharded Data Parallel (FSDP)](https://pytorch.org/blog/introducing-pytorch-fully-sharded-data-parallel-api/)，框架自身实现了 DeepSpeed ZeRO 的功能
 
-* Mindspore
-
+* [Mindspore：Distributed Training Design](https://www.mindspore.cn/doc/note/en/r1.1/design/mindspore/distributed_training_design.html) 
+    * 包含三种：auto、semi-auto、hybrid
+    * semi-auto 是指定了切分方式的，就按指定的来，没指定的就框架 auto
+    * hybrid 是全手动写切分逻辑：https://www.mindspore.cn/tutorial/training/en/r1.1/advanced_use/save_load_model_hybrid_parallel.html 
 
 
 <br>
