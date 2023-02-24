@@ -1,138 +1,232 @@
-# 大模型训练
+# LLM 背景
+## Critical Question
+> **为什么所有GPT-3复现都失败了？使用ChatGPT你应该知道这些?**：https://www.jiqizhixin.com/articles/2023-02-20-3  
+* 闭源模型：GPT3，PALM；及其指令微调版本：Instruct-GPT、FLAN-PaLM
+* 开源：OPT-175B，BLOOM-176B、GLM-130B；及其指令微调版本：OPT-IML、BLOOMZ
+* 开源模型失败的一些猜想：
+    * 语料库多样性、质量、语料库token数量
+    * bfloat16 而不是 float16
+    * 训练中途重启：包括改变截断梯度范数 (clip gradient norm)、学习率、改变优化器
+    * 一些超参：词向量、layer normalization、激活函数、batch size 的逐渐增长
+
+## 模型-数据 的 规模 
+* 模型参数量
+    | Model | Organization  | Date  | Size (# params)|
+    | :---: | :-----------: | :---: | :-----:|
+    | ELMo  | AI2 | Feb 2018 | 94M |
+    | GPT   | OpenAI | Jun 2018 | 110M |
+    | BERT  | Google | Oct 2018 | 340M |
+    | XLM  | Facebook | Jan 2019 | 655M |
+    | GPT-2  | OpenAI | Mar 2019 | 1500M |
+    | RoBERTa  | Facebook | Jul 2019 | 355M |
+    | Megatron-LM  | NVIDIA | Sep 2018 | 8.3B |
+    |T5|	Google	|Oct 2019	|11B|
+    |Turing-NLG	|Microsoft	|Feb 2020|	17B|
+    |GPT-3	|OpenAI	|May 2020|	175B|
+    |Megatron-Turing NLG|	Microsoft, NVIDIA|	Oct 2021|	530B|
+    |Gopher	|DeepMind|	Dec 2021 |	280B|
+
+* 千亿模型训练样本 token 数量：千亿到万亿
+    * 见：Training Compute-Optimal Large Language Models
+
+        <p align="left" >
+        <img src="./pictures/train_token_LLM.png" width="600">
+        </p>
+
+    * GPT-3 用了 300B token 训练数据，但总收集数据量为 500B token
+
+        <p align="left" >
+        <img src="./pictures/train_token_GPT3.png" width="600">
+        </p>
+
+## 常见模型
+* Transformer 模型结构及参数：https://zhuanlan.zhihu.com/p/107891957
+* CLIP
+    * Chinese CLIP：https://github.com/billjie1/Chinese-CLIP 
+    * mCLIP：https://github.com/FreddeFrallan/Multilingual-CLIP 
+* GPT Familty
+    * GPT-1/2/3，[各代之间区别见：PDF文档](./pictures/GPTS.pdf)   
+    * GPT-1 
+        * 确认了单向 transformer 在 unsupervised pre-training + supervised finetuning 的范式下也可以 NLU
+        * 在 9 out of 12 个下游任务上超过 SOTA
+    * GPT-2 
+        * 结构类似 GPT-1，但去掉了微调，而引入 `task conditioning: P(output|input, task)`
+        * 相比一代，用了更大的网络（1.5B vs. 117M），更大数据（**40GB vs. 5GB**），规模大约是 10 倍
+        * 在 zero-shot setting 下在 7 out of 8 数据集超过了 SOTA 
+    * GPT-3
+        * 见上图，175B 参数，其中 Common Crawl 有 45TB 原始数据，清洗后 **570GB**（400B BPE token），**所以千亿大模型大约 1-2 TB 高质量干净数据差不多够训练了**
+    * GPT-3.5 / InstructGPT / ChatGPT
+    
+        > [1. **拆解追溯 GPT-3.5 各项能力的起源**](https://yaofu.notion.site/GPT-3-5-360081d91ec245f29029d37b54573756)  
+        > [2. **Model index for researchers**](https://platform.openai.com/docs/model-index-for-researchers)   
+    
+        code-davinci-002，text-davinci-002/003，ChatGPT 都叫 GPT-3.5，都是 code-davinci-002  的微调版本 
+
+        <p align="center" >
+        <img src="./pictures/gpt_family.png" width="500">
+        </p>
+
+        * InstructGPT 三阶段：supervised fine-tuning on pre-trained GPT-3 --> Reward Model --> RL PPO；三阶段所用的标注的额外数据如下，总量并不大  
+
+            <p align="left" >
+            <img src="./pictures/train_token_chatgpt.png" width="600">
+            </p>
+    
+        * 结论：
+            * code-davinci-002 的基础模型可能不是 initial GPT-3 davinci 模型，而是可能经过如图所示技术路线改造过的 
+            * code-davinci-002 推理能力很强（很强的基础模型），但与人的 alignment 不够  
+            text-davinci-002 alignment 能力增强了，但在很多任务上跑分变低（上下文 ICL 能力变弱）  
+            text-davinci-003 加上了 RLHF，普遍的生成通常比 text-davinci-002 长，然后上下文能力有所恢复     
+            ChatGPT 进一步接近和人对话
+            * 1.3B 的经过 RLHF 的 InstructGPT（模型来源于 GPT-3 XL，见 GPT-3 论文 Table E1），在 labeler 评测中，就可优于原始 175B GPT-3
+            * **模型规模超过阈值后的涌现能力（大约100B）**：突破 scaling law
+
+
+<br>
+<br>
+
+
+# 分布式训练
 > https://mp.weixin.qq.com/s/cr-lYVvn1AQ7BN1VfzfuNg
-## 基础背景知识
-* Communication Primitives 通信原语：Broadcast, Scatter, Gather, Reduce, Reduce-Scatter, All-gather, All-reduce, All-scatter, All-to-All (MoE 中数据 dispatch 用到), Barrier
-    * [这个链接](https://www.cnblogs.com/marsggbo/p/11497780.html) 和 GShard 论文有解释 
 
-* [各种工具 Overview](https://mp.weixin.qq.com/s?__biz=MzU5ODY2MTk3Nw==&mid=2247485568&idx=1&sn=22dc2fdec7d30bcc9d50b8ed0d49acec&chksm=fe4186b6c9360fa0fd66c979af18d8e7afa2e7dd4de4561638294d11856bd7ea9501bb2cfb17&scene=21#wechat_redirect) 
-    <p align="left" >
-    <img src="./pictures/DDL.png" width="700">
-    </p>
-
-* 模型 vs. 数据 
-    * 参数量增长
-        | Model | Organization  | Date  | Size (# params)|
-        | :---: | :-----------: | :---: | :-----:|
-        | ELMo  | AI2 | Feb 2018 | 94M |
-        | GPT   | OpenAI | Jun 2018 | 110M |
-        | BERT  | Google | Oct 2018 | 340M |
-        | XLM  | Facebook | Jan 2019 | 655M |
-        | GPT-2  | OpenAI | Mar 2019 | 1500M |
-        | RoBERTa  | Facebook | Jul 2019 | 355M |
-        | Megatron-LM  | NVIDIA | Sep 2018 | 8.3B |
-        |T5|	Google	|Oct 2019	|11B|
-        |Turing-NLG	|Microsoft	|Feb 2020|	17B|
-        |GPT-3	|OpenAI	|May 2020|	175B|
-        |Megatron-Turing NLG|	Microsoft, NVIDIA|	Oct 2021|	530B|
-        |Gopher	|DeepMind|	Dec 2021 |	280B|
-
-    * 千亿模型训练样本 token 数量：千亿到万亿
-        * 见：Training Compute-Optimal Large Language Models
-            <p align="left" >
-            <img src="./pictures/train_token_LLM.png" width="600">
-            </p>
-        * GPT-3 用了 300B token 训练数据，但总收集数据量为 500B token
-            <p align="left" >
-            <img src="./pictures/train_token_GPT3.png" width="600">
-            </p>
-
-* 模型
-    * Transformer 模型结构及参数：https://zhuanlan.zhihu.com/p/107891957
-    * CLIP
-        * Chinese CLIP：https://github.com/billjie1/Chinese-CLIP 
-        * mCLIP：https://github.com/FreddeFrallan/Multilingual-CLIP 
-    * GPT Familty
-        * GPT-1/2/3，[各代之间区别见：PDF文档](./pictures/GPTS.pdf)   
-        * GPT-1 
-            * 确认了单向 transformer 在 unsupervised pre-training + supervised finetuning 的范式下也可以 NLU
-            * 在 9 out of 12 个下游任务上超过 SOTA
-        * GPT-2 
-            * 结构类似 GPT-1，但去掉了微调，而引入 `task conditioning: P(output|input, task)`
-            * 相比一代，用了更大的网络（1.5B vs. 117M），更大数据（**40GB vs. 5GB**），规模大约是 10 倍
-            * 在 zero-shot setting 下在 7 out of 8 数据集超过了 SOTA 
-        * GPT-3
-            * 见上图，175B 参数，其中 Common Crawl 有 45TB 原始数据，清洗后 **570GB**（400B BPE token），**所以千亿大模型大约 1-2 TB 高质量干净数据差不多够训练了**
-        * GPT-3.5 / InstructGPT / ChatGPT
-        
-            > [**拆解追溯 GPT-3.5 各项能力的起源**](https://yaofu.notion.site/GPT-3-5-360081d91ec245f29029d37b54573756)  
-            > https://platform.openai.com/docs/model-index-for-researchers   
-     
-            code-davinci-002，text-davinci-002/003，ChatGPT 都叫 GPT-3.5，都是 code-davinci-002  的微调版本 
-
-            <p align="center" >
-            <img src="./pictures/gpt_family.png" width="500">
-            </p>
-
-            * InstructGPT 三阶段：supervised fine-tuning on pre-trained GPT-3 --> Reward Model --> RL PPO；三阶段所用的标注的额外数据如下，总量并不大  
-
-                <p align="left" >
-                <img src="./pictures/train_token_chatGPT.png" width="600">
-                </p>
-        
-            * 结论：
-                * code-davinci-002 的基础模型可能不是 initial GPT-3 davinci 模型，而是可能经过如图所示技术路线改造过的 
-                * code-davinci-002 推理能力很强（很强的基础模型），但与人的 alignment 不够  
-                text-davinci-002 alignment 能力增强了，但在很多任务上跑分变低（上下文 ICL 能力变弱）  
-                text-davinci-003 加上了 RLHF，普遍的生成通常比 text-davinci-002 长，然后上下文能力有所恢复     
-                ChatGPT 进一步接近和人对话
-                * 1.3B 的经过 RLHF 的 InstructGPT （模型来源于 GPT-3 XL，见 GPT-3 论文 Table E1）就可优于原始 175B GPT-3
-
-
-* 并行方法：数据并行、Pipeline 并行、tensor 并行
-    * Pipeline并行、tensor并行 都属于模型并行。对带宽需求：Tensor并行 > 数据并行 > pipeline并行
-    * 带宽：NVLink > PCIE Switch > infiniband > EtherNet  
-    * tensor并行
-        * 1d: Megatron-LM (NVIDIA)
-        * 2d: Optimus (An Efficient 2D Method for Training Super-Large Deep Learning)
-        * 3d: Maximizing Parallelism in Distributed Training for
+## 训练并行方法：数据并行、Pipeline 并行、tensor 并行
+* 带宽：NVLink > PCIE Switch >= infiniband > EtherNet  
+* Tensor并行，有多种方法
+    * 1d: Megatron-LM (NVIDIA)，权重竖切
+    * 2d: Optimus (An Efficient 2D Method for Training Super-Large Deep Learning)
+    * 3d: Maximizing Parallelism in Distributed Training for
 Huge Neural Networks
+    * 针对 MoE 的 expert 并行：GShard，Fast MoE，Faster MoE，PR-MoE，SE-MoE，Switch Transformer
 
-    * 如下图，两个八卡 node，那么：
-        * node 之间先做了 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行。但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
+* pipeline 并行
+    * GPipe，PipeDream 分别为 同步和异步
+    * GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP
+    * PipeDream-1F1B 可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了
+        * 为了解决这个问题，Pipedream 最多需要存储 4 个版本的 weight（4 是 stage 数量）
+
+            <p align="left" >
+            <img src="./pictures/pipeline_p.png" width="900">
+            </p>
+
+            > 图中 W_i(v) indicates weights on worker i with version v  
+            > 红色箭头表示了一个 minibatch-4 的 FP 和 BP
+
+    * PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不想 PipeDream 一样存很多版本权重，并且尽可能同步 flash
+        * Megatron-2 用的就是 PipeDream-Flash
+
+* 数据并行
+    > [AI框架基础技术之深度学习中的通信优化](https://zhuanlan.zhihu.com/p/348982652)   
+    * 数据并行中通信的优化：从 Parameter Server 到 Ring All-Reduce
+        * 前者是 torch 的 DP，总通信量随节点数 N 增加线性增加
+        * 后者是 DDP，总通信时间随节点数 N 增加保持恒定
+    * 数据并行中的进一步优化
+        * 通信融合 
+        * 反向传播梯度的计算，和梯度的传输 在时间上 overlap。但注意：结合结合通信融合时，不能全部融合成一个了，这样通信时间就不能 hidden 了
+        
+            <p align="left" >
+            <img src="./pictures/data_p_opt.png" width="600">
+            </p>
+
+* Pipeline并行、tensor并行 都属于模型并行。
+
+
+* 总结：
+    * 一般而言对通信量：Tensor并行 > 数据并行 > pipeline并行
+        * 其中 数据并行和 pipeline并行 的比较，见 https://www.high-flyer.cn/blog/model_parallel-2/ ，当 Transform 变深变宽时，趋势会明显。**但这个规则不是死的，见下文**
+    * 步骤：
+        * **首先满足 tensor并行，把最高速的 intra-server gpu 通信留给 tensor并行**
+        * 然后考虑 数据并行 / pipeline并行，其中 pipeline并行 是为了使得能够适应 GPU memory（对于超大模型）
+    * 例子：如下图两个八卡 node，那么
+        * node 之间做的是 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行  
+        * 但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
 
             <p align="left" >
             <img src="./pictures/megatron_parr.jpg" width="600">
             </p>
 
-    * 总结一下，一般而言，**首先考虑 tensor并行，g-gpus server 用 g 维的 tensor 并行；然后用 pipeline 并行把模型切分，使得能够适应 GPU memory（对于超大模型）；最后考虑数据并行，主要用于 server 之间**
-        * 见 Paper：Efficient Large-Scale Language Model Training on GPU Clusters
+        * Pangu-Alpha 训练的并行方式：
+            * 同一个 server 的卡之间，tensor并行
+            * 一个 rack 的 server 之间，pipeline 并行
+            * 不同 rack 之间，数据并行
+            * PS：pangu 的训练是用带宽最小的 Cross-Rack 通信做了数据并行，看起来和上面说的 `数据并行通信量一般 > pipeline并行` 矛盾了
+                * **Paper 里面做了解释，数据并行的通信 可以和BP 在时间上重叠，所以不紧要，怎么方便怎么来**：Deploying data parallelism and optimizer parallelism across racks is due to that the induced communication operators are not on the critical path of the training iteration, which could be fused and overlapped with backward propagation to improve the performance
+                
+
+            <p align="left" >
+            <img src="./pictures/pangu-alpha-parral.png" width="800">
+            </p>
 
 <br>
 
-## 框架
+## 分布式深度学习框架
+### Overview  
+* 分布式深度学习框架网络传输的抽象层次：[对抗软件系统复杂性：恰当分层，不多不少](https://mp.weixin.qq.com/s?__biz=MzU5ODY2MTk3Nw==&mid=2247485568&idx=1&sn=22dc2fdec7d30bcc9d50b8ed0d49acec&chksm=fe4186b6c9360fa0fd66c979af18d8e7afa2e7dd4de4561638294d11856bd7ea9501bb2cfb17&scene=21#wechat_redirect) 
+    <p align="left" >
+    <img src="./pictures/DDL.png" width="700">
+    </p>
+    
+    * Ray 基于 gRPC，不支持高性能网络 RDMA 协议，有性能瓶颈
+    * TensorFlow 的最初设计里，无论是控制还是数据传输都基于 gRPC 实现，也不能调用 RDMA，有性能瓶颈（后来有了 networking TF 插件改善了）
+
+* Communication Primitives 通信原语：Broadcast, Scatter, Gather, Reduce, Reduce-Scatter, All-gather, All-reduce, All-scatter, All-to-All (MoE 中数据 dispatch 用到), Barrier
+    * [这个链接](https://www.cnblogs.com/marsggbo/p/11497780.html) 和 GShard 论文有解释 
+
+
 ### Megatron
 > https://github.com/nvidia/megatron-lm 
 
-* 步骤
+* 运行步骤
     * Docker pull 和 执行
     * 数据处理，改造 Tokenizer
     * Megatron 自带 Tokenizer：BertWordPieceLowerCase, BertWordPieceCase, GPT2BPETokenizer
     * Compiling dataset index
-    * Compiling (only the first time) and loading fused kernels
-
+    * Compiling (only the first time for running) and loading fused kernels
 * Megatron 代码学习
     * Tokenizer 及并行原理：https://zhuanlan.zhihu.com/p/388830967 
     * 代码：https://zhuanlan.zhihu.com/p/470279673 
 * Megatron 中 FFN 实现：https://zhuanlan.zhihu.com/p/366906920 
     * 第一个线性层：input broadcast 到每一个设备上，权重竖切，`XW = X[W1, W2] = [XW1, XW2]`
     * 第二个线性层：横切（结果需要 all-reduce 相加）
+* 版本
+    * 第一代：Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism，是 **tensor 并行 + 数据并行**
+    * 第二代：Efficient Large-Scale Language Model Training on GPU Clusters
+Using Megatron-LM，**在第一代基础上，加上了 pipeline 并行（用的 PipeDream-Flush）**
 
 ### Deepspeed 
-Deepspeed (MicroSoft) 和 Megatron，两者简单比较：
-* DeepSpeed 本质上是一种 “节省显存” 的 **数据并行**，即：在数据并行下如何以更少的机器去跑更大的模型。DeepSpeed 假设了单层参数量可以在单张显卡上放得下，如果不满足这个假设，那么仍然需要使用模型并行，DeepSpeed 的模型并行是通过调用 Megatron 来实现的
-* 根据 NVIDIA 最新的那篇论文（链接：https://arxiv.org/abs/2104.04473 )，Megatron 在大规模训练的效率是超过 DeepSpeed 不少的。
-* DeepSpeed 的论文一直强调：可以用更少机器训练更大的模型，但没有突出过在效率上的优势。DeepSpeed 后来又出了一篇论文：ZeRO-Infinity（链接：https://arxiv.org/abs/2104.07857 ），当单层参数量在单张显卡上放不下的时候，它通过对这一层算子切片，一片一片来执行，使得单卡也能跑起来一个巨大的层，可以理解成一种 “时间”轴上展开的模型并行。
+* Zero 
+    * 训练时，需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP)，其中 Adam 的 optimizer states 量最大，parameters 反而不大
+        * 参数量为 N 的模型，训练至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），还额外需要一个 buffer 去存储每层 activation
+        * **也即 100B 模型，训练需要 1600GB 显存**（100张卡就够放下了，但训练太慢，所以大模型还是 compute-throughput-bound，memory 不是最主要的问题）
+    * 所以 ZeRO 提出：不用每个数据并行的节点上都存上所有层的相关信息；activation 的存储也可以 re-compute 省掉
+    * 通俗易懂的讲解：[ZeRO & DeepSpeed: New system optimizations enable training models with over 100 billion parameters](https://www.microsoft.com/en-us/research/blog/zero-deepspeed-new-system-optimizations-enable-training-models-with-over-100-billion-parameters/)
+* DeepSpeed 的本质：略微降低的效率去节省显存
+    * DeepSpeed 核心是 `ZeRO`，本质上是一种 “节省显存” 的 **数据并行**，即：在数据并行下如何以更少的机器去跑更大的模型。DeepSpeed 假设了单层参数量可以在单张显卡上放得下，如果不满足这个假设，那么仍然需要使用 tensor并行，DeepSpeed 的 tensor并行是通过调用 Megatron 来实现的
+    * 根据 NVIDIA 最新的那篇论文（链接：https://arxiv.org/abs/2104.04473 )，Megatron 在大规模训练的效率是超过 DeepSpeed 不少的
+    * DeepSpeed 的论文一直强调：可以用更少机器训练更大的模型，但没有突出过在效率上的优势。DeepSpeed 后来又出了一篇论文：ZeRO-Infinity（链接：https://arxiv.org/abs/2104.07857 ），当单层参数量在单张显卡上放不下的时候，它通过对这一层算子切片，一片一片来执行，使得单卡也能跑起来一个巨大的层，可以理解成一种 “时间” 轴上展开的模型并行
+
 
 ### Megatron-Deepspeed 
 > https://github.com/microsoft/Megatron-DeepSpeed  
 
-DeepSpeed version of NVIDIA's Megatron-LM that adds additional support for several features such as MoE model training, Curriculum Learning, 3D Parallelism, and others.   
-模型并行还是调用的 Deepspeed  
-**一般经验：借鉴 deepspeed 的写法，然后作为 extension 加在 Megatron-LM 上**
+* DeepSpeed version of NVIDIA's Megatron-LM that adds additional support for several features such as MoE model training, Curriculum Learning, 3D Parallelism, and others， 
+Tensor 并行还是调用的 Deepspeed  
+* **一般经验：借鉴 deepspeed 的写法，然后作为 extension 加在 Megatron-LM 上**
+
+
+### PyTorch / Mindspore 框架内实现的并行训练
+* PyTorch 
+    * Tensor Parallelism：Megatron 已经实现了
+    * [PyTorch 官方 Pipeline Parallelism API](https://pytorch.org/docs/stable/pipeline.html)，基于 touchgpipe
+    * Data Parallelism
+        * 之前的 DP/DDP
+        * 和 V1.11 推出的 [PyTorch Fully Sharded Data Parallel (FSDP)](https://pytorch.org/blog/introducing-pytorch-fully-sharded-data-parallel-api/)，框架自身实现了 DeepSpeed ZeRO 的功能
+
+* Mindspore
+
+
 
 <br>
 <br>
-
 
 
 # LLM Tuning 方法
@@ -144,7 +238,7 @@ DeepSpeed version of NVIDIA's Megatron-LM that adds additional support for sever
 
 <br>
 
-## Prompt tuning
+## Prompt tuning：白盒和黑盒
 ### Whit Box: 按时间顺序，有以下文章 
 
 * `Prefix Tuning：Optimizing continuous prompts for generation_ACL21` ***(关注的是用 GPT/BART 做 NLG 任务)***

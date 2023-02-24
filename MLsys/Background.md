@@ -10,6 +10,9 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 <img src="./Pictures/loop_opt.png", width='1000'>
 </p>
 
+
+<br>
+
 ## Loop Reorder
 
 <center class="half">
@@ -103,11 +106,15 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
         ```
         这样计算顺序就变为了：左矩阵第 i 行的第 k 个数与右矩阵第 k 行所有数做乘法，并累加到输出矩阵第 i 行的每个位置。如图中 `C[i,:]` 那一行的结果，可以通过 `A[i,k] 和 B[K,:]` 对k的累加得到。在最内层循环中右矩阵和输出矩阵都是按行访存，大大减少了 cache miss 的次数
 
+<br>
+
 
 ## Data Reuse
 > P20/21: http://www.cse.cuhk.edu.hk/~byu/CMSC5743/2021Fall/slides/Lec02-conv.pdf  
 
 避免重复计算，例如在卷积中把需要被重复使用多次元素先算出来（通过 Loop Reodering）
+
+<br>
 
 ## Loop Tiling: Ultilize Shared Memory
 > https://zhuanlan.zhihu.com/p/367644657  
@@ -116,8 +123,12 @@ H*W*M 的 K*K 卷积（假设stride=1）实现需要 6 层 for 循环（一张2d
 * 将 global memory 中的数据按照 block load 到 shared memory 中去，减少对低速存储的访问
 * 多个 block 的运算 GPU 上可以实现并行
 
+<br>
+
 ## 避免 Shared Memory 的 bank conflict
 见 [Loop Tiling 的 CUDA 代码实现](./CUDA_Program.md#avoid-bank-conflict)
+
+<br>
 
 ## Loop Unrolling
 > [Why is it faster to process a sorted array than an unsorted array?](https://zhuanlan.zhihu.com/p/22469702)  

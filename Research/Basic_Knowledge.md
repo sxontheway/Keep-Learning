@@ -281,7 +281,19 @@ class C3D_reduced(nn.Module):
         out = torch.matmul(attn, v)
         ```
 
-<p align="center" >
-<img src="./pictures/multi-head.png"  width="600">
-</p>
+        <p align="center" >
+        <img src="./pictures/multi-head.png"  width="600">
+        </p>
 
+    * Flash Attention
+        > [Flash Attention 简记](https://zhuanlan.zhihu.com/p/582606847)
+
+        Attention 目标是计算 `Output = Softmax(QK^T)V`，QKV 尺寸都为 `N*d`  
+        相比原始 Attention，Flash Attention 用了两个技巧减少 attention layer 所需要的存储，并提高运算速度：Tiling 和 operator fusion  
+        * `QK^T` 可以用 Tiling 矩阵分块来做。矩阵运算 `C = AB`，把矩阵 AB 分块，`C_ij = A的第i行 和 B的第j列的内积`，见 [Loop Tiling 的 CUDA 代码实现](../MLSys/CUDA_Program.md#with-shared-memory) 
+        * Attention 中的 softmax 是按行算的，`Softmax(QK^T)` 尺寸为 `N*N`，相当于 Output 的每一行都是 V 的 N 个 d 维向量按 softmax 结果做线性组合
+        * 而按行计算 softmax 这个需求，其实可以和矩阵乘的 tiling 做 operator fusion。做矩阵乘法时候，顺便把 softmax 也算了
+
+            <p align="left" >
+            <img src="./pictures/flashattention.png"  width="1000">
+            </p>
