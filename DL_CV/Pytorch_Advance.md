@@ -245,6 +245,7 @@ if __name__ == "__main__":
     # True
     ```
 
+<br>
 
 ## JIT: just-in-time compiler 
 > https://zhuanlan.zhihu.com/p/52154049  
@@ -265,6 +266,7 @@ Tracing方式对于含有if和for-loop的场景失效，需要用script方式
 https://zhpmatrix.github.io/2019/03/09/torch-jit-pytorch/   
 
 
+<br>
 
 ## Dataloader 加速
 * 仅从使用者的角度考虑,DataLoader做了下面的事情：
@@ -293,4 +295,62 @@ https://github.com/pytorch/pytorch/issues/31359
     * Prefetch next batch / 新开的cuda stream拷贝tensor到gpu：https://zhuanlan.zhihu.com/p/97190313  
     * 生产者消费者模型：https://blog.csdn.net/winycg/article/details/92443146    
 
-## APEX
+<br>
+
+## 自定义一个 torch.autograd.torch 函数
+见官方文档：
+```python
+import torch
+
+# An template in tutorial
+class Exp(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, i):
+        result = i.exp()
+        ctx.save_for_backward(result)
+        return result
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        result, = ctx.saved_tensors
+        return grad_output * result
+
+output = Exp.apply(input)
+```
+
+我好奇一个问题，中间到底是怎么抽象封装的，为什么有一个 `ctx`？是从哪里来的？答案在 `torch.autograd.Function` 中
+
+  * 查看 `torch.autograd.Function` 这个类的定义：`class Function(with_metaclass(FunctionMeta, _C._FunctionBase, FunctionCtx, _HookMixin))`，相当于 `Function` 这个类融合了多个基类
+  * 其中一个基类 `FunctionMeta` 的定义如下：
+    ```python
+    class FunctionMeta(type):
+        def __init__(cls, name, bases, attrs):
+              
+            """
+            This metaclass sets up the following properties:
+            _backward_cls: The Function class corresponding to the differentiated
+            version of this function (which is generated on the fly by this metaclass).
+            """
+            backward_fn = type(name + 'Backward', (BackwardCFunction,), {'_forward_cls': cls})
+            cls._backward_cls = backward_fn
+
+            return super(FunctionMeta, cls).__init__(name, bases, attrs)
+    ```
+
+    * `FunctionMeta` 类的成员 `_backward_cls` 是一个类，这个类继承自 `BackwardCFunction`
+    * 所以例子中，`Exp` 通过继承 `Function`，其实也初始化了 `BackwardCFunction`（上面代码用了 super 方法）
+    * 同时，`Exp` 会有一个名为 `_forward_cls` 的成员函数
+ 
+  * 再看 `BackwardCFunction` 这个类，有一个叫 `apply()` 的成员函数，定义如下
+    ```python
+    class BackwardCFunction(_C._FunctionBase, _ContextMethodMixin, _HookMixin):
+        def apply(self, *args):
+            # _forward_cls is defined by derived class
+            return self._forward_cls.backward(self, *args)  
+    ```
+  * 所以总结一下：
+    * 例子中的 `Exp.apply(input)`，调用了继承自 `BackwardCFunction` 中的 `apply` 函数，最终会启动 `Exp` 中用户自己写的 `forward` 
+    * 类 `Exp` 通过继承 `Function`，也继承了 `_ContextMethodMixin` 这个类，所以拥有了 `save_for_backward` 这个成员函数。所以例子中的 `ctx` 的作用有点类似于 `self`，用于指代自己
+    * 但 `ctx` 和 `self` 的区别在于
+      * `self` 用于有实例的情况，但例子中用了 `@staticmethod`，不需要实例，是直接对类进行调用
+      * 但其实 `ctx` 中具体内容的生成，已经被 torch 源码通过继承 `Function` 和 `apply` 隐式地处理了。所以不显示调用 `forward` 进行推理，而是用 `apply` 包了一层
