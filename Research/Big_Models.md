@@ -90,14 +90,33 @@
 > https://mp.weixin.qq.com/s/cr-lYVvn1AQ7BN1VfzfuNg
 
 ## 训练并行方法
-* 主要的并行方法：数据并行、Pipeline 并行、tensor 并行。后两者可以笼统归为模型并行
+* 主要的并行方法：数据并行、Pipeline 并行、tensor 并行、专家并行。后三者都可以笼统归为模型并行
 * 带宽：NVLink > PCIE Switch >= infiniband > EtherNet  
 * Tensor并行，有多种方法
     * 1d: Megatron-LM (NVIDIA)，权重竖切
     * 2d: Optimus (An Efficient 2D Method for Training Super-Large Deep Learning)
-    * 3d: Maximizing Parallelism in Distributed Training for
-Huge Neural Networks
-    * 针对 MoE 的 expert 并行：GShard，Fast MoE，Faster MoE，PR-MoE，SE-MoE，Switch Transformer
+    * 3d: Maximizing Parallelism in Distributed Training for Huge Neural Networks
+* MoE 的 专家并行
+
+    > Paper：GShard，Fast MoE，Faster MoE，PR-MoE，SE-MoE，Switch Transformer
+
+    * 例如：一共 24 个 experts，并行度为2。那么会有一半的 GPU 处理 12 个 experts，另外一半处理另外 12 个；如果并行度为 1，那么意味着每个 GPU 都完全包含了 24 个 experts
+    * MoE routing 原理：回顾一下 transformer 原理
+        * 因为 Transformer 权重的作用其实是把 `d1` 维的隐变量变为 `d2` 维度的，所以 token 和 token 之间的处理是可以在时序上独立进行的（但共享权重）。Transformer 为了提高运行效率，会让多个 token 组成一个序列，然后几个序列组成 batch 一起吃进去，所以起来像是并行在执行。MoE 要做的是把这一组组的序列先合并再按 token 拆开，分给不同的专家（所以要 reshard）
+    * MoE routing 流程
+        * input tensor 大小：(G, S, M)，分别为：group 的数量、每个 group 里面序列长度（或 token 的数量）、每个 token 的隐变量尺寸
+        * Algo2 第一行是在计算每个 token 分到每个专家上的置信度。矩阵相乘使得在 feature dimension 上吸收了（M 维度）。权重 `wg` 对应的 `ME` 没下划线，表示没有在设备上进行 shard。而 `G` 代表不同的 group，代表在设备上 sharded，也即不同设备分别计算了自己拿到的 batch 要分给哪些专家  
+        * Algo2 第三/四行 见 第二张图：input 要先和 mask 做爱因斯坦求和，再 all-to-all reshard
+            * 其中爱因斯坦求和时，因为不同机器按照 group 切分数据，`(GSEC, GSM)` 在每个机器上其实是 `(SEC，SM)`；然后因为 `S` 这个维度代表一个 group 中 token 的数量，而上面说到 token 被分配给不同 expert 了，所以 `S` 这个维度消失了，每台机器上实际在做 `(SEC，SM) -> ECM`
+            * 加上跨机器这个维度，`ECM` 变为 `GECM`，然后 `E-G` 进行 `reshard` 变为 `EGCM` 
+
+            <p align="left" >
+            <img src="./pictures/gshard.png" width="800">
+            </p>
+            <p align="left" >
+            <img src="./pictures/gshard2.png" width="800">
+            </p>
+
 
 * pipeline 并行
     * GPipe，PipeDream 分别为 同步和异步
