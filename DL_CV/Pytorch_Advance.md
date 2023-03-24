@@ -36,7 +36,19 @@
         <p align="center" >
             <img src="./pictures/ddp_torch.png" width=800>
         </p>
-    
+
+
+<br>
+
+
+## DDP 的训练数据
+> https://blog.csdn.net/daixiangzi/article/details/106162971  
+
+* 需要用 torch 的 `DistributedSampler`，否则每个节点上都会存所有的数据，就和 “单卡训练” 在数学上不等价了
+* 和 “单卡” 在数学上等价：需要每个 epoch 重新 shuffle 给每个节点
+
+<br>
+
 
 ## DDP 具体用法
 
@@ -176,11 +188,15 @@ if __name__ == "__main__":
     processes(split_data)
 ```
 
+<br>
+
 ## 解决方案
 * 以上代码在 Pytorch1.9 的Linux版本下会报错：` ValueError: bad value(s) in fds_to_keep`，在windows下则正常运行
 * 解决方案有两种：
     * 将 `mp.Process()` 那行改成：`data_i = data[rank]; p = mp.Process(target=init_process, args=(rank, size, data_i, run))`
     * 在 `mp.Process()` 那行之前加：`data = [i.clone() for i in data]`，相当于将 data 的每个元素重新在内存里面复制了一遍
+
+<br>
 
 ## 原因分析
 > You cannot pass a tensor to the mp.Process that has data shared with other processes
@@ -190,6 +206,7 @@ if __name__ == "__main__":
 
 <br>
 <br>
+
 
 # Pytorch Internals
 ## Folders

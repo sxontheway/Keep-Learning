@@ -90,89 +90,145 @@
 > https://mp.weixin.qq.com/s/cr-lYVvn1AQ7BN1VfzfuNg
 
 ## 训练并行方法
-* 主要的并行方法：数据并行、Pipeline 并行、tensor 并行、专家并行。后三者都可以笼统归为模型并行
-* 带宽：NVLink > PCIE Switch >= infiniband > EtherNet  
-* Tensor并行，有多种方法
-    * 1d: Megatron-LM (NVIDIA)，权重竖切
-    * 2d: Optimus (An Efficient 2D Method for Training Super-Large Deep Learning)
+* 主要包含方法：数据并行、Pipeline 并行、tensor 并行、专家并行。后三者都可以笼统归为模型并行
+* 带宽：NVLink > PCIE Switch >= infiniband > EtherNet    
+### Tensor并行，有多种方法
+* 1d 切分: Megatron-LM (NVIDIA)，并行切分 hidden dimension 了
+    * FFN (两层MLP) 和 Attention Layer
+        * 都有权重 AB，其中 A 竖切 B 横切，最后 all-reduce（element-wise相加），都有通信算子 f 和 g
+            * f：no operation in FP (forward pass)，all-reduce in BP
+            * g：all-reduce in FP, no operation in BP
+        * MLP 是直接切权重，Attention 是按 head 来切：例如一共 24 个 head 切 4 份，那每张卡上计算 6 个 head
+
+            <p align="left" >
+            <img src="./pictures/model_parr.png" width="900">
+            </p>
+
+* 2d 切分
+    * 1d 基础上加上 sequence parallel：`Reducing Activation Recomputation in Large Transformer Models`
+        * tensor 并行如上如所示，权重被切分了，中间的计算结果的激活也被切分了（例如 XA_1，XA_2）；但每张卡的 input activation 都没被切分（例如 MLP/Attention 的最左边的 X）
+        * 这篇文章提出的方法一： sequence 并行：不产生额外数量的通信算子，只是算子类型变了；同时会将所有 activation 都切分了 
+            * g：all-gather in FP，reduce-scatter in BP
+            * g'：reduce-scatter in FP, all-gather in BP
+
+                <p align="left" >
+                <img src="./pictures/seq_parr.png" width="600">
+                </p>
+        * 方法二：recompute activation
+            * 详见 paper：softmax/dropout/attention over V 的激活很大，但 FLOPs 不大，可以对它们进行重计算即可；其他 matrix 乘法相关部分就不进行重计算了，这样能减小 memory，但不增加很多计算开销
+
+    * 1d 基础上再切分 batch：Optimus_An Efficient 2D Method for Training Super-Large Deep Learning
+* 其他  
+    * Tesseract: Parallelize the Tensor Parallelism Efficiently，可以配置成 2d 或者 3d 切分
     * 3d: Maximizing Parallelism in Distributed Training for Huge Neural Networks
-* MoE 的 专家并行
-
-    > Paper：GShard，Fast MoE，Faster MoE，PR-MoE，SE-MoE，Switch Transformer
-
-    * 例如：一共 24 个 experts，并行度为2。那么会有一半的 GPU 处理 12 个 experts，另外一半处理另外 12 个；如果并行度为 1，那么意味着每个 GPU 都完全包含了 24 个 experts
-    * MoE routing 原理：回顾一下 transformer 原理
-        * 因为 Transformer 权重的作用其实是把 `d1` 维的隐变量变为 `d2` 维度的，所以 token 和 token 之间的处理是可以在时序上独立进行的（但共享权重）。Transformer 为了提高运行效率，会让多个 token 组成一个序列，然后几个序列组成 batch 一起吃进去，所以起来像是并行在执行。MoE 要做的是把这一组组的序列先合并再按 token 拆开，分给不同的专家（所以要 reshard）
-    * MoE routing 流程
-        * input tensor 大小：(G, S, M)，分别为：group 的数量、每个 group 里面序列长度（或 token 的数量）、每个 token 的隐变量尺寸
-        * Algo2 第一行是在计算每个 token 分到每个专家上的置信度。矩阵相乘使得在 feature dimension 上吸收了（M 维度）。权重 `wg` 对应的 `ME` 没下划线，表示没有在设备上进行 shard。而 `G` 代表不同的 group，代表在设备上 sharded，也即不同设备分别计算了自己拿到的 batch 要分给哪些专家  
-        * Algo2 第三/四行 见 第二张图：input 要先和 mask 做爱因斯坦求和，再 all-to-all reshard
-            * 其中爱因斯坦求和时，因为不同机器按照 group 切分数据，`(GSEC, GSM)` 在每个机器上其实是 `(SEC，SM)`；然后因为 `S` 这个维度代表一个 group 中 token 的数量，而上面说到 token 被分配给不同 expert 了，所以 `S` 这个维度消失了，每台机器上实际在做 `(SEC，SM) -> ECM`
-            * 加上跨机器这个维度，`ECM` 变为 `GECM`，然后 `E-G` 进行 `reshard` 变为 `EGCM` 
-
-            <p align="left" >
-            <img src="./pictures/gshard.png" width="800">
-            </p>
-            <p align="left" >
-            <img src="./pictures/gshard2.png" width="800">
-            </p>
 
 
-* pipeline 并行
-    * GPipe，PipeDream 分别为 同步和异步
-    * GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP
-    * PipeDream-1F1B 可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了
-        * 为了解决这个问题，Pipedream 最多需要存储 4 个版本的 weight（4 是 stage 数量）
+### pipeline 并行
+* GPipe，PipeDream 分别为 同步和异步
+* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP
+* PipeDream-1F1B 可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了
+    * 为了解决这个问题，Pipedream 最多需要存储 4 个版本的 weight（4 是 stage 数量）
 
-            <p align="left" >
-            <img src="./pictures/pipeline_p.png" width="900">
-            </p>
+        <p align="left" >
+        <img src="./pictures/pipeline_p.png" width="900">
+        </p>
 
-            > 图中 W_i(v) indicates weights on worker i with version v  
-            > 红色箭头表示了一个 minibatch-4 的 FP 和 BP
+        > 图中 W_i(v) indicates weights on worker i with version v  
+        > 红色箭头表示了一个 minibatch-4 的 FP 和 BP
 
-    * PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不想 PipeDream 一样存很多版本权重，并且尽可能同步 flash
-        * Megatron-2 用的就是 PipeDream-Flash
-
-* 数据并行
-    > [AI框架基础技术之深度学习中的通信优化](https://zhuanlan.zhihu.com/p/348982652)   
-    * 数据并行中通信的优化：从 Parameter Server 到 Ring All-Reduce
-        * 前者是 torch 的 DP，总通信量随节点数 N 增加线性增加
-        * 后者是 DDP，总通信时间随节点数 N 增加保持恒定
-    * 数据并行中的进一步优化
-        * 通信融合 
-        * 反向传播梯度的计算，和梯度的传输 在时间上 overlap。但注意：结合结合通信融合时，不能全部融合成一个了，这样通信时间就不能 hidden 了
-        
-            <p align="left" >
-            <img src="./pictures/data_p_opt.png" width="600">
-            </p>
+* PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不想 PipeDream 一样存很多版本权重，并且尽可能同步 flash
+    * Megatron-2 用的就是 PipeDream-Flash
 
 
-* 总结：
-    * 一般而言对通信量：Tensor并行 > 数据并行 > pipeline并行
-        * 其中 数据并行和 pipeline并行 的比较，见 https://www.high-flyer.cn/blog/model_parallel-2/ ，当 Transform 变深变宽时，趋势会明显。**但这个规则不是死的，见下文**
-    * 步骤：
-        * **首先满足 tensor并行，把最高速的 intra-server gpu 通信留给 tensor并行**
+### 数据并行
+> [AI框架基础技术之深度学习中的通信优化](https://zhuanlan.zhihu.com/p/348982652)   
+* 数据并行中通信的优化：从 Parameter Server 到 Ring All-Reduce
+    * 前者是 torch 的 DP，总通信量随节点数 N 增加线性增加
+    * 后者是 DDP，总通信时间随节点数 N 增加保持恒定
+* 数据并行中的进一步优化：通信融合 commuincation fusion
+    * 让 反向传播梯度的计算、梯度的传输 在时间上 overlap。但注意：结合结合通信融合时，不能全部融合成一个了，这样通信时间就不能 hidden 了
+    
+        <p align="left" >
+        <img src="./pictures/data_p_opt.png" width="600">
+        </p>
+
+
+### MoE 专家并行
+
+> Paper：GShard，Fast MoE，Faster MoE，PR-MoE，SE-MoE，Switch Transformer
+
+* 例如：一共 24 个 experts，并行度为2。那么会有一半的 GPU 处理 12 个 experts，另外一半处理另外 12 个；如果并行度为 1，那么意味着每个 GPU 都完全包含了 24 个 experts
+* MoE routing 原理：回顾一下 transformer 原理
+    * 因为 Transformer 权重的作用其实是把 `d1` 维的隐变量变为 `d2` 维度的，所以 token 和 token 之间的处理是可以在时序上独立进行的（但共享权重）。Transformer 为了提高运行效率，会让多个 token 组成一个序列，然后几个序列组成 batch 一起吃进去，所以起来像是并行在执行。MoE 要做的是把这一组组的序列先合并再按 token 拆开，分给不同的专家（所以要 reshard）
+* MoE routing 流程
+    * input tensor 大小：(G, S, M)，分别为：group 的数量、每个 group 里面序列长度（或 token 的数量）、每个 token 的隐变量尺寸
+    * Algo2 第一行是在计算每个 token 分到每个专家上的置信度。矩阵相乘使得在 feature dimension 上吸收了（M 维度）。权重 `wg` 对应的 `ME` 没下划线，表示没有在设备上进行 shard。而 `G` 代表不同的 group，代表在设备上 sharded，也即不同设备分别计算了自己拿到的 batch 要分给哪些专家  
+    * Algo2 第三/四行 见 第二张图：input 要先和 mask 做爱因斯坦求和，再 all-to-all reshard
+        * 其中爱因斯坦求和时，因为不同机器按照 group 切分数据，`(GSEC, GSM)` 在每个机器上其实是 `(SEC，SM)`；然后因为 `S` 这个维度代表一个 group 中 token 的数量，而上面说到 token 被分配给不同 expert 了，所以 `S` 这个维度消失了，每台机器上实际在做 `(SEC，SM) -> ECM`
+
+        * 加上跨机器这个维度，`ECM` 变为 `GECM`，然后 `E-G` 进行 `reshard` 变为 `EGCM` 
+
+        <p align="left" >
+        <img src="./pictures/gshard.png" width="800">
+        </p>
+        <p align="left" >
+        <img src="./pictures/gshard2.png" width="800">
+        </p>
+
+
+### 总结
+* 一般对通信量：Tensor并行 > 数据并行 > pipeline并行
+    * 其中 数据并行和 pipeline并行 的比较，见 https://www.high-flyer.cn/blog/model_parallel-2/ ，当 Transform 变宽时，pipeline 并行通信量上更占优。**但这个规则不是死的，见下文**
+    * 经验：
+        * **首先满足 tensor 并行，把最高速的 intra-server gpu 通信留给 tensor 并行**
         * 然后考虑 数据并行 / pipeline并行，其中 pipeline并行 是为了使得能够适应 GPU memory（对于超大模型）
-    * 例子一：如下图两个八卡 node，那么
-        * node 之间做的是 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行  
-        * 但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
+* 例子一：如下图两个八卡 node，那么
+    * node 之间做的是 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行  
+    * 但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
 
-            <p align="left" >
-            <img src="./pictures/megatron_parr.jpg" width="600">
-            </p>
+        <p align="left" >
+        <img src="./pictures/megatron_parr.jpg" width="600">
+        </p>
 
-    * 例子二：Pangu-Alpha 训练的并行方式：
-        * 同一个 server 的卡之间，tensor并行
-        * 一个 rack 的 server 之间，pipeline 并行
-        * 不同 rack 之间，数据并行
-        * PS：pangu 的训练是用带宽最小的 Cross-Rack 通信做了数据并行，看起来和上面说的 `数据并行通信量一般 > pipeline并行` 矛盾了
-            
-            * **Paper 里面做了解释，数据并行的通信 可以和BP 在时间上重叠，所以不紧要，怎么方便怎么来**：Deploying data parallelism and optimizer parallelism across racks is due to that the induced communication operators are not on the critical path of the training iteration, which could be fused and overlapped with backward propagation to improve the performance
+* 例子二：Pangu-Alpha 训练的并行方式：
+    * 同一个 server 的卡之间，tensor并行
+    * 一个 rack 的 server 之间，pipeline 并行
+    * 不同 rack 之间，数据并行
+    * PS：pangu 的训练是用带宽最小的 Cross-Rack 通信做了数据并行，看起来和上面说的 `数据并行通信量一般 > pipeline并行` 矛盾了
         
-            <p align="left" >
-            <img src="./pictures/pangu-alpha-parral.png" width="800">
-            </p>
+        * **Paper 里面做了解释，数据并行的通信 可以和BP 在时间上重叠，所以不紧要，怎么方便怎么来**：Deploying data parallelism and optimizer parallelism across racks is due to that the induced communication operators are not on the critical path of the training iteration, which could be fused and overlapped with backward propagation to improve the performance
+    
+        <p align="left" >
+        <img src="./pictures/pangu-alpha-parral.png" width="800">
+        </p>
+
+<br>
+
+## 参数量、计算量、内存
+### 参数量
+* Embedding layer 参数量：`(seq_len + vocab_size) * hidden_size`
+* 每层 transformer layer：`hidden_size*hidden_size*12`，和 h 是平方关系
+    * Attention：`hidden_size*hidden_size*4` （QKV 3，concat 之后的 linear 1）
+    * FFN：一个 hidden layer，两个权重：`hidden_size*hidden_size*4*2` 
+* 所以 seq_len=4096, vocab_size=116444, hidden_size=768，12层
+    * 两个 embedding layer 参数量一共 176M
+    * transformer layer 参数量 81M
+### 计算量
+* FC，transformer layer 参数量 和 FLOPS 都是 h 的平方关系：可以粗略估计：参数量几倍、运算量几倍（扣除 embedding layer 后）
+### 内存
+训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
+* 模型和优化器参数：参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
+* Activation buffer，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
+    * 优化 activation，对长序列、大batch很有帮助
+    * 见下图：如果不进行 softmax recompute 的话，和 seq_len 成二次方；经过 recompute 优化后可以变为一次方，`O(sbh)`，且和 batchsize 相关。下面右图 micro_batch_size 分别为 1,4,4,4
+    
+        <p align="left" >
+        <img src="./pictures/memory_comp.png" width="900">
+        </p>
+
+* 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题
+    * 100B 模型，模型和优化器参数需要 1600GB 显存；activation 需要 4800GB 的话，一共 6400GB，100张 A100 就能放下
+    * LLama paper：65B模型，1.4T token，需要 100w 个 A100 hour。换算下，100B模型，1T token，100张卡，要训练 400 多天，太慢了，所以一般都是千卡起步
 
 <br>
 
@@ -187,7 +243,8 @@
     * TensorFlow 的最初设计里，无论是控制还是数据传输都基于 gRPC 实现，也不能调用 RDMA，有性能瓶颈（后来有了 networking TF 插件改善了）
 
 * Communication Primitives 通信原语：Broadcast, Scatter, Gather, Reduce, Reduce-Scatter, All-gather, All-reduce, All-scatter, All-to-All (MoE 中数据 dispatch 用到), Barrier
-    * [这个链接](https://www.cnblogs.com/marsggbo/p/11497780.html) 和 GShard 论文有解释 
+    * [这个链接](https://downey.io/notes/omscs/cse6220/distributed-memory-model-mpi-collectives/) 和 GShard 论文有解释
+    * 对偶算子：gather/reduce，all-gather/scatter-reduce 
 
 
 ### Megatron
@@ -211,12 +268,13 @@
 Using Megatron-LM，**在第一代基础上，加上了 pipeline 并行（用的 PipeDream-Flush）**
 
 ### Deepspeed 
+
 * Zero 
-    * 训练时，需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP)，其中 Adam 的 optimizer states 量最大，parameters 反而不大
-        * 参数量为 N 的模型，训练至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），还额外需要一个 buffer 去存储每层 activation
-        * **也即 100B 模型，训练需要 1600GB 显存**（100张卡就够放下了，但训练太慢，所以大模型还是 compute-throughput-bound，memory 不是最主要的问题）
+
+
     * 所以 ZeRO 提出：不用每个数据并行的节点上都存上所有层的相关信息；activation 的存储也可以 re-compute 省掉
-    * 通俗易懂的讲解：[ZeRO & DeepSpeed: New system optimizations enable training models with over 100 billion parameters](https://www.microsoft.com/en-us/research/blog/zero-deepspeed-new-system-optimizations-enable-training-models-with-over-100-billion-parameters/)
+
+    * 通俗易懂的讲解：**[ZeRO & DeepSpeed: New system optimizations enable training models with over 100 billion parameters](https://www.microsoft.com/en-us/research/blog/zero-deepspeed-new-system-optimizations-enable-training-models-with-over-100-billion-parameters/)**
 * DeepSpeed 的本质：略微降低的效率去节省显存
     * DeepSpeed 核心是 `ZeRO`，本质上是一种 “节省显存” 的 **数据并行**，即：在数据并行下如何以更少的机器去跑更大的模型。DeepSpeed 假设了单层参数量可以在单张显卡上放得下，如果不满足这个假设，那么仍然需要使用 tensor并行，DeepSpeed 的 tensor并行是通过调用 Megatron 来实现的
     * 根据 NVIDIA 最新的那篇论文（链接：https://arxiv.org/abs/2104.04473 )，Megatron 在大规模训练的效率是超过 DeepSpeed 不少的
@@ -242,6 +300,7 @@ Tensor 并行还是调用的 Deepspeed
 * [Mindspore：Distributed Training Design](https://www.mindspore.cn/doc/note/en/r1.1/design/mindspore/distributed_training_design.html) 
     * 包含三种：auto、semi-auto、hybrid
     * semi-auto 是指定了切分方式的，就按指定的来，没指定的就框架 auto
+        * 例如一个 BN 接一个 MatMul，分别是数据并行、模型并行。那中间会存在张量重排，会用到 allgather + concat。Mindspore 会自动取搜索出这个通信策略
     * hybrid 是全手动写切分逻辑：https://www.mindspore.cn/tutorial/training/en/r1.1/advanced_use/save_load_model_hybrid_parallel.html 
 
 
