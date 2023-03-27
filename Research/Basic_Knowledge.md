@@ -12,14 +12,15 @@ C，C++，java 这些高级语言都是图灵完备的，有 if else / for / go 
 <br>
 
 
-# 深度学习配置
+# 深度学习知识
 ## Optimizer
 ### Adam，L2, weight decay 和 AdamW
 > https://www.jiqizhixin.com/articles/2018-07-03-14   
 
-* 背景：2014年被提出的Adam优化器的收敛性被证明是错误的，之前大部分机器学习框架中对于Adam的权重衰减的实现也都是错误的。`Fixing Weight Decay Regularization in Adam` （ICLR 2017 Best Paper）提出了一种新的方法用于修复Adam的权重衰减错误，命名为AdamW，Pytorch 中也有一个优化器叫 AdamW
-* L2正则化和权重衰减在大部分情况下并不等价，只在 SGD 优化的情况下是等价的。而大多数框架中对于 `Adam+L2` 正则使用的是权重衰减的方式，两者不能混为一谈
+* 背景：2014年被提出的 Adam 优化器的收敛性被证明是错误的，之前大部分机器学习框架中对于Adam的权重衰减的实现也都是错误的。`Fixing Weight Decay Regularization in Adam` （ICLR 2017 Best Paper）提出了一种新的方法用于修复 Adam 的权重衰减错误，命名为 AdamW，Pytorch 中也有一个优化器叫 AdamW
+* L2正则化和权重衰减在大部分情况下并不等价，只在 SGD 优化的情况下是等价的。而大多数框架中对于 `Adam+L2` 正则使用的是权重衰减的方式，但事实上两者不能混为一谈
 
+<br>
 
 ## Unstructure Pruning: Lottery Hypothesis
 * `The Lottery Hypothesis`：一个网络，先train到收敛，然后我剪枝，剪枝之后呢，我把那些还没有被剪的参数重新初始化到刚开始初始化的样子，然后再train，发现效果还挺好，有时候甚至更好。和之前的 pruning 的区别是，pruning 是 `先train网络 --> prune --> 再 finetune pruned 过后的网络（整个过程重复多次）`；Lottery 直接用的是最古老的原网络的权重
@@ -149,6 +150,8 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
 </p>
 
 
+<br>
+
 ## ResNet 
 * 常规的用于 ImagenNet 的 Resnet 是 224*224
     * 网络的前两层 kernel size 分别为 7 和 3，并降低采样了两次，使得输入第一个 Resnet Block 前的尺寸变为了 56*56
@@ -156,6 +159,7 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
 * ResNet for CIFAR：
     * 输入尺寸是 32*32，一共经历两次 `stride=2`，在 avg pooling 之前的输出尺寸是 `(N, feat_dim, 8, 8)`，参见：[链接1](https://github.com/KaihuaTang/Long-Tailed-Recognition.pytorch/blob/master/classification/models/ResNet32Feature.py)，[链接2](https://zhuanlan.zhihu.com/p/144665196)
 
+<br>
 
 ## 简单的视频检测网络
 可以用 3DCNN：https://dl.acm.org/doi/pdf/10.1145/3213344.3213351
