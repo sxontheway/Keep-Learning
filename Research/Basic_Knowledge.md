@@ -224,10 +224,11 @@ class C3D_reduced(nn.Module):
 > https://zhuanlan.zhihu.com/p/80986272
 
 <p align="center" >
-	<img src="./pictures/transformer.jpg"  height="500">
+	<img src="./pictures/transformer.png"  width="900">
 </p>
 
 ## 一些细节  
+
 ### Positional Embedding:  
 * Word embedding 和 positional encoding （位置的正余弦函数值）相加  
     * work 和 position embedding 尺寸都是 `(nbatches，L, 512)`，其中 L 为 seq_length，512 为 embedding_size
@@ -249,9 +250,15 @@ class C3D_reduced(nn.Module):
 	<img src="./pictures/encoder2.png"  width="400">
     </p>
 
+### Decoder
+* 说 GPT 系列是 decoder-only 的意思：是说训练方式和 decoder 一样，只能看见上文，没有下文，不是说网络结构
+    * 上图右边是 GPT-1 怎样将 decoder-only 用于 NLU 任务：先做 next word prediction 的预训练，预训练好微调 linear layer + softmax 做分类
+* 网络结构上，decoder-only 的 GPT 系统，其实更像是用了 encoder block，而不像 decoder block 有中间那个 multi-head attention
+    
+
 ### Normalization 层
 * LayerNorm
-    * 上图里面是最早的 `attention is all you need` 里面中的结构，用的是 Post-Norm
+    * 上图左边是最早的 `attention is all you need` 里面中的结构，用的是 Post-Norm
         * 现在最新的 GPT 多用 Pre-Norm，会有更稳定的梯度分布，见下图 PaLM 文章中的 “serialized” 版本：  
         https://zhuanlan.zhihu.com/p/480783670 
 
