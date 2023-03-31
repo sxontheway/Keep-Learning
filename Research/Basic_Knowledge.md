@@ -258,8 +258,8 @@ class C3D_reduced(nn.Module):
 
 ### Normalization 层
 * LayerNorm
-    * 上图左边是最早的 `attention is all you need` 里面中的结构，用的是 Post-Norm
-        * 现在最新的 GPT 多用 Pre-Norm，会有更稳定的梯度分布，见下图 PaLM 文章中的 “serialized” 版本：  
+    * 上图左边是 `attention is all you need`，右边是 GPT-1，图里面显示的是 Post-Norm
+        * 但现在最新的模型一般默认 Pre-Norm，因为会有更稳定的梯度分布，见下图 PaLM 文章中的 “serialized” 版本：  
         https://zhuanlan.zhihu.com/p/480783670 
 
             <p align="center" >

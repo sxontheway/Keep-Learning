@@ -115,7 +115,12 @@
                 <img src="./pictures/seq_parr.png" width="600">
                 </p>
         * 方法二：recompute activation
-            * 详见 paper：softmax/dropout/attention over V 的激活很大，但 FLOPs 不大，可以对它们进行重计算即可；其他 matrix 乘法相关部分就不进行重计算了，这样能减小 memory，但不增加很多计算开销
+            * 详见上面的 paper：softmax/dropout/attention over V 的激活占存储很大，但 FLOPs 不大，可以对它们进行重计算即可；其他 matrix 乘法相关部分就不进行重计算了，这样能减小 memory，但不增加很多计算开销
+
+                <p align="left" >
+                <img src="./pictures/qkv_detail.png" width="500">
+                </p>
+
 
     * 1d 基础上再切分 batch：Optimus_An Efficient 2D Method for Training Super-Large Deep Learning
 * 其他  
@@ -218,13 +223,20 @@
 ### 内存
 训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
 * 模型和优化器参数：参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
-* Activation buffer，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
-    * 优化 activation，对长序列、大batch很有帮助
-    * 见下图：如果不进行 softmax recompute 的话，和 seq_len 成二次方；经过 recompute 优化后可以变为一次方，`O(sbh)`，且和 batchsize 相关。下面右图 micro_batch_size 分别为 1,4,4,4
-    
+    * 混合精度训练，FP 和 BP 过程都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，cast 成 fp32后再缩小
+
         <p align="left" >
-        <img src="./pictures/memory_comp.png" width="900">
+        <img src="./pictures/auto_cast.png" width="600">
         </p>
+
+* Activation buffer，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
+    * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
+        * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
+        * 经过 recompute 优化后可以变为一次方 `O(sbh)`        
+            <p align="left" >
+            <img src="./pictures/memory_comp.png" width="900">
+            </p>
+
 
 * 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题
     * 100B 模型，模型和优化器参数需要 1600GB 显存；activation 需要 4800GB 的话，一共 6400GB，100张 A100 就能放下
