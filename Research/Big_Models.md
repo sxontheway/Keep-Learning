@@ -211,6 +211,73 @@
 
 <br>
 
+## fp32/fp16/bf16、混合精度、训练溢出
+> [好文：如何解决混合精度训练大模型的局限性问题](https://www.51cto.com/article/746136.html)  
+
+### fp32/fp16/bf16
+* fp32/fp16 绝大多数硬件都支持，所以可以用混合精度训练提高吞吐；但 bf16/tf32 只有新的硬件才支持，V100/昇腾910等不支持
+* bf16 具有和 fp32 相同的 range，但精度（也就是两个最小单位之间的间隔）降低
+    * bf16/fp32 进行混合精度训练，可以减少溢出几率
+    * 对于大型 transformer，bf16 损失的精度被证明不怎么影响收敛
+* tf32 是 A100 中引入的新格式，用于替代 fp32，也即可以全程 tf32 训练或 bf16/tf32 混合训练
+
+<p align="center" >
+<img src="./pictures/fp1632.png" width="600">
+</p>
+
+### 混合精度训练的要点
+bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp16 range 更大，所以比 fp16/fp32 混合训练稳定性更高。但 fp16/fp32 混合训练 GPT-3 大模型也是完全可行的，只要解决可溢出问题，有以下几个要点：
+   
+* fp32权重备份 + loss scaling 解决下溢出问题
+    * 对 loss 进行 scale：见左图
+    * 对 gradient 进行 scale：见右图  
+    由于链式法则的存在，对梯度做直接做 scale 也是可以的，反而更划算。这样，所有前向后向都可以全用 fp16 (activation、weight、gradient 全用 fp16)，只在进行更新的时候，才用 fp32 和 master weight 更新
+
+        <p align="center" >
+        <img src="./pictures/mixed_precision.png" width="1000">
+        </p>
+
+* 跳过 NaN 的 batch 
+    * dynamic loss scale (PyTorch 中采用的这种方案）  
+    在一个 window 内，如果没有 NaN，loss scale 变大（例如乘2）；如果有 NaN，则降低 loss scale，并跳过 NaN 的 batch，不更新梯度
+    * 或将 INF 值改为 FP16 的最大值（需要实际验证）
+
+* 基于 Tensorcore 进行矩阵乘加：在某些模型中，fp16 矩阵乘法的过程中，需要利用 fp32 来进行矩阵乘法中间结果的累加，以减少加法过程中的舍入误差，保证精度不损失   
+这也是为什么有些人说，只有 Volta 之后有 TensorCore 的 GPU (例如V100)，才能利用 fp16+混合精度来进行加速。其他 GPU 如果硬要用 fp16，只能做 fp16 的 multiply-add operation，会有较大精度损失
+
+    <p align="center" >
+    <img src="./pictures/tensorcore.png" width="400">
+    </p>
+
+### 溢出案例分析
+* 有时，当 loss scale 降为 1，然后不再上升；同时训练 loss 要么跳涨，要么停滞不下降（相当于没在训练了）    
+    * 解决方案：可以改变超参，**降低lr**，或** 增大 epsilon**（但这样做会损失一部分优化器自适应学习率的能力）
+    * 原因如下：
+        * loss scale 不再上升：因为每个 window 中都有 Nan
+        * loss 跳涨：主要来源于 Adam 的缺陷
+            * Adam 相比 SGD 的优势是会根据梯度自适应学习率，但当梯度的二阶矩过小，导致分母 `v_t+ε` 在 fp16 中下溢出变为0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
+
+            <p align="center" >
+            <img src="./pictures/3optimizer.png" width="500">
+            </p>
+
+            * 当出现一个难度较大的 batch，在这个 batch 中出现了 NaN，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，之后 batch 的梯度可能就一直下溢了
+        * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 保持为1，使得模型几乎不再更新    
+
+* 对 softmax 改造
+    > [如何防止softmax函数上溢出 (overflow) 和下溢出 (underflow)](https://www.codelast.com/%E5%8E%9F%E5%88%9B-%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2softmax%E5%87%BD%E6%95%B0%E4%B8%8A%E6%BA%A2%E5%87%BAoverflow%E5%92%8C%E4%B8%8B%E6%BA%A2%E5%87%BAunderflow/)
+
+    用 f(x-max) 代替 f(x)；再加上 logsoftmax；分子避免了下溢、分母避免了上溢
+
+    <p align="center" >
+    <img src="./pictures/logsoftmax.png" width="1000">
+    </p>
+
+* 如何尽可能早地发现溢出的可能？  
+如上所述，当梯度下溢加上 adam，反而可能变成上溢。一般经验是，在训练前期，可以用一个 Tensor Collection Hook (TCH)，收集溢出比率，比率在 1% 以下并保持稳定而非上升趋势，后期发生溢出可能性较小
+
+<br>
+
 ## 参数量、计算量、内存
 ### 参数量
 * Embedding layer 参数量：`(seq_len + vocab_size) * hidden_size`
@@ -220,37 +287,6 @@
 * 所以 seq_len=4096, vocab_size=116444, hidden_size=768，12层
     * 两个 embedding layer 参数量一共 176M
     * transformer layer 参数量 81M
-### fp32 / fp16 / bf16
-> [好文：如何解决混合精度训练大模型的局限性问题](https://www.51cto.com/article/746136.html)  
-
-fp32 单精度浮点数是精度上最理想的方案，但为了提高吞吐，一般用 16 位方案：
-* fp16+fp32 混合训练：有以下几个注意点要做
-    * fp32权重备份 + loss scaling 解决下溢出问题（右上图）
-        * loss scaling 是对计算出来的 loss 进行scale。由于链式法则的存在，对梯度做直接做 scale 也是可以的，更划算。这样，所有前向后向都可以全用 fp16 (activation、weight、gradient 全用 fp16)，只在进行更新的时候，才用 fp32 和 master weight 更新（右下图）
-
-            <p align="center" >
-            <img src="./pictures/auto_cast.png" width="1200">
-            </p>
-
-    * 跳过 NaN 解决上溢出：比如在 BN 中出现 NaN，一些可以尝试的方案
-        * 将 INF 值改为 FP16 的最大值
-        * 跳过该步的权重更新（PyTorch 中的 dynamic loss scale 采用的这种方案）
-        * 但注意，有时当 loss scale 已经降为 1 了，但仍然大量 NaN，导致 loss 跳涨或者 gradient 不再优化，此时可以考虑降低学习率、改造 softmax    
-        见 [如何防止softmax函数上溢出 (overflow) 和下溢出 (underflow)](https://www.codelast.com/%E5%8E%9F%E5%88%9B-%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2softmax%E5%87%BD%E6%95%B0%E4%B8%8A%E6%BA%A2%E5%87%BAoverflow%E5%92%8C%E4%B8%8B%E6%BA%A2%E5%87%BAunderflow/)：用 f(x-max) 代替 f(x)；再加上 logsoftmax；分子避免了下溢、分母避免了上溢
-
-            <p align="center" >
-            <img src="./pictures/logsoftmax.png" width="1200">
-            </p>
-
-    * 基于 Tensorcore 进行矩阵乘加：在某些模型中，fp16 矩阵乘法的过程中，需要利用 fp32 来进行矩阵乘法中间结果的累加，以减少加法过程中的舍入误差，保证精度不损失。这也是为什么说，只有 Volta 之后结构的，有 TensorCore 的 GPU (例如V100)，才能利用 fp16 混合精度来进行加速。其他 GPU 只能用 fp16 进行的 multiply-add operation，可能有精度问题
-
-        <p align="center" >
-        <img src="./pictures/tensorcore.png" width="600">
-        </p>
-
-* 全程用 bf16 训练（需要硬件支持，例如 V100/昇腾910 就不支持，A100 支持）：一些模型 bf16 可能会降低收敛性；但对于大型 transformer，bf16 影响不大
-    * 最新的硬件 A100 还有 tf32，fp16 的精度，fp32 的范围
-
 
 ### 计算量
 * FC，transformer layer 参数量 和 FLOPS 都是 h 的平方关系：可以粗略估计：参数量几倍、运算量几倍（扣除 embedding layer 后）
