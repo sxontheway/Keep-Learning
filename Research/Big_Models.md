@@ -80,6 +80,8 @@
             ChatGPT 进一步接近和人对话
             * 1.3B 的经过 RLHF 的 InstructGPT（模型来源于 GPT-3 XL，见 GPT-3 论文 Table E1），在 labeler 评测中，就可优于原始 175B GPT-3
             * **模型规模超过阈值后的涌现能力（大约100B）**：突破 scaling law
+* 其他系列：PaLM，GLM，LLama, BLOOM，OPT
+    * 其中 GLM 的训练方法特别一点：用的 Autoregressive Blank Infilling，目标是在 NLU NLG 都表现得好
 
 
 <br>
@@ -218,21 +220,51 @@
 * 所以 seq_len=4096, vocab_size=116444, hidden_size=768，12层
     * 两个 embedding layer 参数量一共 176M
     * transformer layer 参数量 81M
+### fp32 / fp16 / bf16
+> [好文：如何解决混合精度训练大模型的局限性问题](https://www.51cto.com/article/746136.html)  
+
+fp32 单精度浮点数是精度上最理想的方案，但为了提高吞吐，一般用 16 位方案：
+* fp16+fp32 混合训练：有以下几个注意点要做
+    * fp32权重备份 + loss scaling 解决下溢出问题（右上图）
+        * loss scaling 是对计算出来的 loss 进行scale。由于链式法则的存在，对梯度做直接做 scale 也是可以的，更划算。这样，所有前向后向都可以全用 fp16 (activation、weight、gradient 全用 fp16)，只在进行更新的时候，才用 fp32 和 master weight 更新（右下图）
+
+            <p align="center" >
+            <img src="./pictures/auto_cast.png" width="1200">
+            </p>
+
+    * 跳过 NaN 解决上溢出：比如在 BN 中出现 NaN，一些可以尝试的方案
+        * 将 INF 值改为 FP16 的最大值
+        * 跳过该步的权重更新（PyTorch 中的 dynamic loss scale 采用的这种方案）
+        * 但注意，有时当 loss scale 已经降为 1 了，但仍然大量 NaN，导致 loss 跳涨或者 gradient 不再优化，此时可以考虑降低学习率、改造 softmax    
+        见 [如何防止softmax函数上溢出 (overflow) 和下溢出 (underflow)](https://www.codelast.com/%E5%8E%9F%E5%88%9B-%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2softmax%E5%87%BD%E6%95%B0%E4%B8%8A%E6%BA%A2%E5%87%BAoverflow%E5%92%8C%E4%B8%8B%E6%BA%A2%E5%87%BAunderflow/)：用 f(x-max) 代替 f(x)；再加上 logsoftmax；分子避免了下溢、分母避免了上溢
+
+            <p align="center" >
+            <img src="./pictures/logsoftmax.png" width="1200">
+            </p>
+
+    * 基于 Tensorcore 进行矩阵乘加：在某些模型中，fp16 矩阵乘法的过程中，需要利用 fp32 来进行矩阵乘法中间结果的累加，以减少加法过程中的舍入误差，保证精度不损失。这也是为什么说，只有 Volta 之后结构的，有 TensorCore 的 GPU (例如V100)，才能利用 fp16 混合精度来进行加速。其他 GPU 只能用 fp16 进行的 multiply-add operation，可能有精度问题
+
+        <p align="center" >
+        <img src="./pictures/tensorcore.png" width="600">
+        </p>
+
+* 全程用 bf16 训练（需要硬件支持，例如 V100/昇腾910 就不支持，A100 支持）：一些模型 bf16 可能会降低收敛性；但对于大型 transformer，bf16 影响不大
+    * 最新的硬件 A100 还有 tf32，fp16 的精度，fp32 的范围
+
+
 ### 计算量
 * FC，transformer layer 参数量 和 FLOPS 都是 h 的平方关系：可以粗略估计：参数量几倍、运算量几倍（扣除 embedding layer 后）
 ### 内存
 训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
-* 模型和优化器参数：参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
+* fp6/fp32 混合精度训练时，模型和优化器参数大小：参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
     * 混合精度训练，FP 和 BP 过程都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，cast 成 fp32后再缩小
 
-        <p align="left" >
-        <img src="./pictures/auto_cast.png" width="600">
-        </p>
 
 * Activation buffer，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
     * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
         * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
-        * 经过 recompute 优化后可以变为一次方 `O(sbh)`        
+        * 经过 recompute 优化后可以变为一次方 `O(sbh)`    
+
             <p align="left" >
             <img src="./pictures/memory_comp.png" width="900">
             </p>
@@ -241,6 +273,21 @@
 * 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题
     * 100B 模型，模型和优化器参数需要 1600GB 显存；activation 需要 4800GB 的话，一共 6400GB，100张 A100 就能放下
     * LLama paper：65B模型，1.4T token，需要 100w 个 A100 hour。换算下，100B模型，1T token，100张卡，要训练 400 多天，太慢了，所以一般都是千卡起步
+
+<br>
+
+## 位置编码
+> https://zhuanlan.zhihu.com/p/525552086  
+* 绝对位置编码
+    * Sinusoidal 位置编码
+    * 可学习的位置编码：weight 尺寸是 `（seq_len, hidden_size）`
+    * 基于已有固定长度位置编码的层次分解
+        * 其实是利用现有位置编码做线性组合 https://kexue.fm/archives/7947 
+        * 仍需要 finetuning，效果损失可能较大
+* 相对位置编码：推理长度可以大于训练长度，大多不加在 embedding 中，而加在 attention 矩阵上了
+    * Rotary Position Embeddings
+    * XLNet：Transformer-XL   
+    * ALibi (ICLR22)：简单地在 attention 矩阵上加一个相对位置差距的矩阵，效果好于上述方法
 
 <br>
 
@@ -409,6 +456,14 @@ What Makes In-Context Learning Work?
         <img src="./pictures/zeroshot-cot0.png" width="700">
         </p>
 
+* Automatic Prompting
+    * `Large Language Models Are Human-Level Prompt Engineers`：发现了比 `让我们一步一步思考` 更好的提示词，用 log probability 作为衡量，越大的 prompt 认为越好
+
+        <p align="left" >
+        <img src="./pictures/APE.png" width="600">
+        </p>
+
+
 * 上面解决了 few shot 问题，但对于 zero shot 怎么办呢？ 可以参考 Paper：[Large Language Models are Zero-Shot Reasoners](https://arxiv.org/pdf/2205.11916.pdf)  
 
     原理是用 pipeline 诱导出一些思考过程，“Let's think step by step” 会让 LLM 尽可能生成一些思考过程，然后再将生成的 rationale 和 question 拼在一起，重新配合一个 answer 指向的 prompt 如 “The answer is ” 来激励模型生成答案
@@ -432,6 +487,10 @@ What Makes In-Context Learning Work?
                 <p align="left" >
                 <img src="./pictures/least-to-most.png" width="700">
                 </p>
+
+* 引入 self-consistency
+    * `Self-Consistency Improves Chain of Thought Reasoning in Language Models`: 思想是通过小样本链式思考生成多个不同的推理路径，并利用生成结果选择最一致的答案 
+
 
 <br>
 
