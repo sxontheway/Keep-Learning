@@ -762,12 +762,12 @@ if __name__ == "__main__":
 * `run.sh`
     ```bash
     #!/bin/bash
-    kill -9 $(ps -ef|grep receive_and_inference|gawk '$0 !~/grep/ {print $2}' |tr -s '\n' ' ')
+    kill -9 $(ps -ef|grep client|gawk '$0 !~/grep/ {print $2}' |tr -s '\n' ' ')
 
     for i in {1..2}
     do
-        python3 receive_and_inference${i}.py &
+        python3 client${i}.py &
     done
 
-    python3 send_data.py
+    python3 server.py
     ```
