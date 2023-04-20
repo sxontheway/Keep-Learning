@@ -700,4 +700,74 @@ if __name__ == "__main__":
 [函数内部的变量在函数执行完后就销毁，为什么可变对象却能保存上次调用时的结果呢？](https://www.zhihu.com/question/264533969)
 
 
+## 3.6 socket 使用
+下面的例子：server 先等 client 1 2 准备好，然后再通过用户输入发送消息
 
+* `client1.py`
+    ```python
+    import time
+    import socket
+
+    def main():
+        time.sleep(2)
+
+        # Send message if ready
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)    # TCP
+        sock.connect(('localhost', 8000))
+        sock.sendall(b'node1_ready')
+        sock.close()
+
+        # receive and process
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)     # UDP
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('', 9000))   
+        while True:
+            data, addr = sock.recvfrom(1024)
+            print("received1", data.decode())
+
+    if __name__ == "__main__":
+        main()
+    ```
+* `client2.py` 将 `node1_ready` 改为 `node2_ready`；`received1` 改为 `received2` 即可
+* `server.py`
+    ```python
+    import socket
+    import time
+
+    # Wait untile nodes are ready
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)    # TCP
+    sock.bind(('localhost', 8000))
+    sock.listen(2)
+    node1_ready, node2_ready= False, False
+    while True:
+        conn, addr = sock.accept()
+        data = conn.recv(1024)
+        if data == b'node1_ready':
+            node1_ready = True
+        elif data == b'node2_ready':
+            node2_ready = True
+        conn.close()
+        if node1_ready and node2_ready:
+            break
+
+    # broadcast input
+    print("Can start")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    while True:
+        data = input("Input: ")
+        sock.sendto(data.encode(), ('255.255.255.255', 9000))
+        time.sleep(1)
+    ```
+* `run.sh`
+    ```bash
+    #!/bin/bash
+    kill -9 $(ps -ef|grep receive_and_inference|gawk '$0 !~/grep/ {print $2}' |tr -s '\n' ' ')
+
+    for i in {1..2}
+    do
+        python3 receive_and_inference${i}.py &
+    done
+
+    python3 send_data.py
+    ```
