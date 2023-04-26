@@ -2,6 +2,8 @@
 > https://www.ruanyifeng.com/blog/2014/06/git_remote.html
 
 ## 一般流程
+> **add remote --> (pull) --> stage changes --> commit files --> push**
+
 * push之前：需要 checkout，也就是对于每个发生 change 的文件决定 discard changes 还是 stage changes；当所有需要的 change 都 staged 之后，commit with message。接下来就可以和远端 sych 了
 * push 和 pull：pull 的 change 和自己的 push 发生在一个文件时，会产生冲突，需要手动解决每个地方的 conflict
 
