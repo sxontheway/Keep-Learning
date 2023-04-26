@@ -229,10 +229,21 @@ class C3D_reduced(nn.Module):
 
 ## 一些细节  
 
-### Positional Embedding:  
-* Word embedding 和 positional encoding （位置的正余弦函数值）相加  
+### Positional Embedding 和长度外推
+> https://kexue.fm/archives/9431
+word embedding 和 positional encoding 相加得到输入网络的 embedding  
+
+* 绝对位置编码：位置的正余弦函数值作为位置编码
     * work 和 position embedding 尺寸都是 `(nbatches，L, 512)`，其中 L 为 seq_length，512 为 embedding_size
-    * word embedding 的词表大小由人定义，可以是4w，甚至10多w；position embedding 的词表大小为 seq_length，512
+    * word embedding 的词表大小由人定义，可以是 4w，甚至 10w+；position embedding 的词表大小为 seq_length，例如 512
+* 训练得到的位置编码
+    * T5 采用
+* 用相对位置编码，例如 RoPE：https://blog.csdn.net/codename_cys/article/details/124652508
+    * 通过绝对位置编码的方式实现相对位置编码，实现长度外推：用了对数 e，数学上具有美感，但效果有限：https://kexue.fm/archives/9431
+    * 主要是为了服务于 Linear Attention：Linformer: Self-Attention with Linear Complexity
+    * bias 项在其中也起了作用：https://blog.csdn.net/c9Yv2cf9I06K2A9E/article/details/130023049
+* 在 attention 矩阵上加东西：ALibi，Kerple，Sandwich
+    * 能外推的关键点：引入局部注意力
 
 ### Encoder 的结构简述
 * Multi-Head Attention （橙色）
