@@ -334,16 +334,31 @@ LayerNorm 是 transformer 中标配，是对 hidden size 求均值和方差
         ```
 
         <p align="center" >
-        <img src="./pictures/multi-head.png"  width="600">
+        <img src="./pictures/multi-head.png"  width="800">
         </p>
 
 
 * 所以 ViT, mobileVit 也都能处理不同尺寸的 input image
     > 见 [mobileVit PyTorch 代码](./mobileVit.py)  
 
-
 <br>
 
+## 增量推理/全量推理、KV Cache、Multi-Query Attention
+
+* 增量推理和全量推理
+    * 增量推理每次输入的 seq_len 为 1，而全量推理每次为从句子开始到最新位置的总长度 
+    * 假设 hidden_size 为 h，那么增联推理时，Q K^T V 的尺寸为分别为 (1,h)，(h,n+1), (n+1,h)，这里 n 就是需要 cache 的 K 和 V 的历史数据
+
+    <p align="center" >
+    <img src="./pictures/kvcache.jpg"  width="550">
+    </p>
+
+* Multi-Query Attention 见上上图，和 multi-head 的区别是 KV 多个 head 之间共用一个权重，来源于 PaLM。其初衷是服务与增量推理，而非训练
+    * PaLM 原文：Multi-query attention has a neutral effect on model quality and **training speed (Shazeer, 2019)**, but results in a significant cost savings at autoregressive decoding time. This is because standard multi-headed attention has low efficiency on accelerator hardware during auto-regressive decoding, because the key/value tensors are not shared between examples, and only a single token is decoded at a time.
+    * `Transformer Decoding: One Write-Head is All You Need` 这篇 paper 中，计算了增量推理时，multi-query 和 multi-head 的 `memory access/compute`。假设 `n=seq_len`, ``, 
+        * multi-head
+
+<br>
 
 ## Flash Attention
 > [Flash Attention 简记](https://zhuanlan.zhihu.com/p/582606847)

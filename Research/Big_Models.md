@@ -108,8 +108,8 @@
 
 * 2d 切分
     * 1d 基础上加上 sequence parallel：`Reducing Activation Recomputation in Large Transformer Models`
-        * tensor 并行如上如所示，权重被切分了，中间的计算结果的激活也被切分了（例如 XA_1，XA_2）；但每张卡的 input activation 都没被切分（例如 MLP/Attention 的最左边的 X）
-        * 这篇文章提出的方法一： sequence 并行：不产生额外数量的通信算子，只是算子类型变了；同时会将所有 activation 都切分了 
+        * tensor 并行如上如所示，权重被切分了，中间的计算结果的激活也被切分了（例如 XA_1，XA_2）；但每张卡的 input activation 都没被切分，比如 LayerNorm 和 dropout 的激活
+        * 这篇文章提出的方法一： sequence 并行：不产生额外数量的通信算子，只是算子类型变了；同时会将 LayerNorm 和 dropout 的激活 也切分了 
             * g：all-gather in FP，reduce-scatter in BP
             * g'：reduce-scatter in FP, all-gather in BP
 
@@ -299,6 +299,9 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 * Activation buffer，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
     * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
         * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
+        * tensor并行 可以把一部分激活切成 t 份，但 LayerNorm，dropout 和 input activation 不能倍切分
+        * sequence并行 进一步让 t 能够覆盖到所有激活，但仍然是 O(as^2bh)，a 是注意力头数量
+            * `multi-head attention 中 s*s 的矩阵每个注意力头会出现一次，一共会出现 a 次；模型并行的话，每张卡需要存 a/t 个 s*s 矩阵` 
         * 经过 recompute 优化后可以变为一次方 `O(sbh)`    
 
             <p align="left" >
