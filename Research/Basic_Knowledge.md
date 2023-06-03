@@ -287,6 +287,13 @@ LayerNorm 是 transformer 中标配，是对 hidden size 求均值和方差
 </p>
 
 
+### 降低 Transformer 的计算复杂度
+* Linear Transformer 方法：Efficient Attention, Linformer, Linear Transformer, Reformer, RWKV
+    > https://0809zheng.github.io/2021/07/12/efficienttransformer.html  
+
+* 通过矩阵乘法结合率，改造 Softmax 
+    > https://kexue.fm/archives/7546 
+
 <br>
 
 ## 和 LSTM 的对比

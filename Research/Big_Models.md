@@ -273,8 +273,12 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     <img src="./pictures/logsoftmax.png" width="1000">
     </p>
 
-* 如何尽可能早地发现溢出的可能？  
+* 如何尽可能早地发现溢出的可能？    
 如上所述，当梯度下溢加上 adam，反而可能变成上溢。一般经验是，在训练前期，可以用一个 Tensor Collection Hook (TCH)，收集溢出比率，比率在 1% 以下并保持稳定而非上升趋势，后期发生溢出可能性较小
+
+* 出现 loss spike 的原因？  
+见 PaLM Paper 5.1节，不一定是只因为数据不好，可能来源于模型某种状态和数据的耦合。因为用导致 spike 的数据但换一个 ckpt 就不会产生
+
 
 <br>
 
@@ -329,6 +333,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     * ALibi (ICLR22)：简单地在 attention 矩阵上加一个相对位置差距的矩阵，效果好于上述方法
 
 <br>
+
 
 ## 分布式深度学习框架
 ### Overview  
