@@ -357,7 +357,7 @@ LayerNorm 是 transformer 中标配，是对 hidden size 求均值和方差
     * 假设 hidden_size 为 h，那么增联推理时，Q K^T V 的尺寸为分别为 (1,h)，(h,n+1), (n+1,h)，这里 n 就是需要 cache 的 K 和 V 的历史数据
 
     <p align="center" >
-    <img src="./pictures/kvcache.jpg"  width="550">
+    <img src="./pictures/incremental_inference.png"  width="550">
     </p>
 
 * Multi-Query Attention 见上上图，和 multi-head 的区别是 KV 多个 head 之间共用一个权重，来源于 PaLM。其初衷是服务与增量推理，而非训练
