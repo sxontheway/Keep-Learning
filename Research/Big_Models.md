@@ -264,7 +264,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
             * 当出现一个难度较大的 batch，在这个 batch 中出现了 NaN，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，之后 batch 的梯度可能就一直下溢了
         * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 保持为1，使得模型几乎不再更新    
 
-* 对 softmax 改造
+* 对 softmax 进行数值稳定性改造
     > [如何防止softmax函数上溢出 (overflow) 和下溢出 (underflow)](https://www.codelast.com/%E5%8E%9F%E5%88%9B-%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2softmax%E5%87%BD%E6%95%B0%E4%B8%8A%E6%BA%A2%E5%87%BAoverflow%E5%92%8C%E4%B8%8B%E6%BA%A2%E5%87%BAunderflow/)
 
     用 f(x-max) 代替 f(x)；再加上 logsoftmax；分子避免了下溢、分母避免了上溢
@@ -279,6 +279,8 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 * 出现 loss spike 的原因？  
 见 PaLM Paper 5.1节，不一定是只因为数据不好，可能来源于模型某种状态和数据的耦合。因为用导致 spike 的数据但换一个 ckpt 就不会产生
 
+* 出现 loss 越训练越高？  
+产生的原因可能和 loss spike 不同，可以尝试改变超参，减小 lr，增大 warm up step
 
 <br>
 
@@ -313,7 +315,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
             </p>
 
 
-* 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题
+* 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题（非超长）
     * 100B 模型，模型和优化器参数需要 1600GB 显存；activation 需要 4800GB 的话，一共 6400GB，100张 A100 就能放下
     * LLama paper：65B模型，1.4T token，需要 100w 个 A100 hour。换算下，100B模型，1T token，100张卡，要训练 400 多天，太慢了，所以一般都是千卡起步
 
@@ -331,9 +333,84 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     * Rotary Position Embeddings
     * XLNet：Transformer-XL   
     * ALibi (ICLR22)：简单地在 attention 矩阵上加一个相对位置差距的矩阵，效果好于上述方法
+        * ALibi + Flash Attention 实现 80k 序列长度：https://www.mosaicml.com/blog/mpt-7b 
 
 <br>
 
+## 增量推理/全量推理、KV Cache
+
+* 增量推理和全量推理
+    * 增量推理每次输入的 seq_len 为 1，而全量推理每次为从句子开始到最新位置的总长度 
+    * 假设 hidden_size 为 h，增量推理时，Q/K^T/V 的尺寸为分别为 (1,h)，(h,n+1), (n+1,h)，这里 n 就是需要 cache 的 K 和 V 的历史数据
+
+    <p align="center" >
+    <img src="./pictures/incremental_inference.png"  width="550">
+    </p>
+
+* LLM 推理时分为 `prefill阶段 (吃prompt）`、`decoding阶段（串行输出）`
+    * prefill 阶段，内存占用随 prompt 长度二次增长，`二次方显存是主要矛盾`；时间（计算复杂度）也应该是二次，但相比 decoding 的时间，不是主要矛盾
+    * decode 阶段，利用增量推理内存占用是线性增长，推理时间也是线性；这时 `decode time 是主要矛盾`
+
+<br>
+
+
+## 降低 Multi-Head Attention 的平方复杂度
+> 目标是高效计算 `Output = Softmax(QK^T)V`，并降低显存，QKV 和 output 尺寸都为 `N*d`  
+
+### 需要重训练
+* RMKV
+    * https://zhuanlan.zhihu.com/p/514840332
+    * 串行版本利用上一个时间点的计算结果，实现 O(n) 的注意力；但其实
+    * 方法并不新颖：https://kexue.fm/archives/7546 中 自回归生成 一节有提到类似思想
+
+* 利用矩阵乘法结合律，QKV 矩阵乘法先计算 KV，并用一个另外的核函数换掉 QK 的 Softmax
+    * `Efficient Attention: Attention with Linear Complexities`
+    * `Hydra Attention: Efficient Attention with Many Heads`
+
+* Linear Transformer 方法（从局部稀疏化、或降低 QK^T 的秩出发）：Linformer, Linear Transformer, Reformer
+    > https://0809zheng.github.io/2021/07/12/efficienttransformer.html  
+
+
+### 不需要重训练（数学上等价）
+> 主要降低了空间复杂度，没降低计算复杂度；甚至因为重计算有增加，但减少了很多 memory access，所以也能加速
+  
+* Self-attention Does Not Need O(n^2) Memory：https://zhuanlan.zhihu.com/p/445016136   
+
+    * 原理       
+        原始 attention layer 的计算步骤是计算出 `S=QK^T` 矩阵，再按行算 softmax。但这个 S 矩阵尺寸是 `(batch_size, num_head, seq_len, seq_len)`，当 seq_len 是 64k 时，显存占用是大问题  
+
+        <p align="center" >
+        <img src="./pictures/standard_atttention.png"  width="700">
+        </p>
+
+        所以考虑，能不能不存这个非常大的 S 矩阵。其实是可以的，基本原理如下把 softmax 的并行计算变成串行。一个长度为 N 的向量，计算 softmax 实际上只需要 O(1) 外部存储   
+
+        <p align="center" >
+        <img src="./pictures/flashattention.png"  width="1000">
+        </p>
+
+    * 实现   
+        * 上上图中，QKV 都是 N*d 尺寸，但 S 矩阵其实是按行取用的
+            * 训练中，`seq_len=N`，但 softmax 可以按行计算，P 和 V 相乘得到 O 也可以按行
+            * 增量推理中，天然 `seq_len=1`，S 矩阵尺寸为 1*N
+            * 每一行的存储最大可以优化到 O(1)；所以不管训练还是推理，整个 attention layer 最大可以优化到 O(1) 空间复杂度，但这会拉低计算并行度
+        * 实际实现中，每次计算 `O(sqrt(N))` 个元素的 softmax 值（也即上图每次计算两个），空间复杂度为 `O(sqrt(N))`
+
+* Flash Attention
+    > [Flash Attention 简记](https://zhuanlan.zhihu.com/p/582606847)  
+    > 和 `Self-attention Does Not Need O(n^2) Memory` 相比，基本原理差不多，但把 batch_size 上的并行也考虑到了，算是上篇文章的一种 concrete 的工程实现
+
+    相比原始 Attention，Flash Attention 用了两个技巧减少 attention layer 所需要的存储，并提高运算速度：Tiling 和 operator fusion  
+    * `QK^T` 可以用 Tiling 矩阵分块来做。矩阵运算 `C=AB`，把矩阵 AB 分块，`C_ij = A 的第i行 和 B 的第j列的内积`，见 [Loop Tiling 的 CUDA 代码实现](../MLSys/CUDA_Program.md#with-shared-memory) 
+    * Attention 矩阵的 softmax 是按行算的，`Softmax(QK^T)` 尺寸为 `N*N`，相当于 Output 的每一行都是 V 的 N 个 d 维向量按 softmax 结果做线性组合
+    * 而按行计算 softmax 这个需求，其实可以和矩阵乘的 tiling 做 operator fusion。做矩阵乘法时候，顺便把 softmax 也算了
+
+
+* ByteTransformer
+    * 因为 FlashAttention 只用一个 threadblock，在 bs 较小时，可能用不满硬件资源；这篇文章利用多个 block，对不同 seq length 长度支持更好
+    * 但在 bs 较大时，FlashAttention 还是有优势
+
+<br>
 
 ## 分布式深度学习框架
 ### Overview  

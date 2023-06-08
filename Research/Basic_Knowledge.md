@@ -287,13 +287,6 @@ LayerNorm 是 transformer 中标配，是对 hidden size 求均值和方差
 </p>
 
 
-### 降低 Transformer 的计算复杂度
-* Linear Transformer 方法：Efficient Attention, Linformer, Linear Transformer, Reformer, RWKV
-    > https://0809zheng.github.io/2021/07/12/efficienttransformer.html  
-
-* 通过矩阵乘法结合率，改造 Softmax 
-    > https://kexue.fm/archives/7546 
-
 <br>
 
 ## 和 LSTM 的对比
@@ -344,39 +337,16 @@ LayerNorm 是 transformer 中标配，是对 hidden size 求均值和方差
         <img src="./pictures/multi-head.png"  width="800">
         </p>
 
+    * 所以 ViT, mobileVit 也都能处理不同尺寸的 input image
+        > 见 [mobileVit PyTorch 代码](./mobileVit.py)  
 
-* 所以 ViT, mobileVit 也都能处理不同尺寸的 input image
-    > 见 [mobileVit PyTorch 代码](./mobileVit.py)  
 
-<br>
+* Multi-head Attention 和 Single-head 对比
+    * 两者在矩阵乘法计算量上是相同的，但是 multi-head 会产生 num_head 个 attention matrix，在这里加大了模型容量；另一方面，Multi-head 相比 Single-head 另一方面将特征空间强制分成 num_head 个子空间所以效果好过 Single-head
 
-## 增量推理/全量推理、KV Cache、Multi-Query Attention
-
-* 增量推理和全量推理
-    * 增量推理每次输入的 seq_len 为 1，而全量推理每次为从句子开始到最新位置的总长度 
-    * 假设 hidden_size 为 h，那么增联推理时，Q K^T V 的尺寸为分别为 (1,h)，(h,n+1), (n+1,h)，这里 n 就是需要 cache 的 K 和 V 的历史数据
-
-    <p align="center" >
-    <img src="./pictures/incremental_inference.png"  width="550">
-    </p>
-
-* Multi-Query Attention 见上上图，和 multi-head 的区别是 KV 多个 head 之间共用一个权重，来源于 PaLM。其初衷是服务与增量推理，而非训练
+* Multi-Query Attention 见上图，和 multi-head 的区别是 KV 多个 head 之间共用一个权重，来源于 PaLM。其初衷是服务与增量推理，而非训练
     * PaLM 原文：Multi-query attention has a neutral effect on model quality and **training speed (Shazeer, 2019)**, but results in a significant cost savings at autoregressive decoding time. This is because standard multi-headed attention has low efficiency on accelerator hardware during auto-regressive decoding, because the key/value tensors are not shared between examples, and only a single token is decoded at a time.
-    * `Transformer Decoding: One Write-Head is All You Need` 这篇 paper 中，计算了增量推理时，multi-query 和 multi-head 的 `memory access/compute`。假设 `n=seq_len`, ``, 
-        * multi-head
+    * `Transformer Decoding: One Write-Head is All You Need` 这篇 paper 中，在增量推理时，multi-query 相比 multi-head 能降低 `memory access/compute ratio`
 
 <br>
-
-## Flash Attention
-> [Flash Attention 简记](https://zhuanlan.zhihu.com/p/582606847)
-
-Attention 目标是计算 `Output = Softmax(QK^T)V`，QKV 尺寸都为 `N*d`  
-相比原始 Attention，Flash Attention 用了两个技巧减少 attention layer 所需要的存储，并提高运算速度：Tiling 和 operator fusion  
-* `QK^T` 可以用 Tiling 矩阵分块来做。矩阵运算 `C = AB`，把矩阵 AB 分块，`C_ij = A的第i行 和 B的第j列的内积`，见 [Loop Tiling 的 CUDA 代码实现](../MLSys/CUDA_Program.md#with-shared-memory) 
-* Attention 中的 softmax 是按行算的，`Softmax(QK^T)` 尺寸为 `N*N`，相当于 Output 的每一行都是 V 的 N 个 d 维向量按 softmax 结果做线性组合
-* 而按行计算 softmax 这个需求，其实可以和矩阵乘的 tiling 做 operator fusion。做矩阵乘法时候，顺便把 softmax 也算了
-
-    <p align="left" >
-    <img src="./pictures/flashattention.png"  width="1000">
-    </p>
 
