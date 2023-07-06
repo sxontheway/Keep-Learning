@@ -167,6 +167,8 @@
 * 例如：一共 24 个 experts，并行度为2。那么会有一半的 GPU 处理 12 个 experts，另外一半处理另外 12 个；如果并行度为 1，那么意味着每个 GPU 都完全包含了 24 个 experts
 * MoE routing 原理：回顾一下 transformer 原理
     * 因为 Transformer 权重的作用其实是把 `d1` 维的隐变量变为 `d2` 维度的，所以 token 和 token 之间的处理是可以在时序上独立进行的（但共享权重）。Transformer 为了提高运行效率，会让多个 token 组成一个序列，然后几个序列组成 batch 一起吃进去，所以起来像是并行在执行。MoE 要做的是把这一组组的序列先合并再按 token 拆开，分给不同的专家（所以要 reshard）
+    * 专家并行类似一种结合了 数据并行和模型并行 的并行方法：**不同 expert 之间的权重不同，并且处理的 token 也不同**
+        * 专家并行和模型并行一起用：模型并行用在在 Attention Layer 和 FFN，专家并行只用在 FFN
 * MoE routing 流程
     * input tensor 大小：(G, S, M)，分别为：group 的数量、每个 group 里面序列长度（或 token 的数量）、每个 token 的隐变量尺寸
     * Algo2 第一行是在计算每个 token 分到每个专家上的置信度。矩阵相乘使得在 feature dimension 上吸收了（M 维度）。权重 `wg` 对应的 `ME` 没下划线，表示没有在设备上进行 shard。而 `G` 代表不同的 group，代表在设备上 sharded，也即不同设备分别计算了自己拿到的 batch 要分给哪些专家  
@@ -198,9 +200,9 @@
         </p>
 
 * 例子二：Pangu-Alpha 训练的并行方式：
-    * 同一个 server 的卡之间，tensor并行
+    * 同一个 server 的卡之间（一般是8卡），tensor并行
     * 一个 rack 的 server 之间，pipeline 并行
-    * 不同 rack 之间，数据并行
+    * 不同 rack 之间，数据并行（+优化器切分并行）
     * PS：pangu 的训练是用带宽最小的 Cross-Rack 通信做了数据并行，看起来和上面说的 `数据并行通信量一般 > pipeline并行` 矛盾了
         
         * **Paper 里面做了解释，数据并行的通信 可以和BP 在时间上重叠，所以不紧要，怎么方便怎么来**：Deploying data parallelism and optimizer parallelism across racks is due to that the induced communication operators are not on the critical path of the training iteration, which could be fused and overlapped with backward propagation to improve the performance
@@ -208,6 +210,16 @@
         <p align="left" >
         <img src="./pictures/pangu-alpha-parral.png" width="800">
         </p>
+
+* 例子三：MOE 模型的训练并行方法
+    * 用了 数据并行 + 模型并行 + 专家并行
+    * 没有 pipeline 并行了，专家并行替流水线并行在 server 之间进行；这需要 server 之间的交换机支持 all-to-all 算子
+
+        <p align="left" >
+        <img src="./pictures/moe_run.png" width="700">
+        </p>
+
+
 
 <br>
 
@@ -367,8 +379,16 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     * `Efficient Attention: Attention with Linear Complexities`
     * `Hydra Attention: Efficient Attention with Many Heads`
 
-* Linear Transformer 方法（从局部稀疏化、或降低 QK^T 的秩出发）：Linformer, Linear Transformer, Reformer
+* Linear Transformer 方法（从局部稀疏化、或降低 QK^T 的秩出发）：Linformer, Linear Transformer, Reformer, Performer, BigBird 
     > https://0809zheng.github.io/2021/07/12/efficienttransformer.html  
+
+
+* 上述方法本质上是降低 attention matrix 的秩，但不是没有副作用
+    * `Low-Rank Bottleneck in Multi-head Attention Models`，Google 这篇中说到，即便是 O(n^2) 复杂度的 transformer 结构，由于 QKV Projection，当 per_head_dim 小于 seq_len 时，也会出现低秩的问题，会对准确度造成影响。所以提出固定 per_head_dim，改变 head_num
+        * Paper 中 Table 1 做了一个实验，固定 dim=1024，增大 head_num 精度反而下降；和传统的认为 head 变多模型表现力更强正好相反
+    * 延伸开来，针对长序列，对于上述进降低 attention matrix 秩的 linear transformer 方法
+        * 当长序列 `seq_len >> per_head_dim*head_num` 时，为了控制 attention matrix 的尺寸，其尺寸是 (bs,num_head,seq_len,seq_len)，可以适当减少 head_num；一方面网络表现力可能会下降，但是缓解低秩和OOM的问题，可能利大于弊
+        * 此外，上述进一步降低 attention matrix 秩的方法，一方面在序列较短时 overhead 反而增大（特别是增量推理 seq_len 其实等于 1 时），另一方面会加剧低秩的问题，需要结合实际情况考虑
 
 
 ### 不需要重训练（数学上等价）
@@ -405,6 +425,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     * Attention 矩阵的 softmax 是按行算的，`Softmax(QK^T)` 尺寸为 `N*N`，相当于 Output 的每一行都是 V 的 N 个 d 维向量按 softmax 结果做线性组合
     * 而按行计算 softmax 这个需求，其实可以和矩阵乘的 tiling 做 operator fusion。做矩阵乘法时候，顺便把 softmax 也算了
 
+    * Block-sparse Flash Attention：固定 butterfly 形状的 attention mask
 
 * ByteTransformer
     * 因为 FlashAttention 只用一个 threadblock，在 bs 较小时，可能用不满硬件资源；这篇文章利用多个 block，对不同 seq length 长度支持更好
