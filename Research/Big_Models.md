@@ -297,7 +297,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 <br>
 
 ## 参数量、计算量、内存
-### 参数量
+### 参数量 O(12*lh^2)
 * Embedding layer 参数量：`(seq_len + vocab_size) * hidden_size`
 * 每层 transformer layer：`hidden_size*hidden_size*12`，和 h 是平方关系
     * Attention：`hidden_size*hidden_size*4` （QKV 3，concat 之后的 linear 1）
@@ -307,24 +307,36 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     * transformer layer 参数量 81M
 
 ### 计算量
-* FC，transformer layer 参数量 和 FLOPS 都是 h 的平方关系：可以粗略估计：参数量几倍、运算量几倍（扣除 embedding layer 后）
+> https://zhuanlan.zhihu.com/p/624740065
+* 前向：`l * (24bsh^2 + 4bs^2h) + 2bshV`，后向乘以2
+    * 计算 QKV：6bsh^2
+    * 计算 QK^T：2bs^2d
+    * 计算 V 的加权：2bs^2d
+    * 计算 attention 后的线性：2bsh^2
+    * 计算 FFN：8bsh^2
+    * 计算词表：2bshV
+    * Softmax：2bs^2
+* 所以长序列 `s>h` 时，`4bs^2h` 不可忽略了
+
 ### 内存
 训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
-* fp6/fp32 混合精度训练时，模型和优化器参数大小：参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
+* 静态内存：混合精度时，参数量*16
+    * fp6/fp32 混合精度训练时，模型和优化器参数大小：参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
     * 混合精度训练，FP 和 BP 过程都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，cast 成 fp32后再缩小
 
+* 动态内存
+    * 前向运行时，所需要的瞬时内存（即便用全部重计算）
+    * 存储部分 Activation buffer 用于反传，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
+        * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
+            * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
+            * tensor并行 可以把一部分激活切成 t 份，但 LayerNorm，dropout 和 input activation 不能倍切分
+            * sequence并行 进一步让 t 能够覆盖到所有激活，但仍然是 O(as^2bh)，a 是注意力头数量
+                * `multi-head attention 中 s*s 的矩阵每个注意力头会出现一次，一共会出现 a 次；模型并行的话，每张卡需要存 a/t 个 s*s 矩阵` 
+            * 经过 recompute 优化后可以变为一次方 `O(sbh)`    
 
-* Activation buffer，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
-    * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
-        * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
-        * tensor并行 可以把一部分激活切成 t 份，但 LayerNorm，dropout 和 input activation 不能倍切分
-        * sequence并行 进一步让 t 能够覆盖到所有激活，但仍然是 O(as^2bh)，a 是注意力头数量
-            * `multi-head attention 中 s*s 的矩阵每个注意力头会出现一次，一共会出现 a 次；模型并行的话，每张卡需要存 a/t 个 s*s 矩阵` 
-        * 经过 recompute 优化后可以变为一次方 `O(sbh)`    
-
-            <p align="left" >
-            <img src="./pictures/memory_comp.png" width="900">
-            </p>
+                <p align="left" >
+                <img src="./pictures/memory_comp.png" width="900">
+                </p>
 
 
 * 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题（非超长）
@@ -378,6 +390,10 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 * 利用矩阵乘法结合律，QKV 矩阵乘法先计算 KV，并用一个另外的核函数换掉 QK 的 Softmax
     * `Efficient Attention: Attention with Linear Complexities`
     * `Hydra Attention: Efficient Attention with Many Heads`
+    * 这类方法两个问题：
+        * Attention `O(n^2d)` 的复杂度变为 `O(nd^2)`，可能会增大推理的开销（增量推理 n=1）；虽然 transformer 整体的开销因为有其他层，还是 `O(d^2)`（n=1)；但需要实测
+        * 怎样显示地加 attention mask，例如实现样本隔离的功能（每个 batch 里面的 mask 都不一样，不能用写死在 cuda kernel 里面的 mask
+    * 所以一个小结，这类方法可能不太适应现在的 GPT，在 Bert 的时代是很好的工作
 
 * Linear Transformer 方法（从局部稀疏化、或降低 QK^T 的秩出发）：Linformer, Linear Transformer, Reformer, Performer, BigBird 
     > https://0809zheng.github.io/2021/07/12/efficienttransformer.html  
