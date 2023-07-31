@@ -126,6 +126,7 @@ WantedBy=multi-user.target
    * SSH 能连，但是 vscode 连不上，尝试删除 `rm -rf ~/.vscode-server`
    * 显示公钥 Permission Denied：尝试将本地的 `~/.known_host` 清理一下
    * 有可能是 server 由于网络原因不能从 vscode 源下到 vscode-server 插件，需要手动 scp 上传，见: [Remote-ssh服务器端vscode-server安装失败](https://yimiandai.me/post/remote-vscode-server/)
+   * 之前都好好的，突然有一天 vscode remote 连不上了，scp也访问不了，但root账户可以。后来查出是 password expire 的问题：因为 `/etc/login.defs` 中 `PASS_MAX_DAYS 90`，可以改成 9999。root 账户中重新设置新密码后，再登录就可以了。 
 
 <br>
 
