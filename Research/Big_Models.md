@@ -149,6 +149,16 @@
 
 ### 数据并行
 > [AI框架基础技术之深度学习中的通信优化](https://zhuanlan.zhihu.com/p/348982652)   
+* FSDP 
+    * 见 [deepspeed Zero](https://www.microsoft.com/en-us/research/blog/zero-deepspeed-new-system-optimizations-enable-training-models-with-over-100-billion-parameters)，通过权重、优化器切分让数据并行的维度也能切分权重，能进一步压低每张卡上所需要的显存
+    * 如图所示，n 是 batchsize，d 是输入隐藏维度：DP 横切输入 X，MP 横切权重 W。FSDP 切分的方式跟随 DP，例如 device 12 作为一组，device 34 作为一组，两组之间权重需要靠通信共享）
+
+        <p align="left" >
+        <img src="./pictures/fsdp.png" width="700">
+        </p>
+
+
+
 * 数据并行中通信的优化：从 Parameter Server 到 Ring All-Reduce
     * 前者是 torch 的 DP，总通信量随节点数 N 增加线性增加
     * 后者是 DDP，总通信时间随节点数 N 增加保持恒定
