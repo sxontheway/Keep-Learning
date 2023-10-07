@@ -1,27 +1,116 @@
-# 将笔记本 wifi 通过有线共享给多个设备，并能 ssh remote
+# 基本概念
+## 网络模型、协议相关
+* OSI 七层协议，与 TCP/IP 四层协议
+    * 物理层：解决了硬件之间如何通信，主要功能为定义物理设备标准（如接口类型、传
+输速率等），从而实现比特流（一种以 0、1 表示的数据流）的传输   
+    * 数据链路层：主要功能为帧编码和误差纠正控制。具体工作为接受来自物理层的数据，并封装为帧，然后传输到上一层。同样也可以将来自网络层的数据拆为比特流传输给物理层。之所以能实现纠错的功能，是因为每帧除了要传输的数据外，还包括校验信息    
+    * 网络层：在节点之间创建逻辑电路，通过 IP 寻找地址（在网络中每个节点都有一个IP）。这一层传输的数据以包为单位
+    * 传输层：负责监督数据传输的质量，处理丢包等问题
+    * 会话层：主要功能为管理网络设备的会话连接   
+    * 表示层：主要负责数据格式转换、加密等   
+    * 应用层：提供应用接口，可以为用户直接提供各种网络服务，完成各种网络工作
+
+        <p align="center" >
+            <img src="./Pictures/tcpip_osi.png", width='800'>
+            <img src="./Pictures/tcpip.png", width='600'>
+        </p>
+
+    可以看到，越往底层，越会在上层数据前面加一些数据段（例如 IP头，MAC等，TCP/UCP等）
+
+* HTTP，HTTPS
+    * HTTP，HTTPS 都是应用层协议，两者区别在于是否有用 SSL/TLS 加密；HTTP 是明文传输，
+    * TLS 是 SSL（Secure Socket Layer）的改进版本，是属于工作在 TCP传输层-应用层 之间的一种协议
+* SSL，SSH 的加密方法：非对称加密（例如RSA） + 对称加密（例如AES）
+    * SSL
+        * SSL公钥是包含在SSL证书中的，向用户公开，用于加密会话密钥；私钥由申请 SSL 证书的网站服务器端保存，用于解密由公钥加密的会话密钥。SSL加密具体过程如下:
+            * 用户访问网站，网站向用户发送SSL证书，证书中包含网站的公钥
+            * 用户使用网站的公钥加密一个随机生成的会话密钥，并发送给网站
+            * 网站使用自己保存的私钥解密用户发送来的会话密钥
+            * 网站和用户两端都获得会话密钥后，使用该密钥加密后续通信内容
+        * 回话密钥是通过 **非对称加密** 保护的，而会话内容是通过回话密钥通过 **对称加密形式** 保护的（堆成加密速度快）
+    * SSH：加密方式和 SSL 有点类似
+        * 客户端生成一对公钥和私钥，其中私钥需保密，公钥可以公开
+        * 客户端将公钥发送到想要访问的服务器，服务器存储该公钥
+        * 当客户端连接服务器时，服务器随机生成一个对话密钥，使用客户端提供的公钥加密这个对话密钥，然后发送给客户端
+        * 客户端使用自己的私钥解密出对话密钥
+        * 客户端和服务器使用这个对话密钥和对称加密算法（如AES）来加密传输实际的数据通信
+        * 数据传输结束后，对话密钥被销毁
+    * 为什么对称加密比非对称加密快？https://cloud.tencent.com/developer/article/1672173   
+    因为对称加密主要是位运算，非对称加密涉及幂运算
+
+## 路由器/交换机：两者工作的层不同  
+* 交换机（Switch）工作在数据链路层，基于 MAC 识别，能完成封装转发数据包功能  
+* 路由器工作在网络层，基于 IP 实现寻址。所以路由器要完成数据转发，需要从原始数据中拆的包比交换机多一层
+
+## 计算中心网络架构 
+> https://cloud.tencent.com/developer/article/2226221 
+* 传统三层架构：核心层、汇聚层、接入层
+    * 传统的三层机构中，路由器位于核心交换机的上层。这种构通常是为南北向流量设计的，用于处理东西向流量时，核心层和汇聚层交换机的压力很大
+        * 南北向流量：数据中心之外的客户端-数据中心内服务器之间的流量
+        * 东西向流量：数据中心内的服务器之间的流量
+    * 常用的接入交换机是 TOR（Top of Rack）交换机：一般可以支持 48、64卡之间的互联
+
+  
+* 叶-脊架构  
+    路由器放在叶节点下面；某一个 spine 出现问题，吞吐只会有轻微的下降； 
+
+    <p align="center" >
+        <img src="./Pictures/spine_leaf.png", width='600'>
+    </p>
+
+
+* 胖树架构：通过增加交换机设备数量，使得汇聚层-核心层的带宽不是收敛的（上面和下面同样大，而不是上小下大）
+
+    <p align="center" >
+        <img src="./Pictures/fat_tree.png", width='600'>
+    </p>
+
+* RDMA 
+    * InfiniteBind，RoCE，iWARP 三种。RoCE 走 Ethernet，用以太网交换机即可；IB 有专门的协议，需要用 IB 交换机
+    * 在大规模的运算场景中，IB 采用较多
+        <p align="center" >
+            <img src="./Pictures/rdma.png", width='600'>
+        </p>
+* DGXA100 SuperPOD 组网网络
+    20 台 Node 连 8 台交换机
+    <p align="center" >
+        <img src="./Pictures/superpod.png", width='600'>
+    </p>
+
+
+<br><br>
+
+
+# 实战案例
+## 将笔记本 wifi 通过有线共享给多个设备，并能 ssh remote
 > [win10将wlan网络共享给以太网](https://cloud.tencent.com/developer/article/1678119)  
 
-* 用笔记本连wifi，然后将两个设备用交换机通过网线连起来 
-* 笔记本上
-    * 允许wifi的连接共享
-    * 配置以太网 ip，dns
-* 在设备上：ifconfig查看ip，应该就能ping上；如果不行，手动配置ip和dns
+* 笔记本 A 连 wifi，然后将设备 A B 用交换机通过网线连起来 
+* 笔记本上 A
+    * WLAN 网络共享设置
+        勾选 “允许其他网络用户通过此计算机的Internet连接来连接 ”在家庭网络连接的下拉列表选项中选择以太网，
+    * 配置以太网ip，dns；选择以太网 -> internet协议版本4(TCP/IPV4) -> 属性，可配置如下   
+        ip：192.168.137.1（表示C类私网ip地址，只可用于局域网的访问，不能访问公网），子网掩码 255.255.255.0   
+        DNS 服务器地址：必须配置为 WLAN 中的 DNS 服务器 ip 地址，否则无法打开网页
+* 设备B上
+    * ifconfig查看ip，应该就能ping上；如果不行，手动配置ip和dns，如下
+    * IP和设备A同网段，默认网关设置为A的IP（192.168.137.1），子网掩码/DNS服务器和A相同
 
 <br>
 
-# 自建跳板机直连 GPU Server
+## 自建跳板机直连 GPU Server
 > [SSH Tunnelling 讲解](https://johnliu55.tw/ssh-tunnel.html)
-## 背景
+### 背景
 实验室给我们分了几台多卡 GPU Server，但是必须通过网页的跳板机才能连接，而且不支持 Vscode Remote，所以调试和传文件很不方便。于是我想绕开它的跳板机，而用自己的电脑搭建一个跳板机，这样就可以实现 Vscode Remote 和 Winscp 传文件等功能
 
-## 概念
-### Reverse Proxy 反向代理
+### 概念
+#### Reverse Proxy 反向代理
 > https://segmentfault.com/a/1190000018262215  
 
 正向代理代理的对象是客户端，例如 VPN，多（客户端）对一（服务端）  
 反向代理代理的对象是服务端，例如服务器的负载均衡（后端有很多台机器），一（客户端）对多（客户端）
 
-### Reverse Tunnel 反向隧道
+#### Reverse Tunnel 反向隧道
 > https://www.howtogeek.com/428413/what-is-reverse-ssh-tunneling-and-how-to-use-it/   
 
 * Because the original connection came from the remote computer to you, using it to go in the other direction is using it “in reverse.” And because SSH is secure, you’re putting a secure connection inside an existing secure connection. This means your connection to the remote computer acts as a private tunnel inside the original connection. Therefore, we arrive at the name “reverse SSH tunneling.”
@@ -31,7 +120,7 @@
 * 代理和隧道 https://blog.csdn.net/qq_41800366/article/details/106332555  
     隧道本身不会去处理 HTTP 请求
 
-## 实现1：用 v2ray
+### 实现1：用 v2ray
 > 适用于：PC1 用的是 ip 在内地的节点。因为有墙，所以要用 v2ray 这样的有代理功能的，理解为 PC1 上跑了一个 VPN
 
 * 因为 GPU Server 没有无法直接 SSH，但它自己能上网。所以可以找一个有公网 ip 的 PC1 （作为 ***跳板机***），让它和 GPU Server 建立一个通道。具体步骤：  
@@ -61,7 +150,7 @@
             <img src="./Pictures/vpn4.png", width=490'>
         </p>
 
-## 实现2：用 SSH Tunnel（更简单）
+### 实现2：用 SSH Tunnel（更简单）
 
 * 适用于 PC1 用 ip 在国外的没有墙的服务器（公网），因为不用代理了，只用 SSH Reverse Tunnel 即可。对于 My PC 的配置就和普通 SSH 差不多：                                                                            
     ```
@@ -94,13 +183,13 @@
 
 <br>
 
-# 在 Amazon 上搭建 VPN
-## 1. 用Amazon Lightsail创建实例
+## 在 Amazon 上搭建 VPN
+### 1. 用Amazon Lightsail创建实例
 Lightsail是亚马逊提供的适用于个人的虚拟服务器，每月收取固定的费用，而不像EC2安装使用的资源收费。  
 详见 https://www.heartnn.com/2018/05/11/deploy-shadowsocks-on-amazon-lightsail/ 
 > 在不用了之后，为避免扣款，需要 1.删除实例 2.同时删除未附着实例的静态IP
 
-## 2. 用虚拟机ssh登录Server
+### 2. 用虚拟机ssh登录Server
 这一步的目的是为了方便复制第3步的命令，详见 https://www.cnblogs.com/liubin0509/p/6211909.html
 * 给Server设置一个静态ip
 * 下载密钥，例如`this_is_a_key.pem`
@@ -109,7 +198,7 @@ Lightsail是亚马逊提供的适用于个人的虚拟服务器，每月收取�
 * 加入ssh agent，例如：`ssh-add this_is_a_key`
 * ssh连接，例如：`ssh ubuntu@52.199.223.188`  
 
-## 3. 在Server上安装Shadowsocks
+### 3. 在Server上安装Shadowsocks
 详见 https://www.heartnn.com/2018/05/11/deploy-shadowsocks-on-amazon-lightsail/ 
 关键步骤：
 ```bash
@@ -145,8 +234,7 @@ chmod +x shadowsocks-all.sh
 # 安装时最好安装simple-obfs，混淆选http还是tls可随意。(这里执行autoconf --version查询版本应该是没有问题的，所以可以正常安装。)
 ```
 
-
-## 4. 使用Shadowsocks
+### 4. 使用Shadowsocks
 详见 https://ssr.tools/386  
 * Shadowsocks Windows版本下载 https://github.com/shadowsocks/shadowsocks-windows/releases/
 ，选PAC模式或全局模式（PAC使用GFWList列表，绕过大陆地址，但不一定稳定）
