@@ -185,8 +185,8 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 * 一般混合精度训练，fp32 和 fp16（bf16）分别用在哪
    * 计算
       * 正向反向矩阵乘 fp16 进 fp16 出（优化方案是Tensor后接非线性算的子 matmul fp32 出，或上文 TensorCore 方案） 
-      * 非线性算子 softmax，layernorm，最后一步计算 logits 等 fp32  
-   * 模型及梯度存储：fp32 master weight，fp32 grad（从计算得到的 fp16 梯度 cast 为 fp32），fp32 momentum，fp32 variance；其余前向后向临时的存储为 fp16
+      * 非线性算子 softmax，layernorm，最后一步计算 logits 等用 fp32 计算
+   * 模型及梯度存储：fp32 master weight，fp32 momentum，fp32 variance；其余前向后向计算时，存一个 fp16 权重，一个 fp16 梯度（这个 fp16 梯度会被 cast 到 32 进优化器）
    * 通信：主要是 reduce 相关的算子，包含 all reduce、reduce scatter、reduce 本身；根据条件选择 fp32 或 16
       * 数据并行/模型并行涉及：all-reduce
       * 优化器并行 和 序列并行 包含 reduce-scatter
