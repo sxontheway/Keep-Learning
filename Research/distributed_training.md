@@ -155,12 +155,12 @@
 * tf32 是 A100 中引入的新格式，用于替代 fp32，也即可以全程 tf32 训练或 bf16/tf32 混合训练
 
 <p align="center" >
-<img src="./pictures/fp1632.png" width="600">
+<img src="./pictures/fp1632.png" width="800">
 </p>
 
 ### 混合精度训练的要点
 bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp16 range 更大，所以比 fp16/fp32 混合训练稳定性更高。但 fp16/fp32 混合训练 GPT-3 大模型也是完全可行的，只要解决可溢出问题，有以下几个要点：
-   
+
 * fp32权重备份 + loss scaling 解决下溢出问题
     * 对 loss 进行 scale：见左图
     * 对 gradient 进行 scale：见右图  
@@ -181,6 +181,16 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     <p align="center" >
     <img src="./pictures/tensorcore.png" width="400">
     </p>
+
+* 一般混合精度训练，fp32 和 fp16（bf16）分别用在哪
+   * 计算
+      * 正向反向矩阵乘 fp16 进 fp16 出（优化方案是Tensor后接非线性算的子 matmul fp32 出，或上文 TensorCore 方案） 
+      * 非线性算子 softmax，layernorm，最后一步计算 logits 等 fp32  
+   * 模型及梯度存储：fp32 master weight，fp32 grad（从计算得到的 fp16 梯度 cast 为 fp32），fp32 momentum，fp32 variance；其余前向后向临时的存储为 fp16
+   * 通信：主要是 reduce 相关的算子，包含 all reduce、reduce scatter、reduce 本身；根据条件选择 fp32 或 16
+      * 数据并行/模型并行涉及：all-reduce
+      * 优化器并行 和 序列并行 包含 reduce-scatter
+
 
 ### 溢出案例分析
 * 有时，当 loss scale 降为 1，然后不再上升；同时训练 loss 要么跳涨，要么停滞不下降（相当于没在训练了）    
@@ -307,7 +317,7 @@ Tensor 并行还是调用的 Deepspeed
 * 规约算子：Reduce、AllReduce、ReduceScatter
     * AllReduce = Reduce + Broadcast = ReduceScatter + AllGather
         <p align="left" >
-        <img src="./pictures/allreduce.png" width="700">
+        <img src="./pictures/allreduce.png" width="800">
         </p>
     * ReduceScatter 是一种并行归约算法，它将要规约的大数据分成多个部分，分配给不同的处理器执行局部归约操作（为了并行化）
 
@@ -353,7 +363,7 @@ Tensor 并行还是调用的 Deepspeed
 
 * **FFN 的张量并行：`Y = GELU(XA)B`（见 Megatron3 Paper）**
 
-    * A列切，B行切；前向后向都会有一次 AllReduce
+    * A列切，B行切；前向后向都会有一次 AllReduce（见下图的 f 和 f_bar）
     * 一次 AllReduce 的过程分为两个阶段，Reduce-Scatter 和 All-Gather，通信量表示为 2φ
     * Magetron3：Reducing Activation Recomputation
 in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGather + 计算 + 后ReduceScatter`，通信量没变，但是把 activation 也切分了
