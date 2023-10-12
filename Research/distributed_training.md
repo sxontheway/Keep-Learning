@@ -204,19 +204,20 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 * 有时，当 loss scale 降为 1，然后不再上升；同时训练 loss 要么跳涨，要么停滞不下降（相当于没在训练了）    
     * 解决方案：可以改变超参，**降低lr**，**增大 warm up step**，**改变 loss scale**，或 **增大 epsilon**（这样做会损失一部分优化器自适应学习率的能力），设置
     * 改变 lr，warmup，改变 loss scale 等：为了让梯度在一个合理的范围内，而不要产生某些特别奇怪的奇异值，尽可能减少溢出的概率
-    * 改变 epsilon
-        * **按照混合精度训练惯例**，优化器内部的 momentum，variance 都是用 fp32 进行的；这种情况下，改变 epsilon 的帮助可能不大
-        * 原因如下：
-            * loss scale 不再上升：因为每个 window 中都有 Nan
-            * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 保持为1，使得模型几乎不再更新    
-            * loss 跳涨：和 Adam 有关
-                * Adam 相比 SGD 的优势是会根据梯度自适应学习率。如果优化器用 fp16，梯度的二阶矩过小，分母 `v_t+ε` 在 fp16 中下溢出变为 0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
+    * 改变 epsilon   
 
-                    <p align="center" >
-                    <img src="./pictures/3optimizer.png" width="500">
-                    </p>
+        **按照混合精度训练惯例**，优化器内部的 momentum，variance 都是用 fp32 进行的；这种情况下，改变 epsilon 的帮助可能不大
+        * loss scale 不再上升：因为每个 window 中都有 Nan
+        * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 保持为1，使得模型几乎不再更新    
+        * loss 跳涨：和 Adam 有关
+            * Adam 相比 SGD 的优势是会根据梯度自适应学习率。如果优化器用 fp16，梯度的二阶矩过小，分母 `v_t+ε` 在 fp16 中下溢出变为 0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
 
-                * 当出现一个难度较大的 batch，在这个 batch 中出现了 NaN，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，并且用 loss scale 会减小，之后 batch 的梯度可能就一直下溢了
+                <p align="center" >
+                <img src="./pictures/3optimizer.png" width="500">
+                </p>
+
+            * 当出现一个难度较大的 batch，在这个 batch 中出现了 NaN，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，并且用 loss scale 会减小，之后 batch 的梯度可能就一直下溢了
+
 
 * 对 softmax 进行数值稳定性改造
     > [如何防止softmax函数上溢出 (overflow) 和下溢出 (underflow)](https://www.codelast.com/%E5%8E%9F%E5%88%9B-%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2softmax%E5%87%BD%E6%95%B0%E4%B8%8A%E6%BA%A2%E5%87%BAoverflow%E5%92%8C%E4%B8%8B%E6%BA%A2%E5%87%BAunderflow/)
