@@ -149,6 +149,7 @@
 
 ### fp32/fp16/bf16
 * fp32/fp16 绝大多数硬件都支持，所以可以用混合精度训练提高吞吐；但 bf16/tf32 只有新的硬件才支持，V100/昇腾910等不支持
+* fp16 的表示范围为 5.96\*10e−8 ~ 65504，FP32 是 1.4\*10e-45 ~ 3.4*10e38
 * bf16 具有和 fp32 相同的 range，但精度（也就是两个最小单位之间的间隔）降低
     * bf16/fp32 进行混合精度训练，可以减少溢出几率
     * 对于大型 transformer，bf16 损失的精度被证明不怎么影响收敛
@@ -161,10 +162,9 @@
 ### 混合精度训练的要点
 bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp16 range 更大，所以比 fp16/fp32 混合训练稳定性更高。但 fp16/fp32 混合训练 GPT-3 大模型也是完全可行的，只要解决可溢出问题，有以下几个要点：
    
-* fp32权重备份 + loss scaling 解决下溢出问题
-    * 对 loss 进行 scale：见左图
-    * 对 gradient 进行 scale：见右图  
-    由于链式法则的存在，对梯度做直接做 scale 也是可以的，反而更划算。这样，所有前向后向都可以全用 fp16 (activation、weight、gradient 全用 fp16)，只在进行更新的时候，才用 fp32 和 master weight 更新
+* fp32权重备份 + loss scaling 解决溢出问题
+    * 对 loss 进行 scale：见左图，主要是为了防止 fp16 的梯度下溢，计算出 scaled fp32 的梯度后，更新 master weight 时，还需要将梯度 unscale 回去
+    * gradient 备份流程：见右图，所有前向后向都可以全用 fp16 (weight、gradient 全用 fp16)，只在 master weight 更新的时候，才用 fp32
 
         <p align="center" >
         <img src="./pictures/mixed_precision.png" width="1000">
@@ -172,8 +172,8 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 
 * 跳过 NaN 的 batch 
     * dynamic loss scale (PyTorch 中采用的这种方案）  
-    在一个 window 内，如果没有 NaN，loss scale 变大（例如乘2）；如果有 NaN，则降低 loss scale，并跳过 NaN 的 batch，不更新梯度
-    * 或将 INF 值改为 FP16 的最大值（需要实际验证）
+    在一个 window 内，如果没有上溢 NaN/Inf，loss scale 变大（例如乘2）；如果有上溢 NaN/inf，则降低 loss scale，并跳过该 batch，不更新梯度
+    * 或将 INF 值强行改为 FP16 的最大值（需要实际验证）
 
 * 基于 Tensorcore 进行矩阵乘加：在某些模型中，fp16 矩阵乘法的过程中，需要利用 fp32 来进行矩阵乘法中间结果的累加，以减少加法过程中的舍入误差，保证精度不损失   
 这也是为什么有些人说，只有 Volta 之后有 TensorCore 的 GPU (例如V100)，才能利用 fp16+混合精度来进行加速。其他 GPU 如果硬要用 fp16，只能做 fp16 的 multiply-add operation，会有较大精度损失
@@ -184,37 +184,53 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 
 ### 溢出案例分析
 * 有时，当 loss scale 降为 1，然后不再上升；同时训练 loss 要么跳涨，要么停滞不下降（相当于没在训练了）    
-    * 解决方案：可以改变超参，**降低lr**，或** 增大 epsilon**（但这样做会损失一部分优化器自适应学习率的能力）
-    * 原因如下：
-        * loss scale 不再上升：因为每个 window 中都有 Nan
-        * loss 跳涨：主要来源于 Adam 的缺陷
-            * Adam 相比 SGD 的优势是会根据梯度自适应学习率，但当梯度的二阶矩过小，导致分母 `v_t+ε` 在 fp16 中下溢出变为0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
+    * 解决方案：可以改变超参，**降低lr**，**增大 warm up step**，**改变 loss scale**，或 **增大 epsilon**（这样做会损失一部分优化器自适应学习率的能力），设置
+    * 改变 lr，warmup，改变 loss scale 等：为了让梯度在一个合理的范围内，而不要产生某些特别奇怪的奇异值，尽可能减少溢出的概率
+    * 改变 epsilon
+        * **按照混合精度训练惯例**，优化器内部的 momentum，variance 都是用 fp32 进行的；这种情况下，改变 epsilon 的帮助可能不大
+        * 原因如下：
+            * loss scale 不再上升：因为每个 window 中都有 Nan
+            * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 保持为1，使得模型几乎不再更新    
+            * loss 跳涨：和 Adam 有关
+                * Adam 相比 SGD 的优势是会根据梯度自适应学习率。如果优化器用 fp16，梯度的二阶矩过小，分母 `v_t+ε` 在 fp16 中下溢出变为 0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
 
-            <p align="center" >
-            <img src="./pictures/3optimizer.png" width="500">
-            </p>
+                    <p align="center" >
+                    <img src="./pictures/3optimizer.png" width="500">
+                    </p>
 
-            * 当出现一个难度较大的 batch，在这个 batch 中出现了 NaN，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，之后 batch 的梯度可能就一直下溢了
-        * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 保持为1，使得模型几乎不再更新    
+                * 当出现一个难度较大的 batch，在这个 batch 中出现了 NaN，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，并且用 loss scale 会减小，之后 batch 的梯度可能就一直下溢了
 
 * 对 softmax 进行数值稳定性改造
     > [如何防止softmax函数上溢出 (overflow) 和下溢出 (underflow)](https://www.codelast.com/%E5%8E%9F%E5%88%9B-%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2softmax%E5%87%BD%E6%95%B0%E4%B8%8A%E6%BA%A2%E5%87%BAoverflow%E5%92%8C%E4%B8%8B%E6%BA%A2%E5%87%BAunderflow/)
 
-    用 f(x-max) 代替 f(x)；再加上 logsoftmax；分子避免了下溢、分母避免了上溢
+    用 f(x-max) 代替 f(x)；再把 log 内的除法改成 log 见的减法，分子的exp和log低效了、分母避免了下溢
 
     <p align="center" >
     <img src="./pictures/logsoftmax.png" width="1000">
     </p>
 
-* 如何尽可能早地发现溢出的可能？    
-如上所述，当梯度下溢加上 adam，反而可能变成上溢。一般经验是，在训练前期，可以用一个 Tensor Collection Hook (TCH)，收集溢出比率，比率在 1% 以下并保持稳定而非上升趋势，后期发生溢出可能性较小
+* 混合精度训练中的动态 scale 对训练的影响
 
-* 出现 loss spike 的原因？  
-见 PaLM Paper 5.1节，不一定是只因为数据不好，可能来源于模型某种状态和数据的耦合。因为用导致 spike 的数据但换一个 ckpt 就不会产生
+    * 溢出分为上溢、下溢。动态 scale 的机制是，上溢 loss scale 会减半，如果 window 设为 1000，也即 1000 个 step 不上溢，就将 loss scale 加倍。如果最后控制在一个稳定的 scale 范围，上溢频率 约等于 1/window。由此会有两个推论：
+        * 选取较小的 window，scale 会偏大；选取较大的 window，scale 会偏小  
+        原因：假设梯度的分布不变，包含大于 max_value/scale 的梯度的 step 会产生上溢，而这些 step 占比为 1/window（统计意义上），如上图
+        * 用 fp32 进行梯度累加得到的 scale，vs. fp16 的梯度通信得到的 scale
+            * window 相同，稳态时溢出比例相同，而 fp32的 max 值更大，梯度分布曲线如果假设不变，fp32的 scale 会更高
 
-* 出现 loss 越训练越高？  
-产生的原因可能和 loss spike 不同，可以尝试改变超参，减小 lr，增大 warm up step
+        <p align="center" >
+        <img src="./pictures/loss_scale.png" width="600">
+        </p>
+        
+    * 实际训练中可能出现一种状况，如上图右边，loss 随着 scale 下降会缓慢上升，然后 scale 恢复后又继续下降
+        * 原因：上溢引起 scale 下降，scale 下降后没有及时恢复又诱发下溢，导致一些权重的参数被错误赋为 0
+        * 解决方案：减小 scale window size
 
+* 其他问题
+    * 如何尽可能早地发现溢出的可能？    
+    一般经验是，在训练前期，可以用一个 Tensor Collection Hook (TCH)，收集溢出比率，比率在 1% 以下并保持稳定而非上升趋势，后期发生溢出可能性较小
+
+    * 出现 loss spike 的原因？  
+    见 PaLM Paper 5.1节，不一定是只因为数据不好，可能来源于模型某种状态和数据的耦合。因为用导致 spike 的数据但换一个 ckpt 就不会产生
 
 
 ## 分布式深度学习框架
@@ -255,8 +271,6 @@ Using Megatron-LM，**在第一代基础上，加上了 pipeline 并行（用的
 ### Deepspeed 
 
 * Zero 
-
-
     * 所以 ZeRO 提出：不用每个数据并行的节点上都存上所有层的相关信息；activation 的存储也可以 re-compute 省掉
 
     * 通俗易懂的讲解：**[ZeRO & DeepSpeed: New system optimizations enable training models with over 100 billion parameters](https://www.microsoft.com/en-us/research/blog/zero-deepspeed-new-system-optimizations-enable-training-models-with-over-100-billion-parameters/)**
