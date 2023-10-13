@@ -161,18 +161,15 @@
 
 ### 混合精度训练的要点
 bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp16 range 更大，所以比 fp16/fp32 混合训练稳定性更高。但 fp16/fp32 混合训练 GPT-3 大模型也是完全可行的，只要解决可溢出问题，有以下几个要点：
-<<<<<<< HEAD
    
 * fp32权重备份 + loss scaling 解决溢出问题
     * 对 loss 进行 scale：见左图，主要是为了防止 fp16 的梯度下溢，计算出 scaled fp32 的梯度后，更新 master weight 时，还需要将梯度 unscale 回去
     * gradient 备份流程：见右图，所有前向后向都可以全用 fp16 (weight、gradient 全用 fp16)，只在 master weight 更新的时候，才用 fp32
-=======
 
 * fp32权重备份 + loss scaling 解决下溢出问题
     * 对 loss 进行 scale：见左图
     * 对 gradient 进行 scale：见右图  
     由于链式法则的存在，对梯度做直接做 scale 也是可以的，反而更划算。这样，所有前向后向都可以全用 fp16 (activation、weight、gradient 全用 fp16)，只在进行更新的时候，才用 fp32 和 master weight 更新
->>>>>>> 9e2b390738d3fc30b19f1cdb27392a1700b7073e
 
         <p align="center" >
         <img src="./pictures/mixed_precision.png" width="1000">
