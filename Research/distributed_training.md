@@ -121,7 +121,7 @@
         </p>
 
 * 例子二：Pangu-Alpha 训练的并行方式：
-    * 同一个 server 的卡之间（一般是8卡），tensor并行
+    * 同一个 server 的卡之间（一般是8卡），tensor并行中的 all-reduce 通常是无法隐藏的
     * 一个 rack 的 server 之间，pipeline 并行
     * 不同 rack 之间，数据并行（+优化器切分并行）
     * PS：pangu 的训练是用带宽最小的 Cross-Rack 通信做了数据并行，看起来和上面说的 `数据并行通信量一般 > pipeline并行` 矛盾了
@@ -149,7 +149,7 @@
 
 ### fp32/fp16/bf16
 * fp32/fp16 绝大多数硬件都支持，所以可以用混合精度训练提高吞吐；但 bf16/tf32 只有新的硬件才支持，V100/昇腾910等不支持
-* fp16 的表示范围为 5.96\*10e−8 ~ 65504，FP32 是 1.4\*10e-45 ~ 3.4*10e38
+* fp16 的表示范围为 [6\*10e−5 ~ 65504]，FP32 是 1.4\*10e-45 ~ 3.4*10e38
 * bf16 具有和 fp32 相同的 range，但精度（也就是两个最小单位之间的间隔）降低
     * bf16/fp32 进行混合精度训练，可以减少溢出几率
     * 对于大型 transformer，bf16 损失的精度被证明不怎么影响收敛
@@ -198,14 +198,14 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 
 
 ### 溢出案例分析
-* 有时，当 loss scale 降为 1，然后不再上升；同时训练 loss 要么跳涨，要么停滞不下降（相当于没在训练了）    
-    * 解决方案：可以改变超参，**降低lr**，**增大 warm up step**，**改变 loss scale**，或 **增大 epsilon**（这样做会损失一部分优化器自适应学习率的能力），设置
+* 有时，当 loss scale 降为 1，然后不再回升；同时训练 loss 要么跳涨，要么停滞不下降（相当于没在训练了）。解决方案：可以改变超参，**降低lr**，**增大 warm up step**，**改变 loss scale**，或 **增大 epsilon**（这样做会损失一部分优化器自适应学习率的能力）
+
     * 改变 lr，warmup，改变 loss scale 等：为了让梯度在一个合理的范围内，而不要产生某些特别奇怪的奇异值，尽可能减少溢出的概率
     * 改变 epsilon   
 
         **按照混合精度训练惯例**，优化器内部的 momentum，variance 都是用 fp32 进行的；这种情况下，改变 epsilon 的帮助可能不大
         * loss scale 不再上升：因为每个 window 中都有 Nan
-        * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 保持为1，使得模型几乎不再更新    
+        * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 上不去保持为1。loss scale 不够大，模型其实一直在下溢，几乎不再更新    
         * loss 跳涨：和 Adam 有关
             * Adam 相比 SGD 的优势是会根据梯度自适应学习率。如果优化器用 fp16，梯度的二阶矩过小，分母 `v_t+ε` 在 fp16 中下溢出变为 0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
 
@@ -213,7 +213,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
                 <img src="./pictures/3optimizer.png" width="500">
                 </p>
 
-            * 当出现一个难度较大的 batch，在这个 batch 中出现了 NaN，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，并且用 loss scale 会减小，之后 batch 的梯度可能就一直下溢了
+            * 当出现一个难度较大的 batch，在这个 batch 中梯度出现上溢 NaN 了，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，并且 loss scale 因为溢出减小，之后 batch 的梯度可能就一直下溢了
 
 
 * 对 softmax 进行数值稳定性改造
@@ -227,19 +227,21 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 
 * 混合精度训练中的动态 scale 对训练的影响
 
-    * 溢出分为上溢、下溢。动态 scale 的机制是，上溢 loss scale 会减半，如果 window 设为 1000，也即 1000 个 step 不上溢，就将 loss scale 加倍。如果最后控制在一个稳定的 scale 范围，上溢频率 约等于 1/window。由此会有两个推论：
+    * 溢出分为上溢、下溢。动态 scale 的机制是，上溢 loss scale 会减半。如果 window 设为 1000，也即 1000 个 step 不上溢，就将 loss scale 加倍。如果最后控制在一个稳定的 scale 范围，训练中出现梯度的最大值约等于 max/scale。由此会有两个推论：
         * 选取较小的 window，scale 会偏大；选取较大的 window，scale 会偏小  
-        原因：假设梯度的分布不变，包含大于 max_value/scale 的梯度的 step 会产生上溢，而这些 step 占比为 1/window（统计意义上），如上图
-        * 用 fp32 进行梯度累加得到的 scale，vs. fp16 的梯度通信得到的 scale
-            * window 相同，稳态时溢出比例相同，而 fp32的 max 值更大，梯度分布曲线如果假设不变，fp32的 scale 会更高
+        原因：假设梯度的分布不变，包含大于 max_value/scale 的梯度的 step 会产生上溢，而这些 step 占比为 1/window（统计意义上），如上图。或者简单理解为，window 变小，scale 上升更快点
+    
+    * 实际训练中可能出现一种状况，如上图右边，loss 随着 scale 下降会缓慢上升，然后 scale 恢复后又继续下降
+        * 原因：上溢引起 scale 下降，scale 下降后没有及时恢复又诱发下溢，导致一些权重的参数被错误赋为 0
+        * 解决方案：减小 scale window size，梯度通信用 fp32
+
+    * 用 fp32 进行梯度通信累加得到的 scale，vs. fp16 的梯度通信累加得到的 scale
+        * 以 fp16/32 混合精度训练为例，fp16 范围为 [6\*10e−5 ~ 65504]，scale 最大到 10e7 就上不去了，且 scale 下降到 10e6 会发生下溢。那么梯度的范围可估算为：`[6*10e-5/10e6，65504/10e7] = [6*10e-11，6.5*10e-3]`，平均梯度可通过 globalnorm 估算（globalnorm算的是所有梯度的平方和的开方，假设是 0.5，模型 100B 参数，平均梯度就是 5\*10e-6）
+        * window 相同，有一种情况是，fp16 梯度通信会有一些精度问题，导致出现一些异常的梯度值（例如超过 `65504/10e6`，虽然绝对值不大，但相对梯度的平均值很大了），就会导致上溢 scale 上不去。最后呈现出用 fp32 进行梯度通信的 scale 会更高
 
         <p align="center" >
         <img src="./pictures/loss_scale.png" width="600">
         </p>
-        
-    * 实际训练中可能出现一种状况，如上图右边，loss 随着 scale 下降会缓慢上升，然后 scale 恢复后又继续下降
-        * 原因：上溢引起 scale 下降，scale 下降后没有及时恢复又诱发下溢，导致一些权重的参数被错误赋为 0
-        * 解决方案：减小 scale window size
 
 * 其他问题
     * 如何尽可能早地发现溢出的可能？    
@@ -347,6 +349,7 @@ Tensor 并行还是调用的 Deepspeed
 ### 概括
 * 数据并行、张量并行、优化器并行会引入 Reduce（或 reduce 衍生的 all-reduce，reduce-scatter）    
 * 流水线并行只 send/recv，不引入reduce
+* 数据并行的通信一般和计算可以重叠隐藏，但张量并行的通信几乎无法隐藏（阻塞的），流水线并行中的通信在但个 microbath 是无法隐藏的，但在多个 microbatch 之间是可以隐藏的，bubble 也是无法消除的（只能尽量减少）
 
 ### 数据并行
 * 数据并行训练，前向：各设备独立计算即可，不需要用到通信；后向：需要各设备实现梯度的 AllReduce    
