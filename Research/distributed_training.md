@@ -261,10 +261,6 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     * Ray 基于 gRPC，不支持高性能网络 RDMA 协议，有性能瓶颈
     * TensorFlow 的最初设计里，无论是控制还是数据传输都基于 gRPC 实现，也不能调用 RDMA，有性能瓶颈（后来有了 networking TF 插件改善了）
 
-* Communication Primitives 通信原语：Broadcast, Scatter, Gather, Reduce, Reduce-Scatter, All-gather, All-reduce, All-scatter, All-to-All (MoE 中数据 dispatch 用到), Barrier
-    * [这个链接](https://downey.io/notes/omscs/cse6220/distributed-memory-model-mpi-collectives/) 和 GShard 论文有解释
-    * 对偶算子：gather/reduce，all-gather/scatter-reduce 
-
 
 ### Megatron
 > https://github.com/nvidia/megatron-lm 
@@ -331,9 +327,10 @@ Tensor 并行还是调用的 Deepspeed
     <img src="./pictures/5ops.png" width="800">
     </p>
     
-    * Scatter 和 Gather 互为反向，也即执行了 Scatter 再执行 Gather 之后能复原
+    * Scatter 和 Gather 互为反向，也即执行了 Scatter 再执行 Gather 之后能复原；
     * All Gather 效果上等于 Gather + Broadcast
     * All to All 的具体操作是：将节点 i 的发送缓冲区中的第 j 块数据发送给节点j，节点 j 将接收到的来自节点 i 的数据块放在自身接收缓冲区的第 i 块位置；有 N 个节点的话，每个节点就会有 N 个缓冲区
+       * MoE 和数据并行维度变模型并行维度插入重排布时，会引入 All2All    
 
 
 * 规约算子：Reduce、AllReduce、ReduceScatter
