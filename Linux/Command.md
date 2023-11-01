@@ -135,7 +135,7 @@
     * docker start 的作用是，重新启动已存在的镜像。也就是说，如果使用这个命令，我们必须事先知道 `<container_id>或<name>`（用`docker ps`查看）
 * GPU 容器：用新的 entrypoint 覆盖镜像的，用上 Nvidia runtime 和 GPU、宿主机挂载
     * 把 docker 默认的 runtime 替换成了 NVIDIA 自家的 nvidia-container-runtime，支持在容器中使用 GPU
-    * 用自定义的 entrypoint 取代镜像中默认的
+    * 用自定义的 entrypoint 取代镜像中默认的；也就是容器启动后第一步的操作，比如原始镜像可能是 `python test.py`
     * `-dit`：`-d` 表示分离模式，容器会在后台作为一个守护进程运行，而不是直接退出；`-i` 允许对容器的 stdin 进行交互;`-t`是分配一个伪终端
         ```bash
         docker run --entrypoint bash -dit \
