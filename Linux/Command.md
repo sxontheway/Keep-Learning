@@ -155,6 +155,14 @@
         --name hello_world test:cuda10.2-torch1.12-ubuntu18.04-python3.8 \ 
         /bin/bash
         ```
+        或
+        ```bash
+        docker run -it \
+        --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
+        -v /nas:/mnt \
+        --name pangu_sx nvcr.io/nvidia/pytorch:23.09-py3 \
+        /bin/bash
+        ```     
         * 其中 `nvidia-docker` 命令使得可以调用显卡，使用 `whereis` 和 `cat` 看具体做了什么
 
         * 文件挂载：`-v /test1:/test2`，是将 host 的` /test1` 目录挂载到容器的 `/test2` 目录
