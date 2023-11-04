@@ -113,8 +113,9 @@
         * **首先满足 tensor 并行，把最高速的 intra-server gpu 通信留给 tensor 并行**
         * 然后考虑 数据并行 / pipeline并行，其中 pipeline并行 是为了使得能够适应 GPU memory（对于超大模型）
 * 例子一：如下图两个八卡 node，那么
-    * node 之间做的是 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行  
-    * 但如下图，node 数没富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
+    * node 内做的是张量并行，node之间做的是 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行  
+    * 但如下图，node 数有富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
+    * 一般来讲，切分方式的由近到远：**张量并行 > 优化器切并行 > 数据并行 > 流水线并行**
 
         <p align="left" >
         <img src="./pictures/megatron_parr.jpg" width="600">
