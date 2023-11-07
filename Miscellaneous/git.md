@@ -34,8 +34,18 @@
 
 ## 提 MR，code review，代码合入流程
 > https://segmentfault.com/a/1190000040941132 
-* 本地 clone 云上代码 --> checkout 生成本地新分支 --> 做代码修改 --> commit，push 到云上新分支 --> 提 merge request --> 代码 review --> 合入
-
+* 本地 clone 云上主分支代码 --> checkout 生成本地新分支 --> 做代码修改 --> commit，push 到云上新分支 --> 提 merge request --> 代码 review（解决冲突） --> 合入
+* 如果 MR 有冲突（同一个文件同一个位置被同时修改时），例如分支 A 要合入分支 B，可以在本地解决冲突：
+   * 在本地先打开分支 A，`git checkout <branch_A>`
+   * 然后拉去分支B，`git pull origin <branch_B>`，这时就会本地弹出冲突文件
+      * git pull可以理解为 git fetch 的操作 + git merge的操作，其详细说明如下：
+        ```
+        git fetch origin master    # 从远程主机的master分支拉取最新内容 
+        git merge FETCH_HEAD       # 将拉取下来的最新内容合并到当前所在的分支中
+        ```
+   * 逐行解决冲突后，`git commit -m <commit_msg>`，`git push origin <branch_A>`，这时 MR 的冲突应该就消失了
+* 如何避免冲突？
+   * ss   
 <br>
 
 # git 命令
