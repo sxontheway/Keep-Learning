@@ -119,7 +119,8 @@
 ## 背景：镜像和容器
 * 为了节省资源，docker 是分层的，下层是镜像（read-only），上层是容器（read-and-write）  
 上层的容器可能会复用同一个下层镜像，而容器和容器之间是独立的
-* 运行中的镜像称为容器，你可以修改容器（比如删除一个文件），但这些修改不会影响到镜像。不过，使用 `docker commit <container-id> <image-name>` 可以把一个正在运行的容器变成一个新的镜像 
+* 运行中的镜像称为容器，你可以修改容器（比如删除一个文件），但这些修改不会影响到镜像。不过用 docker commit 可以把一个正在运行的容器变成一个新的镜像：
+  * 例如 `docker commit --change "ENTRYPOINT" "/bin/bash" <container-id> <image-name>` 
 
 ## 查看 镜像/容器
 * 查看镜像：`docker images`
@@ -131,12 +132,23 @@
     * 其中 `pytest` 是容器名
     * `<Repository>:<TAG>` 是镜像名，可以通过 `docker images` 查看；
     * `/bin/bash` 配合 `-it`，可以在容器中进入终端；`-i` 是交互模式，`-t` 是命令行
-    * `docker exec -it <container_id>或<name> bash`：在 running container 中执行命令
+* 在 running container 中执行命令：`docker exec -it <container_name> bash`
 * 启动/停止：`docker start/stop/restart <container_id>或<name>`，其中 `start` 可以加 `-i` 进入命令行
 * 区别
     * docker run 只在第一次运行时使用，将镜像放到容器中，以后再次启动这个容器时，只需要使用命令 docker start 即可
     * docker run 相当于执行了两步操作：将镜像放入容器中（docker create），然后将容器启动，使之变成运行时容器（docker start）
     * docker start 的作用是，重新启动已存在的镜像。也就是说，如果使用这个命令，我们必须事先知道 `<container_id>或<name>`（用`docker ps`查看）
+* GPU 容器：用新的 entrypoint 覆盖镜像的，用上 Nvidia runtime 和 GPU、宿主机挂载
+    * 把 docker 默认的 runtime 替换成了 NVIDIA 自家的 nvidia-container-runtime，支持在容器中使用 GPU
+    * 用自定义的 entrypoint 取代镜像中默认的；也就是容器启动后第一步的操作，比如原始镜像可能是 `python test.py`
+    * `-dit`：`-d` 表示分离模式，容器会在后台作为一个守护进程运行，而不是直接退出；`-i` 允许对容器的 stdin 进行交互;`-t`是分配一个伪终端
+        ```bash
+        docker run --entrypoint bash -dit \
+        --runtime=nvidia --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
+        -v /nas:/mnt  \
+        --name pangu_sx registry-cbu.huawei.com/cloudbu-llm/pangu-38b-infer-strem:3.0.0
+        ```
+    * 启动容器：`docker start -it pangu_sx`
 
 ## 导入导出/保存载入
 * 导出/导入 容器快照
@@ -154,7 +166,6 @@
 * 先查看有哪些镜像：`docker images`
 * 启动容器：
     * 例如，选定 `test:cuda10.2-torch1.12-ubuntu18.04-python3.8` 这个镜像（也可以用 Image ID），把宿主的 `/mnt/ssd_host` 挂载到镜像中的 `/mnt/ssd` 路径上，创建一个叫 `hello_world` 的容器，并进入命令行：  
-
         ```bash
         nvidia-docker run -it \
         -v /mnt/ssd_host:/mnt/ssd \
@@ -162,12 +173,11 @@
         /bin/bash
         ```
         * 其中 `nvidia-docker` 命令使得可以调用显卡，使用 `whereis` 和 `cat` 看具体做了什么
-
         * 文件挂载：`-v /test1:/test2`，是将 host 的` /test1` 目录挂载到容器的 `/test2` 目录
 
 * 传文件进容器：`docker cp <本地文件路径> ID:<容器文件路径>`
 * 在容器中配置好环境，调试好代码，例如 pip 等
-* 将容器打包保存成镜像，用于跨机器的读取
+* 将容器（80cdd11f9b60）打包保存成镜像，用于跨机器的读取
     > https://blog.csdn.net/github_38924695/article/details/110531410
     * 把容器打包成为镜像，使得在 `docker images` 中能看见  
         * `docker commit -a "eric" -m "my python test" 80cdd11f9b60  hello:v1`，其中 -a 提交的镜像作者，-m 提交时的说明文字，`hello:v1` 是镜像的 name 和 tag

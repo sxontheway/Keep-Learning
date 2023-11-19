@@ -83,6 +83,23 @@
 * 其他系列：PaLM，GLM，LLama, BLOOM，OPT
     * 其中 GLM 的训练方法特别一点：用的 Autoregressive Blank Infilling，目标是在 NLU NLG 都表现得好
 
+## 大模型架构总结
+趋势是：相对位置编码替代绝对位置编码，Pre-SwiGLU替代最早的GeLU，Causal-Decoder统治，AdamW + BF16混合精度，multi-query/group-query attention 
+
+| 模型 | 模型架构 | 注意力机制 | 激活函数 | 位置编码 | Normalization | 其他 |
+|-|-|-|-|-|-|-|  
+| GPT-3 | Causal-decoder | Multi-Head Attention | GeLU | 可学习绝对位置编码 | Pre-LayerNorm | - |
+| GPT-4 | Causal-decoder MoE | - | - | - | - | - |
+| PaLM | Causal-decoder | Multi-Query Attention | SwiGLU | 相对位置编码 RoPE | Pre-LN | Attention 层和 FFN 层并行；无 Bias 层；Adafactor 优化器 |  
+| Gopher 280B/Chinchilla 70B | Causal-decoder | MHA | GeLU | RoPE | Pre-RMSNorm | Gopher 用 Adam，Chinchilla 用 AdamW 优化器 |
+| Bloom | Causal-decoder | MHA | GeLU | ALiBi | Pre-LN | BF16混合精度 |
+| Falcon | Causal-decoder | MQA | GeLU | ALiBi | Pre-LN | - |
+| GLM-130B | **Prefix-Decoder** | MHA | GeGLU | RoPE | **Post-LN with Deep-Norm** | AdamW 优化器,FP16混合精度 |
+| ChatGLM2-6B | Causal-decoder | MQA | SwiGLU | RoPE | Pre-RMSNorm | - |
+| Baichuan-2 | Causal-decoder | MHA | SwiGLU | 7B-RoPE, 13B-ALiBi | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |  
+| LaMMa1 | Causal-decoder | MHA | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
+| LaMMa2 | Causal-decoder | Group-Query Attention | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
+
 
 <br>
 <br>
