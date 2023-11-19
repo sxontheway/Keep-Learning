@@ -1,4 +1,5 @@
-# Bash语法
+# Bash
+## 语法
 1. 文件开头第一行`#!/bin/bash`，表示使用bash解释器
 1. For 循环例子
     ```bash
@@ -17,7 +18,20 @@
 
 <br>
 
-# Bash命令
+## 符号
+> https://www.cnblogs.com/balaamwe/archive/2012/03/15/2397998.html
+
+* 其中  `$() ` 和` `` `(反引号)作用相同，是把括号内命令的输出再作为命令执行
+* `${}`括号中放的是变量，`$()`中放的是命令
+* 例子
+    * `2>&1 | tee XXX.log`
+        ```bash
+        # 其中 2>&1 means "send any error messages (aka 'stderr') to the same output as any informational messages (aka 'stdout")." 
+        # | tee XXX.log means "whatever output there is should also be sent to the file XXX.log"
+        ```
+<br>
+
+## 常见命令
 1. `cat`：连接文件
     * `cat test.txt`：打印整个文件到屏幕
     * `cat /dev/null > test.txt`：清空text.txt文件
@@ -91,22 +105,13 @@
 
 <br>
 
-# Bash 上手
-> https://www.cnblogs.com/balaamwe/archive/2012/03/15/2397998.html
-
-* 符号
-    * 其中  `$() ` 和` `` `(反引号)作用相同，是把括号内命令的输出再作为命令执行
-    * `${}`括号中放的是变量，`$()`中放的是命令
-* 用法
-    * `2>&1 | tee XXX.log`
-        ```bash
-        # 其中 2>&1 means "send any error messages (aka 'stderr') to the same output as any informational messages (aka 'stdout")." 
-        # | tee XXX.log means "whatever output there is should also be sent to the file XXX.log"
-        ```
-    * 在 `bashrc` 中设置代理：  
-    `export http_proxy = http://proxyAddress:port`，  
-    `export http_proxy = https://proxyAddress:port`  
-    密码可能需要 encode to URL-encoded format 转义
+## 其他
+* 在 `bashrc` 中设置代理：  
+`export http_proxy = http://proxyAddress:port`，  
+`export http_proxy = https://proxyAddress:port`  
+密码可能需要 encode to URL-encoded format 转义
+* 挂载
+    * 挂载硬盘 `mount -t nfs -o vers=3,nolock <efs_ip> <挂载路径>`
 
 <br>
 
@@ -119,7 +124,7 @@
 ## 查看 镜像/容器
 * 查看镜像：`docker images`
 * 查看容器状态：`docker ps -a`，不加 `-a` 就只查看运行中的，`-l` 看最近的
-* 删除容器 `docker rm XX`，镜像 `docker rmi XX`
+* 删除容器 `docker rm XX`，删除镜像 `docker rmi XX`
 
 ## 创建/启动/停止
 * 创建并启动容器：`docker run -it --name pytest <Repository>:<TAG> /bin/bash`
@@ -144,7 +149,8 @@
     * `save/load`：对象是镜像，保存的是分层文件信息（联想docker的分层结构），导出的文件大
     * `docker export/import container_id`：对象是容器，保存的是容器当时状态的快照。是一个文件系统，丧失了分层结构
 
-## 完整例子：扩展一个镜像并打包
+## 例子
+### 把容器打包成一个镜像
 * 先查看有哪些镜像：`docker images`
 * 启动容器：
     * 例如，选定 `test:cuda10.2-torch1.12-ubuntu18.04-python3.8` 这个镜像（也可以用 Image ID），把宿主的 `/mnt/ssd_host` 挂载到镜像中的 `/mnt/ssd` 路径上，创建一个叫 `hello_world` 的容器，并进入命令行：  
@@ -166,3 +172,76 @@
     * 把容器打包成为镜像，使得在 `docker images` 中能看见  
         * `docker commit -a "eric" -m "my python test" 80cdd11f9b60  hello:v1`，其中 -a 提交的镜像作者，-m 提交时的说明文字，`hello:v1` 是镜像的 name 和 tag
     * 跨机器：本机上 docker export，另一台设备上 docker import（舍弃了分层结构，只作为新的基础镜像）
+
+
+### 从别人的 .tar 加载自己的容器
+* 从 .tar 文件导入/导出镜像：
+    * `docker load -i xxx.tar`，会自动恢复 save 时的镜像名
+    *  `docker save -o <PATH> <IMGAE_NAME>` 保存
+* 图方便：不需要一个自己的镜像的话，不用修改镜像，而直接从原镜像构建容器，同时修改 entrypoint（加上 `--entrypoint bash`）  
+
+    `docker run  --entrypoint bash -dit --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v /nas:/nas --name sx1 <image_A>`
+
+
+### 更改镜像 image_A 的入口，做成新镜像 image_B，并创建容器
+* 查看有的镜像名：`docker images`，找到 <image_A>
+* 更改现有镜像的入口（a 变为 b）
+
+    ```bash
+    # 从镜像a创建一个容器
+    docker create --name temp <image_A>
+
+    # 启动该容器  
+    docker start temp
+
+    # 修改entrypoint为bash
+    docker commit --change "ENTRYPOINT [\"bash\"]" temp <image_B>
+
+    # 其他修改，例如注册用户 ma-user
+
+    # 删除临时容器          sx:torch1.11_cuda11.6
+    docker rm temp
+    ```
+* 从更改得到的镜像 image_B 构建容器 sx1   
+    `docker run -dit --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v /nas:/nas --name sx1 <image_B>`
+
+* 最后进入容器：`docker start sx1 -i`
+
+
+### 进阶例子：为已有镜像加一个新用户 ma-user，并做成新镜像
+查看本地有哪些 `/bin/bash` 用户：`grep /etc/passwd -e '/bin/bash'`，发现没有 ma-user
+
+为此，我要把如下命令加到一个已有的镜像 sx:torch1.11_cuda11.6 中，生成一个新镜像 sx_cloud:torch1.11_cuda11.6
+```bash
+groupadd ma-group -g 1000 && \
+useradd -d /home/ma-user -m -u 1000 -g 1000 -s /bin/bash ma-user && \
+chmod 770 /home/ma-user && \
+usermod -a -G root ma-user && \
+echo "ma-user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+```
+
+实现这个的过程如下：
+```bash
+# 基于该镜像创建容器,并进入容器（如果报错，试试去掉 /bin/bash）
+docker run -it sx:torch1.11_cuda11.6 /bin/bash
+
+# 在容器内执行你要添加的命令
+groupadd ma-group -g 1000 
+useradd -d /home/ma-user -m -u 1000 -g 1000 -s /bin/bash ma-user
+chmod 770 /home/ma-user
+usermod -a -G root ma-user
+echo "ma-user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# 退出，并生成新镜像
+exit
+docker commit [container_id] sx_cloud:torch1.11_cuda11.6
+```
+
+### （不 work 的尝试）
+系统重装了，但是保留了 `var/lib/docker/overlay2` 文件夹，尝试恢复镜像
+```bash
+systemctl stop docker
+cp -r /mnt/sda7/backup/overlay2 /var/lib/docker/
+sudo systemctl start docker
+docker images
+```
