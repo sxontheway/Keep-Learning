@@ -108,6 +108,78 @@
 
 # LLM Tuning 方法
 
+## 长序列算法
+绝对可学习的位置编码、RoPE、ALibi、LM-Infinite、StreamingLLM、LLM Maybe LongLM: Self-Extend LLM Context Window Without Tuning
+
+### 绝对位置编码
+只在第一层 transformer 层之前，实现是将 vocab embedding 和 positional embedding 相加
+
+* cosine 写死，或用一个 `(hidden_size, seq_len)` 的矩阵进行学习
+* 推理序列长度不能超过给定的 seq_len，否则程序直接报错
+
+### 相对位置编码  
+优势是当推理的序列长度大于训练的上下文长度时，至少在推理时程序不会报错（没有一个 `(hidden_size, seq_len)` 尺寸的 position embedding 矩阵）
+
+* RoPE：https://zhuanlan.zhihu.com/p/662790439   
+对于每一层的 qk，分别乘一个如下 R 矩阵，使得注意力分数包含相对位置信息，实现使得注意力分数 `(R_m q)^T(R_n k) = q^T R_{n-m} k`，和 `n-m` 有关  
+
+    <p align="left" >
+    <img src="./pictures/rope.png" width="1000">
+    </p>
+
+* ALibi：求出 qk 之后加对于 atention score 矩阵加一个 offset
+
+    <p align="left" >
+    <img src="./pictures/alibi.png" width="400">
+    </p>
+
+* NoPE：无位置编码，不管 token 之间距离为多少，都一样
+
+
+### 外推方法
+* 基于 RoPE，ALibi 等相对位置编码。直接内插（例如将推理时 0~4096 的 position difference 压缩到 0~2048 之间），就能实现外推的效果。但均匀分配注意力显然不是最好的方式，所以出现了下面这些方案，有下面的特点：
+    * 不需要 finetine，只是更改 inference 时的 attention 计算
+    * 计算的复杂度一般还是 O(n^2)，只是一些被丢弃的 middle token 的注意力不再计算（KV cache 不再保留），理想情况下能减少到 O(n)
+
+* LM-Infinite
+    * 文章基于几个关于 OOD 的观察：
+
+        <p align="left" >
+        <img src="./pictures/ood_insight.png" width="500">
+        </p>
+
+        * 相对位置编码下，token distance 如果超过训练时所用数据，attention logits 会爆炸
+        * 如果 logits 被要求强制限制在一个范围内，那么注意力的熵会很大 **（也即注意力在过长的窗口内被分散）**
+        * initial token 的注意力非常重要
+            * 即使没有显式位置编码，不同位置的 token 会占据特征空间中不同位置，下图蓝色/红色分别对应 initial 和 tail token
+            * 潜在的原因可能是：1）initial token 在训练过程中被所有 token 可见；2）当所有 token confidence 都不是很高的情况下，会有置信度汇聚到一些 “语义上意义不大” 的 token 上，initial token 就是这种 token
+                * softmax + 1 也是这个思路，让所有位置的 attention score 加起来可以小于 1，从而剩余一些 attention 到特定 token
+
+    * 文章于是提出了一个 "梯子形" 的 mask
+        * 左边一竖对应 global，右边一斜对应 local；当超出预训练长度时，对距离进行截断，中间的一部分 token 直接扔掉 
+        * 图中的 0 1 2 代表 token 之间的距离，可直接套用在 RoPE 或 ALibi 中。文中设置 `n_local = L_pretrain`，设置 `n_global` 在 10~100 之间即可
+    
+            <p align="left" >
+            <img src="./pictures/infinity_llm.png" width="600">
+            </p>
+
+* StreamingLLM
+    * 和 LM-Infinite 基本是相同的 idea，但做了更多实验验证 Attention Sink 的现象（initial several tokens）
+        * 前面的层更倾向于 local attention（一斜），后面的层的注意力更倾向于 initial tokens
+        * 推理时，将中间的 kv cache 按照滑窗机制扔掉（灰色的块的 kv cache 就不再保留）
+
+            <p align="left" >
+            <img src="./pictures/streamllm.png" width="800">
+            </p>
+
+* LLM Maybe LongLM: Self-Extend LLM Context Window Without Tuning    
+    * Attention masl 矩阵中的最大距离差保持和训练时的 context window 一致，但是让 local 更稠密，而压缩距离更远的
+
+        <p align="left" >
+        <img src="./pictures/longlm.png" width="500">
+        </p>
+
+        
 ## Fine-tuning
 * 针对 BERT：How to Fine-Tune BERT for Text Classification?  
     * 可包含 3 stages：extensive pre-training, in-domain pre-training, in-domain finetuning 
