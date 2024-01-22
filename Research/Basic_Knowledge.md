@@ -20,6 +20,23 @@ C，C++，java 这些高级语言都是图灵完备的，有 if else / for / go 
 * 背景：2014年被提出的 Adam 优化器的收敛性被证明是错误的，之前大部分机器学习框架中对于Adam的权重衰减的实现也都是错误的。`Fixing Weight Decay Regularization in Adam` （ICLR 2017 Best Paper）提出了一种新的方法用于修复 Adam 的权重衰减错误，命名为 AdamW，Pytorch 中也有一个优化器叫 AdamW
 * L2正则化和权重衰减在大部分情况下并不等价，只在 SGD 优化的情况下是等价的。而大多数框架中对于 `Adam+L2` 正则使用的是权重衰减的方式，但事实上两者不能混为一谈
 
+### Adam、Adafactor、CAME
+* Adam 是每个参数，维护一个自己的动量 m（来源于一阶梯度） 和速度 v（来源于二阶梯度，用于lr的自适应）
+* Adafactor 是利用矩阵的低秩分解，用向量 r 和 c 去替代矩阵 v
+    * v 用于 lr 的自适应缩放：`u_t = g_t/sqrt(v_t)` 为缩放过后的梯度，然后会再进行一个 clip
+    * Adafactor 需要保存 m、r、c，产生中间变量 v（但 v 可以复用 g 的内存）
+* CAME
+    * 需要比 Adafactor 多算一个 U_t，作为一个 confidence 的补偿：在 `m_t` 和 `u_hat_t` 差别较小时，`S_t` 也较小，从而步长更大
+    * 需要保存 r、c、m、R、C。而 v、u、u_hat 都可以复用 g 的内存
+* ADAM、Adafactor、CAME 比较
+    
+    * CAME 和 Adafactor 所需要存储的优化器参数几乎为 Adam 的一半。但 CAME 和 ADAM 训练的模型精度可比，Adafactor 会差一点
+    * 混合精度训练，总计所需内存从 `16*参数量 -> 12*参数量（多一点）`
+    
+    <p align="center" >
+        <img src="./pictures/optimizer_3.png" width=1000>
+    </p>
+
 <br>
 
 ## Unstructure Pruning: Lottery Hypothesis
