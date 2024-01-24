@@ -466,11 +466,27 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
     * XLNet：Transformer-XL   
     * ALibi (ICLR22)：简单地在 attention 矩阵上加一个相对位置差距的矩阵，效果好于上述方法
         * ALibi + Flash Attention 实现 80k 序列长度：https://www.mosaicml.com/blog/mpt-7b 
-
+* 长序列外推，见 [长序列外推算法](./Big_Models.md#长序列算法)
 <br>
 
-## 增量推理/全量推理、KV Cache
+## 推理
+### Decoding
+主要步骤，选出 `累计置信度>top_p` 的 id，然后把这些 id 按 tempertature 处理之后的概率进行采样  
+* `top_p` 又称 Nucleus Sampling，主要影响词汇量
+* `temperature` 影响连贯性：过高可能不连贯
 
+```python
+def sample_probs(probs, temperature=1.0, top_p=0.85):
+    sorted_probs = np.sort(probs)[::-1]
+    cumulative_probs = np.cumsum(sorted_probs)
+    cutoff = sorted_probs[np.argmax(cumulative_probs > top_p)]
+    probs[probs < cutoff] = 0
+    probs = probs**(1/temperature)
+    return np.random.choice(a=len(probs), p=probs/np.sum(probs))
+```
+
+
+### 增量推理/全量推理、KV Cache
 * 增量推理和全量推理
     * 增量推理每次输入的 seq_len 为 1，而全量推理每次为从句子开始到最新位置的总长度 
     * 假设 hidden_size 为 h，增量推理时，Q/K^T/V 的尺寸为分别为 (1,h)，(h,n+1), (n+1,h)，这里 n 就是需要 cache 的 K 和 V 的历史数据
@@ -490,10 +506,48 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 > 目标是高效计算 `Output = Softmax(QK^T)V`，并降低显存，QKV 和 output 尺寸都为 `N*d`  
 
 ### 需要重训练
-* RMKV
-    * https://zhuanlan.zhihu.com/p/514840332
-    * 串行版本利用上一个时间点的计算结果，实现 O(n) 的注意力；但其实
-    * 方法并不新颖：https://kexue.fm/archives/7546 中 自回归生成 一节有提到类似思想
+* RMKV https://zhuanlan.zhihu.com/p/620469303 
+    * Minimal RWKV Code：https://johanwind.github.io/2023/03/23/rwkv_details.html 
+    * 串行版本利用上一个时间点的计算结果，实现 O(n) 的注意力
+        * 方法起源于自回归：https://kexue.fm/archives/7546
+        * Time-Mixing + Channel-Mixing，这里的 channel 也即 hidden-dimension
+            * 两个模块中都有“token-shift”，也即上一个时间点的 x 乘上 mixture 参数和当前 x 混合
+            * 总之就是让当前 token 和之前的 token 通过各种方法建立关联
+        * 网络其他部分架构，和 transformer 差不多，见 paper，最后也包含 `final_layer_norm + MLP_head + Softmax`
+
+        ```python
+        # channel-mixing
+        # 1. x 和上一步 x 混合
+        # 2. 乘上权重 Wk，Wr 得到 k，r
+        # 3. k 进行 ReLU 再平方，再乘上Wv 得到 vk（可以理解成 gating 分数）
+        # 4. gaiting 分数乘上 sigmoid(r)，r 可以理解为 remember
+        def channel_mixing(x, last_x, mix_k, mix_r, Wk, Wr, Wv):
+            k = Wk @ ( x * mix_k + last_x * (1 - mix_k) )
+            r = Wr @ ( x * mix_r + last_x * (1 - mix_r) )
+            vk = Wv @ np.maximum(k, 0)**2
+            return sigmoid(r) * vk, x
+        
+        # time-mixing
+        # 1. 先将当前输出与上一时刻线性差值，乘上权重，得到 k、v、r
+        # 2. 计算 wkv：wkv 是 v 的历史数据的加权平均，权重是 e^(bonus+k_i)*vi。wkv 是作为 gating 分数，会再乘上 sigmoid(r)
+        # 3. 再计算下一次要用到的 分子num 和 分母den
+        def time_mixing(x, last_x, last_num, last_den, decay, bonus, mix_k, mix_v, mix_r, Wk, Wv, Wr, Wout):
+            k = Wk @ ( x * mix_k + last_x * (1 - mix_k) )
+            v = Wv @ ( x * mix_v + last_x * (1 - mix_v) )
+            r = Wr @ ( x * mix_r + last_x * (1 - mix_r) )
+
+            wkv = (last_num + exp(bonus + k) * v) /      \
+                (last_den + exp(bonus + k))
+            rwkv = sigmoid(r) * wkv
+
+            num = exp(-exp(decay)) * last_num + exp(k) * v
+            den = exp(-exp(decay)) * last_den + exp(k)
+
+            return Wout @ rwkv, (x,num,den)
+        ```
+
+
+
 
 * 利用矩阵乘法结合律，QKV 矩阵乘法先计算 KV，并用一个另外的核函数换掉 QK 的 Softmax
     * `Efficient Attention: Attention with Linear Complexities`

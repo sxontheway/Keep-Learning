@@ -124,9 +124,10 @@
 
     * 对于每一层的 qk，分别乘一个 R 矩阵，使得注意力分数包含相对位置信息，也即注意力分数 `score(q_m, k_n) = (R_m q)^T(R_n k) = q^T R_{n-m} k`，和 `n-m` 有关（图式 4.1）
         * 实现上：对于左图矩阵的计算，可以通过右图所示 向量点乘方案 等效实现 
-        * R 矩阵中参数的意义：有两个参数，token 的位置 `m` 和 旋转的角度 `θ_l`。其中 `θ_l` 包含两部分，指数部分的 i 对应分组，base 用于引入远程衰减（图中的 10000）
-            * 关于 i：向量 q 长度为 d，会被分成 d/2 个分组。按公式，前面的分组 `l` 更小，也即频率更高。当token距离差距相同时，前面的分组旋转的角度会更大  
-            * 关于 base：一个理想的情况是，固定 qk，只改变 mn，`score(q_m, k_n)` 应该呈现远程衰减的特征（由于上图式 4.1 中，qk 固定了，其实只有 `R_{n-m}` 改变）。不同的 base 的衰减曲线见下图： 
+        * R 矩阵中参数的意义：有两个参数，token 的位置 `m` 和 旋转的角度 `θ_l`。其中 `θ_l` 包含两部分，图中的 10000 是 base，用于引入远程衰减，指数部分的 i 对应第 i 个分组
+            * 关于 i：向量 q 长度为 d，会被分成 d/2 个分组。按公式，前面的分组 `l` 更小，也即频率更高。当 token 距离差相同时，前面的分组旋转的角度会更大（想象 `y=a^(-x)` 的曲线，先陡后平)  
+            * 关于 base：一个理想的情况是，固定 qk，只改变 mn，`score(q_m, k_n)` 应该呈现远程衰减的特征（由于上图式 4.1 中，qk 固定了，其实只有 `R_{n-m}` 改变）  
+            不同的 base 的衰减曲线见下图，可见 base 太小不太好
 
                 <p align="left" >
                 <img src="./pictures/rope_base.png" width="400">
@@ -153,8 +154,8 @@
 
 * 线性插值、NTK、YaRN 等：[详解基于调整RoPE旋转角度的大模型长度外推方法](https://mp.weixin.qq.com/s/RtI95hu-ZLxGkdGuNIkERQ)  
 主要是在改变 RopE 公式中的 m 和 θ_l 
-    * 线性内插：目标长度扩大 n 被，所有的旋转弧度都减小至原来的 1/n
-    * NTK-Aware Interpolation：在线性内插的基础上，将 RoPE 的 base 乘以 alpha，产生的效果是 高频分量旋转速度降幅低、低频分量旋转速度降幅高。其中第 0 分组的旋转弧度保持不变，最后一个分组的旋转弧度变为原来的 1/alpha
+    * 线性内插：目标长度扩大 n 倍，所有的旋转弧度都减小至原来的 1/n
+    * NTK-Aware Interpolation：在线性内插的基础上，将 RoPE 的 base 乘以 alpha，产生的效果是 **高频分量旋转速度降幅低、低频分量旋转速度降幅高**。其中第 0 分组的旋转弧度保持不变，最后一个分组的旋转弧度变为原来的 1/alpha
     * NTK-by-parts Interpolation：不改变高频部分，仅缩小低频部分的旋转弧度。
     * Dynamic NTK Interpolation：推理长度小于等于训练长度时，不进行插值；推理长度大于训练长度时，每多推理一个 token，就用 NTK-Aware Interpolation 重新生成一遍 Rk，Rq 等
         * 这种方法不能充分利用 kv cache。或者通过存储原始的 kv cache，外推时online计算新长度下旋转过后的 kv cache
@@ -173,14 +174,14 @@
         </p>
 
         * 相对位置编码下，token distance 如果超过训练时所用数据，attention logits 会爆炸
-        * 如果 logits 被要求强制限制在一个范围内，那么注意力的熵会很大 **（也即注意力在过长的窗口内被分散）**
+        * 如果 logits 的最大值被要求强制限制在一个范围内，那么注意力的熵会很大 **（也即注意力在过长的窗口内被分散）**
         * initial token 的注意力非常重要
             * 即使没有显式位置编码，不同位置的 token 会占据特征空间中不同位置，下图蓝色/红色分别对应 initial 和 tail token
             * 潜在的原因可能是：1）initial token 在训练过程中被所有 token 可见；2）当所有 token confidence 都不是很高的情况下，会有置信度汇聚到一些 “语义上意义不大” 的 token 上，initial token 就是这种 token
                 * softmax + 1 也是这个思路，让所有位置的 attention score 加起来可以小于 1，从而剩余一些 attention 到特定 token
 
     * 文章于是提出了一个 "梯子形" 的 mask
-        * 左边一竖对应 global，右边一斜对应 local；当超出预训练长度时，对距离进行截断，中间的一部分 token 直接扔掉 
+        * **左边一竖对应 global，右边一斜对应 local**；当超出预训练长度时，对距离进行截断，中间的一部分 token 直接扔掉 
         * 图中的 0 1 2 代表 token 之间的距离，可直接套用在 RoPE 或 ALibi 中。文中设置 `n_local = L_pretrain`，设置 `n_global` 在 10~100 之间即可
     
             <p align="left" >
@@ -207,6 +208,7 @@
 ### 基于 Finetuning 的方法
 和上述魔改 RoPE 的方案是正交的
 * LongLLaMA：通过 LoRA + Shifted Sparse Attention,降低微调时所需要占用的资源
+    * 8*A100 可以跑：7B 100k，或者 70B 32k
 * PoSE: Efficient Context Window Extension of LLMs via Positional Skip-wise Training
     * 不一定要用 full-length（例如8k）进行微调，用原始长度（2k）但随机进行一些拼接即可（token内容和位置编码仍来源于 8k 范围）即可
 
