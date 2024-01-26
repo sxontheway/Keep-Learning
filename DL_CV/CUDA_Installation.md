@@ -66,8 +66,17 @@
     ```
 * conda 常用命令，查询/退出/激活/删除
     * `conda env list`, `conda deactivate`, `conda activate $ENV_NAME`, `conda env remove -n $ENV_NAME`
-<br>
 
+
+## 关于驱动版本和 cuda 版本的匹配问题
+> https://www.zhihu.com/question/622711856/answer/3339303390 
+* 驱动版本向后兼容，最新的驱动可以安装 **旧的或新的cuda**，也即驱动升级后，原有 cuda 也能跑
+* `nvcc --V` 显示版本小于 `nvidia-smi` 是正常现象
+    * `nvidia-smi` 看的是 CUDA Driver API，也即 `libcuda.so` 的版本
+    * `nvcc --V` 看的是 CUDA Runtime API，`libcudart.so` 的版本
+    * CUDA Runtime API 依赖 CUDA Driver API，所以 `nvidia-smi` 的版本比 `nvcc --V` 的版本大即可
+
+<br>
 
 # 检查是否安装成功
 ```python
