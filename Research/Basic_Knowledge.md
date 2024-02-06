@@ -364,7 +364,9 @@ LayerNorm 是 transformer 中标配，是对 hidden size 求均值和方差
 * Multi-Query Attention 见上图，和 multi-head 的区别是 KV 多个 head 之间共用一个权重，来源于 PaLM
     * 其初衷是服务与增量推理，而非训练；参数量减少约 `1/6`（transformer总参数 12d^2）
     * PaLM 原文：Multi-query attention has a neutral effect on model quality and **training speed (Shazeer, 2019)**, but results in a significant cost savings at autoregressive decoding time. This is because standard multi-headed attention has low efficiency on accelerator hardware during auto-regressive decoding, because the key/value tensors are not shared between examples, and only a single token is decoded at a time.
-    * `Transformer Decoding: One Write-Head is All You Need` 这篇 paper 中，在增量推理时，multi-query 相比 multi-head 能降低 `memory access/compute ratio`，这来源于把 KV Cache 大小减少了 head 倍，减少了 MAC
+    * `Transformer Decoding: One Write-Head is All You Need`中
+    	* 在增量推理时，multi-query 相比 multi-head 能降低 `memory access/compute ratio`，这来源于 KV Cache 太大，一般 Cache 这种 SRAM 存不下，只能存在显存 DRAM 里面。把 KV-cache 减少 head 倍，能减少 MAC，提升 compute intensity
+ 	* 同时减少长序列时的内存占用，kv cache 的理论大小是：`(batch_size, n_head, n_seq, per_head_size)`
 
 <br>
 
