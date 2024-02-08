@@ -9,88 +9,107 @@
 ## Process 类
 * 对一个不包含 target 属性的 Process 类执行 `start()` 方法，就会运行这个类中的 `run()` 方法，所以这里会执行 `Local.run()`：https://blog.csdn.net/sinat_35360663/article/details/78328448
 * 一个类用一个进程（需要继承 Process）。使用 event，主进程可以选择性激活某些类，未激活的类处于 wait 状态（在联邦学习的多进程实现中会有用）
-```python
-import multiprocessing
-from multiprocessing import Process
+    ```python
+    import multiprocessing
+    from multiprocessing import Process
 
-class Local(Process): 
-    def __init__(self, client_num, event):
-        super(Local, self).__init__()
-        self.num = client_num
-        self.event = event
+    class Local(Process): 
+        def __init__(self, client_num, event):
+            super(Local, self).__init__()
+            self.num = client_num
+            self.event = event
 
-    def run(self):
-        while 1:
-            print(f"{self.num}--before")
-            self.event.wait()
-            print(f"{self.num}--after")
-            self.event.clear()
+        def run(self):
+            while 1:
+                print(f"{self.num}--before")
+                self.event.wait()
+                print(f"{self.num}--after")
+                self.event.clear()
 
 
-if __name__ == '__main__':
+    if __name__ == '__main__':
 
-    process_list, event_list = [], []
-    for i in range(5):  
-        e = multiprocessing.Event()
-        p = Local(i, e) 
-        process_list.append(p)
-        event_list.append(e)
+        process_list, event_list = [], []
+        for i in range(5):  
+            e = multiprocessing.Event()
+            p = Local(i, e) 
+            process_list.append(p)
+            event_list.append(e)
 
-    for p in process_list:
-        p.daemon = True
+        for p in process_list:
+            p.daemon = True
+            p.start()
+
+        for i in range(5):
+            p = process_list[0]
+            p.event.set()
+            time.sleep(1)
+
+        import time
+        time.sleep(10)
+
+        for p in process_list:
+            p.terminate()
+
+        print("End")
+    ```
+
+* 多进程运行函数：
+    ```python
+    from multiprocessing import Process
+
+    def f(name):
+        print('hello', name)
+
+    if __name__ == '__main__':
+        p = Process(target=f, args=('bob',))
         p.start()
-
-    for i in range(5):
-        p = process_list[0]
-        p.event.set()
-        time.sleep(1)
-
-    import time
-    time.sleep(10)
-
-    for p in process_list:
-        p.terminate()
-
-    print("End")
-```
-
-多进程运行函数：
-```python
-from multiprocessing import Process
-
-def f(name):
-    print('hello', name)
-
-if __name__ == '__main__':
-    p = Process(target=f, args=('bob',))
-    p.start()
-    p.join()
-```
+        p.join()
+    ```
+    
 ## Pool 类  
 > `Pool.apply_async` 和 `Pool.map` 区别：https://zhuanlan.zhihu.com/p/33971568  
-* Pool.apply_async  
-`Pool.apply_async`: the Pool of worker processe to perform many function calls asynchronously    
-不保证输入输出顺序对应，下面的代码可能输出：[1, 0, 4, 9, 25, 16, 49, 36, 81, 64]
+* Pool.apply_async：异步的多进程操作
+    * 不保证输入输出顺序对应，下面的代码可能输出：[1, 0, 4, 9, 25, 16, 49, 36, 81, 64]
+    * worker的执行不会阻塞（worker5 不阻塞其他），但是用了 `pool.join()` 就会阻塞主进程，直到所有任务完成，才打印
+    * Approach 2 中 results 的打印也会卡在 worker 5
 
     ```python
     from multiprocessing import Pool
 
-    def foo_pool(x):
+    def worker(x):
+        if x == 5:
+            time.sleep(10)
+        else:
+            time.sleep(1)
+        print(f"Done {x}")
         return x*x
 
     result_list = []
     def log_result(result):
-        # This is called whenever foo_pool(i) returns a result.
+        # This is called whenever worker(i) returns a result.
         # result_list is modified only by the main process, not the pool workers.
         result_list.append(result)
 
     if __name__ == '__main__':
-        pool = Pool()
+
+        pool = Pool(processes=3) 
+        
+        # approach 1
         for i in range(10):
-            pool.apply_async(foo_pool, args = (i, ), callback = log_result)
+            pool.apply_async(worker, args = (i, ), callback = log_result)
         pool.close()
         pool.join()
         print(result_list)
+
+        # approach 2
+        results = []
+        for i in range(10):
+            result = pool.apply_async(worker, (i,)) 
+            results.append(result)
+            
+        for result in results:
+            print(result.get())
     ```
 * Pool.map    
     > 多进程运行含有任意个参数的函数：https://blog.csdn.net/qq_15969343/article/details/84672527  
