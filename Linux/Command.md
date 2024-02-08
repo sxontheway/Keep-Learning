@@ -213,8 +213,15 @@
     docker rm temp
     ```
 * 从更改得到的镜像 image_B 构建容器 sx1   
-    `docker run -dit --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v /nas:/nas --name sx1 <image_B>`
+    * `docker run -dit --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v /nas:/nas --name sx1 <image_B>`
+* Debug
+    * 有时会遇见容器内 `nvidia-smi` 正常，但是 `torch.cuda.is_available()` 找不到 GPU 的问题，创建容器时加上 `-e NVIDIA_DRIVER_CAPABILITIES=compute,utility` 即可
+        * 原因：在默认情况下，Docker 容器内不能直接访问宿主机的 GPU，需要配置：`--gpus all`，否则 nvidia-smi 无打印。但是默认情况下只有图形和显示相关的功能可用，这种情况可能发生在更新了宿主驱动之后。所以需要加上 `-e NVIDIA_DRIVER_CAPABILITIES=compute,utility`，否则宿主的 nvidia driver 在容器内是仅作为 utility 存在的。其发挥作用的主要是 compute 选项，这时 driver 将对容器提供计算支持（就是cuda支持）
+    * 有时容器内会提示内存不足，可以再加一个选项 `--shm-size 16G`（或更大），设置共享内存的大小，用于进程间通信
+        * 上面的 `--ulimit memlock` 用于设置每个进程可以锁定的最大内存量，防止内存被swap出去
+        * `--shm-size` 设置容器内共享内存的总大小，用于进程间通信
 
+* ***最终命令：`docker run -dit --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 --shm-size 16G -v /nas:/nas -v /mnt:/mnt --name sx_roma_new sx_roma:torch1.11_cuda11.6`***
 * 最后进入容器：`docker start sx1 -i`
 
 
