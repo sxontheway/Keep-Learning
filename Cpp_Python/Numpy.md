@@ -190,6 +190,8 @@ print(c[d], np.shape(c[d]))
 
 
 # 3. JSON
+> 对于特大文件，`json.dump`，`json.load` 会是性能瓶颈
+
 * `json.load(fp)`：fp 是文件对象
 * `json.loads(s)`: s 是 string，将字符串解析成 json 格式。如果字符串不严格遵循 json 格式，会报错
     ```python
@@ -204,5 +206,5 @@ print(c[d], np.shape(c[d]))
     # data1 = json.loads(str(a));print(data1)       # 会报错
 
     ```
-* 如果 s 不是严格遵循 json 格式，会报错    
-* `json.dump(obj, fp)`：将Python对象序列化后写入 JSON 文件中
+* `json.dump(pyt_obj, fp)`：将 python 对象序列化后写入 json 文件中
+* `json.dumps(py_obj)`：将 python 对象转化为 json 字符串
