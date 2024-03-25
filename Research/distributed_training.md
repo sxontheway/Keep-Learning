@@ -57,6 +57,9 @@
 * PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不想 PipeDream 一样存很多版本权重，并且尽可能同步 flash
     * Megatron-2 用的就是 PipeDream-Flash，需要存 p（流水线数量份）激活，和一个权重版本
     * PipeDream-Flush 其会比初版 PipeDream 慢一些，主要体现在上图 worker3 的 minibatch 1 backward 之后，不执行 minibatch 3 forward 了， 而是闲置等待，直到可以执行 minibatch 2 backward
+        <p align="left" >
+        <img src="./pictures/pipedream_flush.png" width="800">
+        </p>
 
 
 ### 数据并行
@@ -186,7 +189,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 这也是为什么有些人说，只有 Volta 之后有 TensorCore 的 GPU (例如V100)，才能利用 fp16+混合精度来进行加速。其他 GPU 如果硬要用 fp16，只能做 fp16 的 multiply-add operation，会有较大精度损失
 
     <p align="center" >
-    <img src="./pictures/tensorcore.png" width="400">
+    <img src="./pictures/tensorcore.png" width="500">
     </p>
 
 * 一般混合精度训练，fp32 和 fp16（bf16）分别用在哪
