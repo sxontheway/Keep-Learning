@@ -43,9 +43,9 @@
 
 ### pipeline 并行
 * GPipe，PipeDream 分别为 同步和异步
-* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP
-* PipeDream-1F1B 可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了
-    * 为了解决这个问题，Pipedream 最多需要存储 4 个版本的 weight（4 是 stage 数量）
+* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP。也即要存 micro_size 份激活，而一般 `micro_size >> pipeline_num`
+* PipeDream-1F1B 可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 2 和 3 的 backward，使得权重改变了两次（和深度学习假设冲突了），会导致训练效果下降
+    * 为了解决这个问题，Pipedream 每个 worker 最多需要存储 4 个版本的 weight（4 是 stage 数量）
 
         <p align="left" >
         <img src="./pictures/pipeline_p.png" width="900">
@@ -55,7 +55,8 @@
         > 红色箭头表示了一个 minibatch-4 的 FP 和 BP
 
 * PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不想 PipeDream 一样存很多版本权重，并且尽可能同步 flash
-    * Megatron-2 用的就是 PipeDream-Flash
+    * Megatron-2 用的就是 PipeDream-Flash，需要存 p（流水线数量份）激活，和一个权重版本
+    * PipeDream-Flush 其会比初版 PipeDream 慢一些，主要体现在上图 worker3 的 minibatch 1 backward 之后，不执行 minibatch 3 forward 了， 而是闲置等待，直到可以执行 minibatch 2 backward
 
 
 ### 数据并行
