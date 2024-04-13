@@ -1,8 +1,8 @@
-# 服务器
-* 青云
+# FastGPT
+* 青云服务器
     * 参见 fastgpt 需求，先暂时租 2c4g 60GB https://console.qingcloud.com/ap2a
     * 申请公网 ip（付费），配置 ssh，rsa 密钥
-* docker-comose http://doc.fastai.site/docs/development/docker/
+* docker-compose 部署 fastgpt：http://doc.fastai.site/docs/development/docker/
     * docker 安装 oneapi，mongo，pg，fastgpt，mysql
         ```
         # 安装 Docker
@@ -33,6 +33,27 @@
         * oneapi 端口 3001，root 123456 登录
             * 新建一个 kimi 渠道：sk-XXX
             * oneapi 令牌：sk-XXX
+    * fastgpt 中构建应用之后，可以用下面命令测试：
+        ```bash
+        curl --location --request POST 'http://10.XXX.XXX.XXX:3000/api/v1/chat/completions' \
+        --header 'Authorization: Bearer fastgpt-XXX' \
+        --header 'Content-Type: application/json' \
+        --data-raw '{
+            "chatId": "abcd",
+            "stream": false,
+            "detail": false,
+            "variables": {
+                "uid": "asdfadsfasfd2323",
+                "name": "张三"
+            },
+            "messages": [
+                {
+                    "content": "导演是谁",
+                    "role": "user"
+                }
+            ]
+        }'
+        ```
 
 * FAQ
     * 找不到渠道 
