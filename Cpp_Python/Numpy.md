@@ -186,4 +186,25 @@ c = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
 d = np.array([[1, 0], [2, 3]])  
 print(c[d], np.shape(c[d]))
 ```
-> 见 http://www.runoob.com/numpy/numpy-advanced-indexing.html 
+> 见 http://www.runoob.com/numpy/numpy-advanced-indexing.html
+
+
+# 3. JSON
+> 对于特大文件，`json.dump`，`json.load` 会是性能瓶颈
+
+* `json.load(fp)`：fp 是文件对象
+* `json.loads(s)`: s 是 string，将字符串解析成 json 格式。如果字符串不严格遵循 json 格式，会报错
+    ```python
+    import json
+
+    a = [{"name": "John", "age": 30}, "\n", {"name": "John", "age": 30}]
+    json_a = json.dumps(a)
+    print(a)         # 原始对象
+    print(json_a)    # json 字符串
+
+    data2 = json.loads(json_a);print(data2)
+    # data1 = json.loads(str(a));print(data1)       # 会报错
+
+    ```
+* `json.dump(pyt_obj, fp)`：将 python 对象序列化后写入 json 文件中
+* `json.dumps(py_obj)`：将 python 对象转化为 json 字符串

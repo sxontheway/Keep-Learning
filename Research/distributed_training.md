@@ -43,9 +43,10 @@
 
 ### pipeline 并行
 * GPipe，PipeDream 分别为 同步和异步
-* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP
-* PipeDream-1F1B 可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了
-    * 为了解决这个问题，Pipedream 最多需要存储 4 个版本的 weight（4 是 stage 数量）
+* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP。也即要存 micro_size 份激活，而一般 `micro_size >> pipeline_num`
+* PipeDream-1F1B 体现在最后一个 worker，一次 forward 过后就执行一次 backward，从而解决 micro_size 份激活的内存开销问题
+    * 但其可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了一次（和深度学习假设冲突了），会导致训练效果下降
+    * 为了解决这个问题，Pipedream 每个 worker 最多需要存储 4 个版本的 weight（4 是 stage 数量）
 
         <p align="left" >
         <img src="./pictures/pipeline_p.png" width="900">
@@ -54,8 +55,14 @@
         > 图中 W_i(v) indicates weights on worker i with version v  
         > 红色箭头表示了一个 minibatch-4 的 FP 和 BP
 
-* PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不想 PipeDream 一样存很多版本权重，并且尽可能同步 flash
-    * Megatron-2 用的就是 PipeDream-Flash
+* PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不像 PipeDream 一样存很多版本权重，并且尽可能同步 flash
+    * Megatron-2 用的就是 PipeDream-Flash，需要存 p 份（流水线数量）激活 + 和一个权重版本（对内存最友好）
+    * PipeDream-Flush 其会比初版 PipeDream 慢一些，主要体现在：
+        * 和 GPipe 一样有定期的 flush（黑色线，而不像上图 PipeDream 中在第 4 个 batch 之后就没有 flush 了，所以 bubble 会变大）
+        * 还有一个是上图 worker3 的 minibatch 1 backward 之后，不执行 minibatch 3 forward 了， 而是闲置等待，直到可以执行 minibatch 2 backward
+        <p align="left" >
+        <img src="./pictures/pipedream_flush.png" width="800">
+        </p>
 
 
 ### 数据并行
@@ -185,7 +192,7 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
 这也是为什么有些人说，只有 Volta 之后有 TensorCore 的 GPU (例如V100)，才能利用 fp16+混合精度来进行加速。其他 GPU 如果硬要用 fp16，只能做 fp16 的 multiply-add operation，会有较大精度损失
 
     <p align="center" >
-    <img src="./pictures/tensorcore.png" width="400">
+    <img src="./pictures/tensorcore.png" width="500">
     </p>
 
 * 一般混合精度训练，fp32 和 fp16（bf16）分别用在哪
@@ -466,11 +473,27 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
     * XLNet：Transformer-XL   
     * ALibi (ICLR22)：简单地在 attention 矩阵上加一个相对位置差距的矩阵，效果好于上述方法
         * ALibi + Flash Attention 实现 80k 序列长度：https://www.mosaicml.com/blog/mpt-7b 
-
+* 长序列外推，见 [长序列外推算法](./Big_Models.md#长序列算法)
 <br>
 
-## 增量推理/全量推理、KV Cache
+## 推理
+### Decoding
+主要步骤，选出 `累计置信度>top_p` 的 id，然后把这些 id 按 tempertature 处理之后的概率进行采样  
+* `top_p` 又称 Nucleus Sampling，主要影响词汇量
+* `temperature` 影响连贯性：过高可能不连贯
 
+```python
+def sample_probs(probs, temperature=1.0, top_p=0.85):
+    sorted_probs = np.sort(probs)[::-1]
+    cumulative_probs = np.cumsum(sorted_probs)
+    cutoff = sorted_probs[np.argmax(cumulative_probs > top_p)]
+    probs[probs < cutoff] = 0
+    probs = probs**(1/temperature)
+    return np.random.choice(a=len(probs), p=probs/np.sum(probs))
+```
+
+
+### 增量推理/全量推理、KV Cache
 * 增量推理和全量推理
     * 增量推理每次输入的 seq_len 为 1，而全量推理每次为从句子开始到最新位置的总长度 
     * 假设 hidden_size 为 h，增量推理时，Q/K^T/V 的尺寸为分别为 (1,h)，(h,n+1), (n+1,h)，这里 n 就是需要 cache 的 K 和 V 的历史数据
@@ -490,10 +513,48 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 > 目标是高效计算 `Output = Softmax(QK^T)V`，并降低显存，QKV 和 output 尺寸都为 `N*d`  
 
 ### 需要重训练
-* RMKV
-    * https://zhuanlan.zhihu.com/p/514840332
-    * 串行版本利用上一个时间点的计算结果，实现 O(n) 的注意力；但其实
-    * 方法并不新颖：https://kexue.fm/archives/7546 中 自回归生成 一节有提到类似思想
+* RMKV https://zhuanlan.zhihu.com/p/620469303 
+    * Minimal RWKV Code：https://johanwind.github.io/2023/03/23/rwkv_details.html 
+    * 串行版本利用上一个时间点的计算结果，实现 O(n) 的注意力
+        * 方法起源于自回归：https://kexue.fm/archives/7546
+        * Time-Mixing + Channel-Mixing，这里的 channel 也即 hidden-dimension
+            * 两个模块中都有“token-shift”，也即上一个时间点的 x 乘上 mixture 参数和当前 x 混合
+            * 总之就是让当前 token 和之前的 token 通过各种方法建立关联
+        * 网络其他部分架构，和 transformer 差不多，见 paper，最后也包含 `final_layer_norm + MLP_head + Softmax`
+
+        ```python
+        # channel-mixing
+        # 1. x 和上一步 x 混合
+        # 2. 乘上权重 Wk，Wr 得到 k，r
+        # 3. k 进行 ReLU 再平方，再乘上Wv 得到 vk（可以理解成 gating 分数）
+        # 4. gaiting 分数乘上 sigmoid(r)，r 可以理解为 remember
+        def channel_mixing(x, last_x, mix_k, mix_r, Wk, Wr, Wv):
+            k = Wk @ ( x * mix_k + last_x * (1 - mix_k) )
+            r = Wr @ ( x * mix_r + last_x * (1 - mix_r) )
+            vk = Wv @ np.maximum(k, 0)**2
+            return sigmoid(r) * vk, x
+        
+        # time-mixing
+        # 1. 先将当前输出与上一时刻线性差值，乘上权重，得到 k、v、r
+        # 2. 计算 wkv：wkv 是 v 的历史数据的加权平均，权重是 e^(bonus+k_i)*vi。wkv 是作为 gating 分数，会再乘上 sigmoid(r)
+        # 3. 再计算下一次要用到的 分子num 和 分母den
+        def time_mixing(x, last_x, last_num, last_den, decay, bonus, mix_k, mix_v, mix_r, Wk, Wv, Wr, Wout):
+            k = Wk @ ( x * mix_k + last_x * (1 - mix_k) )
+            v = Wv @ ( x * mix_v + last_x * (1 - mix_v) )
+            r = Wr @ ( x * mix_r + last_x * (1 - mix_r) )
+
+            wkv = (last_num + exp(bonus + k) * v) /      \
+                (last_den + exp(bonus + k))
+            rwkv = sigmoid(r) * wkv
+
+            num = exp(-exp(decay)) * last_num + exp(k) * v
+            den = exp(-exp(decay)) * last_den + exp(k)
+
+            return Wout @ rwkv, (x,num,den)
+        ```
+
+
+
 
 * 利用矩阵乘法结合律，QKV 矩阵乘法先计算 KV，并用一个另外的核函数换掉 QK 的 Softmax
     * `Efficient Attention: Attention with Linear Complexities`

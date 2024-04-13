@@ -105,8 +105,123 @@
 <br>
 
 
+## 长序列算法
+绝对可学习的位置编码、相对位置编码 RoPE、ALibi、NoPE、LM-Infinite、StreamingLLM、LLM Maybe LongLM: Self-Extend LLM Context Window Without Tuning
 
-# LLM Tuning 方法
+### 绝对位置编码
+只在第一层 transformer 层之前，实现是将 vocab embedding 和 positional embedding 相加
+
+* cosine 写死，或用一个 `(hidden_size, seq_len)` 的矩阵进行学习
+* 推理序列长度不能超过给定的 seq_len，否则程序直接报错
+
+### 相对位置编码  
+优势是当推理的序列长度大于训练的上下文长度时，至少在推理时程序不会报错（没有一个 `(hidden_size, seq_len)` 尺寸的 position embedding 矩阵）
+
+* RoPE：https://zhuanlan.zhihu.com/p/662790439   
+    <p align="left" >
+    <img src="./pictures/rope.png" width="1100">
+    </p>
+
+    * 对于每一层的 qk，分别乘一个 R 矩阵，使得注意力分数包含相对位置信息，也即注意力分数 `score(q_m, k_n) = (R_m q)^T(R_n k) = q^T R_{n-m} k`，和 `n-m` 有关（图式 4.1）
+        * 实现上：对于左图矩阵的计算，可以通过右图所示 向量点乘方案 等效实现 
+        * R 矩阵中参数的意义：有两个参数，token 的位置 `m` 和 旋转的角度 `θ_l`。其中 `θ_l` 包含两部分，图中的 10000 是 base，用于引入远程衰减，指数部分的 i 对应第 i 个分组
+            * 关于 i：向量 q 长度为 d，会被分成 d/2 个分组。按公式，前面的分组 `l` 更小，也即频率更高。当 token 距离差相同时，前面的分组旋转的角度会更大（想象 `y=a^(-x)` 的曲线，先陡后平)  
+            * 关于 base：一个理想的情况是，固定 qk，只改变 mn，`score(q_m, k_n)` 应该呈现远程衰减的特征（由于上图式 4.1 中，qk 固定了，其实只有 `R_{n-m}` 改变）  
+            不同的 base 的衰减曲线见下图，可见 base 太小不太好
+
+                <p align="left" >
+                <img src="./pictures/rope_base.png" width="400">
+                </p>
+            
+    * 从 `m` 和 `θ_l`出发可以产生不少外推算法，见外推方法一节
+
+
+* ALibi：求出 qk 之后加对于 atention score 矩阵加一个 offset
+
+    <p align="left" >
+    <img src="./pictures/alibi.png" width="400">
+    </p>
+
+### NoPE   
+无位置编码，不管 token 之间距离为多少，都一样，https://arxiv.org/pdf/2305.19466.pdf    
+不用位置编码也能 work，根本原因是 decoder-only transformer 用了 causal attention mask，不具有时不变性
+
+
+### 基于 RoPE 的外推方法
+* 基于 RoPE，ALibi 等相对位置编码。直接内插（例如将推理时 0~4096 的 position difference 压缩到 0~2048 之间），就能实现外推的效果。但均匀分配注意力显然不是最好的方式，所以出现了下面这些方案，有下面的特点：
+    * 不需要 finetine，只是更改 inference 时的 attention 计算；当然有少量 finetuning 效果会很好
+    * 计算的复杂度一般还是 O(n^2)，只是 LM-Infinite/StreamLLM 中一些被丢弃的 middle token 的注意力不再计算（其 KV cache 不再保留），理想情况下能减少到 O(n)
+
+* 线性插值、NTK、YaRN 等：[详解基于调整RoPE旋转角度的大模型长度外推方法](https://mp.weixin.qq.com/s/RtI95hu-ZLxGkdGuNIkERQ)  
+主要是在改变 RopE 公式中的 m 和 θ_l 
+    * 线性内插：目标长度扩大 n 倍，所有的旋转弧度都减小至原来的 1/n
+    * NTK-Aware Interpolation：在线性内插的基础上，将 RoPE 的 base 乘以 alpha，产生的效果是 **高频分量旋转速度降幅低、低频分量旋转速度降幅高**。其中第 0 分组的旋转弧度保持不变，最后一个分组的旋转弧度变为原来的 1/alpha
+    * NTK-by-parts Interpolation：不改变高频部分，仅缩小低频部分的旋转弧度。
+    * Dynamic NTK Interpolation：推理长度小于等于训练长度时，不进行插值；推理长度大于训练长度时，每多推理一个 token，就用 NTK-Aware Interpolation 重新生成一遍 Rk，Rq 等
+        * 这种方法不能充分利用 kv cache。或者通过存储原始的 kv cache，外推时online计算新长度下旋转过后的 kv cache
+    * YaRN：NTK-by-parts Interpolation + 通过温度系数修正注意力分布
+
+        <p align="left" >
+        <img src="./pictures/ntk.png" width="500">
+        </p>
+
+### 基于更改 Attention score 的外推方法
+* LM-Infinite
+    * 文章基于几个关于 OOD 的观察：
+
+        <p align="left" >
+        <img src="./pictures/ood_insight.png" width="700">
+        </p>
+
+        * 相对位置编码下，token distance 如果超过训练时所用数据，attention logits 会爆炸
+        * 如果 logits 的最大值被要求强制限制在一个范围内，那么注意力的熵会很大 **（也即注意力在过长的窗口内被分散）**
+        * initial token 的注意力非常重要
+            * 即使没有显式位置编码，不同位置的 token 会占据特征空间中不同位置，下图蓝色/红色分别对应 initial 和 tail token
+            * 潜在的原因可能是：1）initial token 在训练过程中被所有 token 可见；2）当所有 token confidence 都不是很高的情况下，会有置信度汇聚到一些 “语义上意义不大” 的 token 上，initial token 就是这种 token
+                * softmax + 1 也是这个思路，让所有位置的 attention score 加起来可以小于 1，从而剩余一些 attention 到特定 token
+
+    * 文章于是提出了一个 "梯子形" 的 mask
+        * **左边一竖对应 global，右边一斜对应 local**；当超出预训练长度时，对距离进行截断，中间的一部分 token 直接扔掉 
+        * 图中的 0 1 2 代表 token 之间的距离，可直接套用在 RoPE 或 ALibi 中。文中设置 `n_local = L_pretrain`，设置 `n_global` 在 10~100 之间即可
+    
+            <p align="left" >
+            <img src="./pictures/infinity_llm.png" width="600">
+            </p>
+
+* StreamingLLM
+    * 和 LM-Infinite 基本是相同的 idea，但做了更多实验验证 Attention Sink 的现象（initial several tokens）
+        * 前面的层更倾向于 local attention（一斜），后面的层的注意力更倾向于 initial tokens
+        * 推理时，将中间的 kv cache 按照滑窗机制扔掉（灰色的块的 kv cache 就不再保留）
+
+            <p align="left" >
+            <img src="./pictures/streamllm.png" width="800">
+            </p>
+
+* LLM Maybe LongLM: Self-Extend LLM Context Window Without Tuning    
+    * Attention masl 矩阵中的最大距离差保持和训练时的 context window 一致，但是让 local 更稠密，而压缩距离更远的
+
+        <p align="left" >
+        <img src="./pictures/longlm.png" width="600">
+        </p>
+
+
+### 基于 Finetuning 的方法
+和上述魔改 RoPE 的方案是正交的
+* LongLLaMA：通过 LoRA + Shifted Sparse Attention,降低微调时所需要占用的资源
+    * 8*A100 可以跑：7B 100k，或者 70B 32k
+* PoSE: Efficient Context Window Extension of LLMs via Positional Skip-wise Training
+    * 不一定要用 full-length（例如8k）进行微调，用原始长度（2k）但随机进行一些拼接即可（token内容和位置编码仍来源于 8k 范围）即可
+
+    <p align="left" >
+    <img src="./pictures/pose.png" width="6000">
+    </p>
+
+
+<br>
+<br>
+
+
+# Tuning 方法
 
 ## Fine-tuning
 * 针对 BERT：How to Fine-Tune BERT for Text Classification?  
@@ -146,7 +261,6 @@
         <img src="./pictures/spot.png" width="800">
         </p>
 
-<br>
 
 ### Black Box
 > 会用到一些无梯度优化，很多都来源于对一些自然现象的总结，例如遗传算法，见：  
@@ -159,6 +273,7 @@
 * Continuous
     * BBT：Black-Box Tuning for Language-Model-as-a-Service
     * BBTv2：Towards a Gradient-Free Future with Large Language Models 
+
 
 <br>
 
@@ -180,11 +295,10 @@ What Makes In-Context Learning Work?
         * 由于 context size 的限制（例如 2048 个字符），主要用于 NLU 分类任务，NLG 任务应用较少
         * few-shot 下的性能饱和问题，即随着 training examples 的数量的增加 (一般是 16 或者 32 左右)，in-context learning 的性能不再提升
 
-<br>
 
-## CoT：提升 LLM 的推理能力
+### CoT 相关
 > CoT Paper List：https://github.com/Timothyxxx/Chain-of-ThoughtsPapers   
-> 解读：https://zhuanlan.zhihu.com/p/589087074   
+> 解读：https://zhuanlan.zhihu.com/p/670193167 
 
 * Chain-of-Thought Prompt（CoT）  
     * 上面的 ICL 在一些需要逻辑推理的任务上表现很差。所以考虑对任务进行拆分，在 prompt 中就给出一些 QA 的例子，并且这些例子中就包含一些推理的步骤（few-shot CoT）  
@@ -203,15 +317,16 @@ What Makes In-Context Learning Work?
         </p>
 
 
-* 上面解决了 few shot 问题，但对于 zero shot 怎么办呢？ 可以参考 Paper：[Large Language Models are Zero-Shot Reasoners](https://arxiv.org/pdf/2205.11916.pdf)  
+* 上面解决了 few shot 问题，但对于 zero shot 怎么办呢？ 
+    
+    可以参考 Paper：[Large Language Models are Zero-Shot Reasoners](https://arxiv.org/pdf/2205.11916.pdf)  
 
     原理是用 pipeline 诱导出一些思考过程，“Let's think step by step” 会让 LLM 尽可能生成一些思考过程，然后再将生成的 rationale 和 question 拼在一起，重新配合一个 answer 指向的 prompt 如 “The answer is ” 来激励模型生成答案
-    
+        
     <p align="left" >
     <img src="./pictures/zeroshot-cot.png" width="700">
     </p>
 
-<br>
 
 * 怎么样解决更困难的问题呢？ 
     > [Paper: Least-to-Most Prompting Enables Complex Reasoning in Large Language Models](https://arxiv.org/pdf/2205.10625.pdf)  
@@ -223,13 +338,17 @@ What Makes In-Context Learning Work?
         * 第二个阶段做 problem solving  
             * 把 CoT 的输出作为输入    
 
-                <p align="left" >
-                <img src="./pictures/least-to-most.png" width="700">
-                </p>
+            <p align="left" >
+            <img src="./pictures/least-to-most.png" width="700">
+            </p>
 
-* 引入 self-consistency
+* 更进一步：引入 self-consistency
     * `Self-Consistency Improves Chain of Thought Reasoning in Language Models`: 思想是通过小样本链式思考生成多个不同的推理路径，并利用生成结果选择最一致的答案 
 
+
+
+### XoT、Reflection 系列
+https://grave-agenda-fa5.notion.site/Agent-12d8f63b07dc452db5ea284218df651c?pvs=4 
 
 <br>
 
