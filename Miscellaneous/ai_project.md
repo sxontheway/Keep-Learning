@@ -54,6 +54,15 @@
             ]
         }'
         ```
+        其中 `10.XXX.XXX.XXX:3000` 用于在部署 fastgpt 的服务器上测试，`103.XXX.XXX.XXX` 用于外部访问
+
+
+    * 云务器端：创建安全组 3000 端口，然后让云服务器的防火墙绑定这个安全组
+        * 如果想开放 OneAPI，可同时开放 3001 端口
+    <p align="center" >
+    <img src="./Pictures/fastgpt.png", height='300'>
+    </p>
+
 
 * FAQ
     * 找不到渠道 
@@ -66,4 +75,6 @@
 
 * chatgpt-on-wechat
     * https://github.com/zhayujie/chatgpt-on-wechat
+    * 想要用语音输入的话，需要 `apt install ffmpeg`。注意用了 fastgpt-api 占用了 `open_ai_api_key`，需要用 whisper 的话需要加 `open_ai_api_key_asr`，然后更改 `openai_voice.py`
+
 
