@@ -85,14 +85,11 @@ C，C++，java 这些高级语言都是图灵完备的，有 if else / for / go 
 * Softmax + cross-entropy 的前向传播和反向传播:  https://zhuanlan.zhihu.com/p/86184547   
     loss对logits的梯度，形式很简洁：`∂L/∂z=a-y`，其中 `logits是z，a是z经过softmax，y是one-hot label`
 
-
 ### 解决正负样本不均  
 * OHEM: online hard example mining，Faster-RCNN 用了这个，正负样本数量为 1:3，正样本从 `IoU>0.5` 中选，负样本从 `0.1~0.5` 中选
-* focal loss
+* focal loss：相当于将上文的 OHEM 1:3 的硬截断的 soft version
     > https://www.cnblogs.com/leebxo/p/11291140.html  
     https://www.cnblogs.com/ymjyqsx/p/9508664.html  
-
-    相当于将上文的 OHEM 1:3 的硬截断的 soft version
     
 <br>
 
@@ -133,12 +130,11 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
 * AdamW 是一个比较通用的比较好的 optimizer
 
 
-
-
 <br>
 <br>
 
-# 常见网络结构
+
+# 常见小型网络结构
 
 ## LSTM
 > https://www.zhihu.com/question/64470274
@@ -162,9 +158,9 @@ Optimizer warm up 等同于One-Cycle SGD：https://www.codenong.com/cs106019396/
 * LSTM参数量：`(hidden_size * (hidden_size + x_dim ) + hidden_size) *4 `，因为 `f = sigma(W[h, x] + b)`，相当于将维度 `(hidden_size + x_dim)` 变到了 `hidden_size`
 
 * 双向 LSTM 主要的出发点是：预测可能需要由前面和后面输入共同决定。其输出是 backward RNN 和 Forward RNN 的结果 concat，所以输出 size 是单向 LSTM 的两倍
-<p align="center" >
-	<img src="./pictures/bilstm.png" width=600>
-</p>
+    <p align="center" >
+        <img src="./pictures/bilstm.png" width=600>
+    </p>
 
 
 <br>
@@ -237,6 +233,7 @@ class C3D_reduced(nn.Module):
 <br>
 <br>
 
+
 # Transformer
 > https://zhuanlan.zhihu.com/p/80986272
 
@@ -244,8 +241,12 @@ class C3D_reduced(nn.Module):
 	<img src="./pictures/transformer.png"  width="900">
 </p>
 
-## 一些细节  
+上图左边是 `attention is all you need`，右边是 GPT-1，图里面显示的是 Post-Norm
 
+但现在最新的模型一般默认 Pre-Norm，因为会有更稳定的梯度分布，差别见下面 Layernorm 一节：https://zhuanlan.zhihu.com/p/480783670 
+
+
+## 一些细节  
 ### Positional Embedding 和长度外推
 > https://kexue.fm/archives/9431
 word embedding 和 positional encoding 相加得到输入网络的 embedding  
@@ -285,23 +286,27 @@ word embedding 和 positional encoding 相加得到输入网络的 embedding
     
 
 ### Normalization 层
-* LayerNorm
-    * 上图左边是 `attention is all you need`，右边是 GPT-1，图里面显示的是 Post-Norm
-        * 但现在最新的模型一般默认 Pre-Norm，因为会有更稳定的梯度分布，见下图 PaLM 文章中的 “serialized” 版本：  
-        https://zhuanlan.zhihu.com/p/480783670 
+* Pre-LayerNorm 和 Post-LayerNorm
+GPT-1 用的是 Post-LayerNorm，GPT-2 就是 Pre-LayerNorm 了：`x_mid = x + Attn(LN(x))，x_output = x_mid + FFN(LN(x_mid))`
+    <p align="center" >
+        <img src="./pictures/pre_post_layernom.png"  width="900">
+    </p>
 
-            <p align="center" >
-            <img src="./pictures/palm_parral.png"  width="700">
-            </p>
+* PaLM 结构
+        <p align="center" >
+        <img src="./pictures/palm_parral.png"  width="700">
+        </p>
 
-    * 此外，PaLM 这篇文章中提议可以把 shortcut 和 LayerNorm 换个位置；训练速度提升 15%，在小模型上会损失一些精度但大模型上能几乎无损
+    * 最大的改变是 FFN 和 Attention 并行，只用一个 LayerNorm。但是 PaLM 文章中的 standard 这个公式和 GPT-2 还是有点不一样，i.e. 第二个残差来源是 x 而不是 GPT-2 中的 `x_mid`
+
+    * PaLM 中实验说用并行的架构，训练速度大概提升 15%，在小模型上会损失一些精度但大模型上能几乎无损
 
 * 和 BatchNorm 对比
 BatchNorm 一般用于 CNN，放在卷积和激活之间，是对 batch 求均值和方差      
 LayerNorm 是 transformer 中标配，是对 hidden size 求均值和方差    
-<p align="center" >
-    <img src="./pictures/norm_layer.png" width=700>
-</p>
+    <p align="center" >
+        <img src="./pictures/norm_layer.png" width=700>
+    </p>
 
 
 <br>

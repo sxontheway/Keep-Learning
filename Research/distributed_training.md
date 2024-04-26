@@ -43,23 +43,25 @@
 
 ### pipeline 并行
 * GPipe，PipeDream 分别为 同步和异步
-* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation，用于 BP。也即要存 micro_size 份激活，而一般 `micro_size >> pipeline_num`
+* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation（总计 micro_size 份激活），而一般 `micro_size >> pipeline_num`
 * PipeDream-1F1B 体现在最后一个 worker，一次 forward 过后就执行一次 backward，从而解决 micro_size 份激活的内存开销问题
-    * 但其可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 minibatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了一次（和深度学习假设冲突了），会导致训练效果下降
-    * 为了解决这个问题，Pipedream 每个 worker 最多需要存储 4 个版本的 weight（4 是 stage 数量）
+    * 但其可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 microbatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了一次（和深度学习假设冲突了），会导致训练效果下降
+    * 为了解决这个问题，Pipedream 每个 worker 最多需要存储 4 个版本的 weight（4 是 stage 数量，一般是比 microsize 数量小很多）
 
         <p align="left" >
         <img src="./pictures/pipeline_p.png" width="900">
         </p>
 
         > 图中 W_i(v) indicates weights on worker i with version v  
-        > 红色箭头表示了一个 minibatch-4 的 FP 和 BP
+        > 红色箭头表示了一个 microbatch-4 的 FP 和 BP
 
 * PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不像 PipeDream 一样存很多版本权重，并且尽可能同步 flash
-    * Megatron-2 用的就是 PipeDream-Flash，需要存 p 份（流水线数量）激活 + 和一个权重版本（对内存最友好）
+    * Megatron-2 用的就是 PipeDream-Flash（下图），需要存 p 份（流水线数量）激活 + 和一个权重版本（对内存最友好）
     * PipeDream-Flush 其会比初版 PipeDream 慢一些，主要体现在：
         * 和 GPipe 一样有定期的 flush（黑色线，而不像上图 PipeDream 中在第 4 个 batch 之后就没有 flush 了，所以 bubble 会变大）
-        * 还有一个是上图 worker3 的 minibatch 1 backward 之后，不执行 minibatch 3 forward 了， 而是闲置等待，直到可以执行 minibatch 2 backward
+            * 下图 microsize=8，pp=4，但每个 device 最多堆积 pp 个 microbatch 的前向（device 3）
+        * 还有一个区别是 worker3 的 microbatch 1 backward 之后，不执行 microbatch 3 forward 了， 而是闲置等待，直到可以执行 microbatch 2 backward
+
         <p align="left" >
         <img src="./pictures/pipedream_flush.png" width="800">
         </p>
@@ -75,24 +77,22 @@
         <img src="./pictures/fsdp.png" width="700">
         </p>
 
-
-
 * 数据并行中通信的优化：从 Parameter Server 到 Ring All-Reduce
     * 前者是 torch 的 DP，总通信量随节点数 N 增加线性增加
     * 后者是 DDP，总通信时间随节点数 N 增加保持恒定
 * 数据并行中的进一步优化：通信融合 commuincation fusion
     * 让 反向传播梯度的计算、梯度的传输 在时间上 overlap。但注意：结合结合通信融合时，不能全部融合成一个了，这样通信时间就不能 hidden 了
-    
+
         <p align="left" >
         <img src="./pictures/data_p_opt.png" width="600">
         </p>
 
-
 ### MoE 专家并行
 
-> Paper：GShard，Fast MoE，Faster MoE，PR-MoE，SE-MoE，Switch Transformer
+> Paper：GShard，Fast MoE，Faster MoE，PR-MoE (Deepspeed)，SE-MoE，Switch Transformer
 
 * 例如：一共 24 个 experts，并行度为2。那么会有一半的 GPU 处理 12 个 experts，另外一半处理另外 12 个；如果并行度为 1，那么意味着每个 GPU 都完全包含了 24 个 experts
+
 * MoE routing 原理：回顾一下 transformer 原理
     * 因为 Transformer 权重的作用其实是把 `d1` 维的隐变量变为 `d2` 维度的，所以 token 和 token 之间的处理是可以在时序上独立进行的（但共享权重）。Transformer 为了提高运行效率，会让多个 token 组成一个序列，然后几个序列组成 batch 一起吃进去，所以起来像是并行在执行。MoE 要做的是把这一组组的序列先合并再按 token 拆开，分给不同的专家（所以要 reshard）
     * 专家并行类似一种结合了 数据并行和模型并行 的并行方法：**不同 expert 之间的权重不同，并且处理的 token 也不同**
@@ -114,11 +114,12 @@
 
 
 ### 总结
-* 一般对通信量：Tensor并行 > 数据并行 > pipeline并行
+* 一般对通信量：Tensor并行 > 专家并行 > 数据并行 > pipeline并行
     * 其中 数据并行和 pipeline并行 的比较，见 https://www.high-flyer.cn/blog/model_parallel-2/ ，当 Transform 变宽时，pipeline 并行通信量上更占优。**但这个规则不是死的，见下文**
     * 经验：
         * **首先满足 tensor 并行，把最高速的 intra-server gpu 通信留给 tensor 并行**
         * 然后考虑 数据并行 / pipeline并行，其中 pipeline并行 是为了使得能够适应 GPU memory（对于超大模型）
+
 * 例子一：如下图两个八卡 node，那么
     * node 内做的是张量并行，node之间做的是 pipeline并行，如果 node 数对于 pipeline 数量有富余，node 之间再做数据并行  
     * 但如下图，node 数有富余，所以 node 内部三种并行都有做：pipeline并行（GPU 01 相对于 45）、数据并行（GPU 01 相对于 23）、tensor并行（GPU 0相对于 1）
@@ -163,9 +164,9 @@
     * 对于大型 transformer，bf16 损失的精度被证明不怎么影响收敛
 * tf32 是 A100 中引入的新格式，用于替代 fp32，也即可以全程 tf32 训练或 bf16/tf32 混合训练
 
-<p align="center" >
-<img src="./pictures/fp1632.png" width="800">
-</p>
+    <p align="center" >
+    <img src="./pictures/fp1632.png" width="800">
+    </p>
 
 ### 混合精度训练的要点
 bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp16 range 更大，所以比 fp16/fp32 混合训练稳定性更高。但 fp16/fp32 混合训练 GPT-3 大模型也是完全可行的，只要解决可溢出问题，有以下几个要点：
@@ -174,55 +175,62 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     * 对 loss 进行 scale：见左图，主要是为了防止 fp16 的梯度下溢，计算出 scaled fp32 的梯度后，更新 master weight 时，还需要将梯度 unscale 回去
     * gradient 备份流程：见右图，所有前向后向都可以全用 fp16 (weight、gradient 全用 fp16)，只在 master weight 更新的时候，才用 fp32
 
-* fp32权重备份 + loss scaling 解决下溢出问题
-    * 对 loss 进行 scale：见左图
-    * 对 gradient 进行 scale：见右图  
-    由于链式法则的存在，对梯度做直接做 scale 也是可以的，反而更划算。这样，所有前向后向都可以全用 fp16 (activation、weight、gradient 全用 fp16)，只在进行更新的时候，才用 fp32 和 master weight 更新
-
-        <p align="center" >
+        <p align="left" >
         <img src="./pictures/mixed_precision.png" width="1000">
         </p>
 
-* 跳过 NaN 的 batch 
+* 处理 NaN 的 batch 
     * dynamic loss scale (PyTorch 中采用的这种方案）  
     在一个 window 内，如果没有上溢 NaN/Inf，loss scale 变大（例如乘2）；如果有上溢 NaN/inf，则降低 loss scale，并跳过该 batch，不更新梯度
-    * 或将 INF 值强行改为 FP16 的最大值（需要实际验证）
+    * 或将 INF 值强行改为 FP16 的最大值（饱和模式的溢出检测，对精度可能有影响）；最好需要直接跳过 Inf/NAN 的 batch
 
-* 基于 Tensorcore 进行矩阵乘加：在某些模型中，fp16 矩阵乘法的过程中，需要利用 fp32 来进行矩阵乘法中间结果的累加，以减少加法过程中的舍入误差，保证精度不损失   
-这也是为什么有些人说，只有 Volta 之后有 TensorCore 的 GPU (例如V100)，才能利用 fp16+混合精度来进行加速。其他 GPU 如果硬要用 fp16，只能做 fp16 的 multiply-add operation，会有较大精度损失
+* 基于 Tensorcore 进行矩阵乘加： 
 
-    <p align="center" >
+    在某些模型中，fp16 矩阵乘法的过程中，是可以用 fp32 进行矩阵乘法中间结果的累加，以减舍入误差，保证精度    
+
+    这也是为什么有些人说，只有 Volta 及之后有 TensorCore 的 GPU (例如V100)，才能利用 fp16+混合精度来进行加速。其他 GPU 如果硬要用 fp16，只能做 fp16 的 multiply-add operation，会有较大精度损失
+
+    <p align="left" >
     <img src="./pictures/tensorcore.png" width="500">
     </p>
 
 * 一般混合精度训练，fp32 和 fp16（bf16）分别用在哪
    * 计算
-      * 正向反向矩阵乘 fp16 进 fp16 出（优化方案是Tensor后接非线性算的子 matmul fp32 出，或上文 TensorCore 方案） 
-      * 非线性算子 softmax，layernorm，最后一步计算 logits 等用 fp32 计算
-   * 模型及梯度存储：fp32 master weight，fp32 momentum，fp32 variance；其余前向后向计算时，存一个 fp16 权重，一个 fp16 梯度（这个 fp16 梯度会被 cast 到 32 进优化器）
+      * 正向反向矩阵乘 fp16 进 fp16 出（优化方案是 Tensor 后接非线性算的子 matmul fp32 出，或上文 TensorCore 方案） 
+      * 非线性算子 softmax，layernorm 用 fp32 计算；最后一步计算 logits 的 mlp（这个影响较小）
+      * MoE 的 router 要用 fp32，见 Switch Transformer Table 2
+      * 大模型网络特别深的话，resiudal 用 fp32 计算（减小累计误差）
+      * 数据并行维度很大的话：数据并行 accum_all_reduce_grad 尝试用 fp32
+   * 模型及梯度存储：fp32 master weight，fp32 momentum，fp32 variance；其余前向后向计算时，存一个 fp16 权重，一个 fp16 梯度（这个 fp16 梯度会被 cast to 32 来更新优化器）
    * 通信：主要是 reduce 相关的算子，包含 all reduce、reduce scatter、reduce 本身；根据条件选择 fp32 或 16
       * 数据并行/模型并行涉及：all-reduce
       * 优化器并行 和 序列并行 包含 reduce-scatter
 
 
-### 溢出案例分析
-* 有时，当 loss scale 降为 1，然后不再回升；同时训练 loss 要么跳涨，要么停滞不下降（相当于没在训练了）。解决方案：可以改变超参，**降低lr**，**增大 warm up step**，**改变 loss scale**，或 **增大 epsilon**（这样做会损失一部分优化器自适应学习率的能力）
+### 如何提升混合精度训练的稳定性
+* 用 fp16（以及之后的 fp8）训练时，需要用动态 scale  
+
+    有时可能会遇见 loss scale 降为 1 不再回升，同时训练 loss 要么跳涨要么停滞不下降（相当于没在训练了）。解决方案：可以改变超参，包括 **降低lr**，**增大 warm up step**，**改变初始 loss scale**，或 **增大优化器的 epsilon**（这样做会损失一部分优化器自适应学习率的能力）
 
     * 改变 lr，warmup，改变 loss scale 等：为了让梯度在一个合理的范围内，而不要产生某些特别奇怪的奇异值，尽可能减少溢出的概率
-    * 改变 epsilon   
 
-        **按照混合精度训练惯例**，优化器内部的 momentum，variance 都是用 fp32 进行的；这种情况下，改变 epsilon 的帮助可能不大
-        * loss scale 不再上升：因为每个 window 中都有 Nan
-        * loss 停滞：可能仍然发生了很多 NaN，但 Adam 中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 上不去保持为1。loss scale 不够大，模型其实一直在下溢，几乎不再更新    
-        * loss 跳涨：和 Adam 有关
-            * Adam 相比 SGD 的优势是会根据梯度自适应学习率。如果优化器用 fp16，梯度的二阶矩过小，分母 `v_t+ε` 在 fp16 中下溢出变为 0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
+    * 关于改变优化器的 epsilon   
+        * 在混合精度训练中的影响
+            * **按照混合精度训练惯例**，优化器内部的 momentum，variance 都是用 fp32 进行的；这种情况下，改变 epsilon 的帮助可能不大
+        * 如果优化器用 fp16，epsion 的影响会比较大
+            * 如果梯度的二阶矩过小，分母 `v_t+ε` 在 fp16 中下溢出变为 0（fp16 最小值为 5.96e-8，但 epsilon 一般设为 1e-8），反而会上溢，模型的改变量变为很大，从而导致训练不收敛
 
-                <p align="center" >
+                <p align="left" >
                 <img src="./pictures/3optimizer.png" width="500">
                 </p>
+            
+    * loss scale 不再上升/loss 停滞：
+        
+        因为每个 window 中都有 Nan。Adam 优化器中分母 `v_t+ε` 这一项没有严重到下溢，只是因为时不时有 NaN 发生，导致 loss scale 上不去保持为1。因为 loss scale 不够大，模型其实一直在下溢，几乎不再更新    
 
-            * 当出现一个难度较大的 batch，在这个 batch 中梯度出现上溢 NaN 了，这些 NaN 的梯度被跳过了。但通过这组难度较大的情况后，因为有 momentum，并且 loss scale 因为溢出减小，之后 batch 的梯度可能就一直下溢了
-
+    * loss 跳涨：和 Adam 有关
+        
+        当出现一个难度较大的 batch（outlier，例如全是代码数据），在这个 batch 中梯度出现上溢 NaN 了，如果用的饱和模式（Nan 被赋成 fp16 的最大值）。通过这些异常batch 之后，因为有 momentum，并且 loss scale 因为溢出减小，之后 batch 的梯度可能就一直下溢了
 
 * 对 softmax 进行数值稳定性改造
     > [如何防止softmax函数上溢出 (overflow) 和下溢出 (underflow)](https://www.codelast.com/%E5%8E%9F%E5%88%9B-%E5%A6%82%E4%BD%95%E9%98%B2%E6%AD%A2softmax%E5%87%BD%E6%95%B0%E4%B8%8A%E6%BA%A2%E5%87%BAoverflow%E5%92%8C%E4%B8%8B%E6%BA%A2%E5%87%BAunderflow/)
@@ -233,31 +241,32 @@ bf16/fp32 混合训练因为两种格式在 range 对齐了，并且 bf16 比 fp
     <img src="./pictures/logsoftmax.png" width="1000">
     </p>
 
-* 混合精度训练中的动态 scale 对训练的影响
-
-    * 溢出分为上溢、下溢。动态 scale 的机制是，上溢 loss scale 会减半。如果 window 设为 1000，也即 1000 个 step 不上溢，就将 loss scale 加倍。如果最后控制在一个稳定的 scale 范围，训练中出现梯度的最大值约等于 max/scale。由此会有两个推论：
-        * 选取较小的 window，scale 会偏大；选取较大的 window，scale 会偏小  
-        原因：假设梯度的分布不变，包含大于 max_value/scale 的梯度的 step 会产生上溢，而这些 step 占比为 1/window（统计意义上），如上图。或者简单理解为，window 变小，scale 上升更快点
-    
-    * 实际训练中可能出现一种状况，如上图右边，loss 随着 scale 下降会缓慢上升，然后 scale 恢复后又继续下降
-        * 原因：上溢引起 scale 下降，scale 下降后没有及时恢复又诱发下溢，导致一些权重的参数被错误赋为 0
-        * 解决方案：减小 scale window size，梯度通信用 fp32
-
-    * 用 fp32 进行梯度通信累加得到的 scale，vs. fp16 的梯度通信累加得到的 scale
-        * 以 fp16/32 混合精度训练为例，fp16 范围为 [6\*10e−5 ~ 65504]，scale 最大到 10e7 就上不去了，且 scale 下降到 10e6 会发生下溢。那么梯度的范围可估算为：`[6*10e-5/10e6，65504/10e7] = [6*10e-11，6.5*10e-3]`，平均梯度可通过 globalnorm 估算（globalnorm算的是所有梯度的平方和的开方，假设是 0.5，模型 100B 参数，平均梯度就是 5\*10e-6）
-        * window 相同，有一种情况是，fp16 梯度通信会有一些精度问题，导致出现一些异常的梯度值（例如超过 `65504/10e6`，虽然绝对值不大，但相对梯度的平均值很大了），就会导致上溢 scale 上不去。最后呈现出用 fp32 进行梯度通信的 scale 会更高
-
-        <p align="center" >
-        <img src="./pictures/loss_scale.png" width="600">
-        </p>
-
-* 其他问题
+* 其他
     * 如何尽可能早地发现溢出的可能？    
     一般经验是，在训练前期，可以用一个 Tensor Collection Hook (TCH)，收集溢出比率，比率在 1% 以下并保持稳定而非上升趋势，后期发生溢出可能性较小
 
     * 出现 loss spike 的原因？  
     见 PaLM Paper 5.1节，不一定是只因为数据不好，可能来源于模型某种状态和数据的耦合。因为用导致 spike 的数据但换一个 ckpt 就不会产生
 
+### 溢出案例分析：fp16/32 混合训练时的下溢问题
+
+* 溢出分为上溢、下溢。动态 scale 的机制是，上溢 loss scale 会减半。如果 window 设为 1000，也即 1000 个 step 不上溢，就将 loss scale 加倍。如果最后控制在一个稳定的 scale 范围，训练中出现梯度的最大值约等于 max/scale。由此会有两个推论：
+    * 选取较小的 window，scale 会偏大；选取较大的 window，scale 会偏小  
+    原因：假设梯度的分布不变，包含大于 max_value/scale 的梯度的 step 会产生上溢，而这些 step 占比为 1/window（统计意义上），如上图。或者简单理解为，window 变小，scale 上升更快点
+
+* 实际训练中可能出现一种状况，如上图右边，loss 随着 scale 下降会缓慢上升，然后 scale 恢复后又继续下降
+    * 原因：上溢引起 scale 下降，scale 下降后没有及时恢复又诱发下溢，导致一些权重的参数被错误赋为 0
+    * 解决方案：减小 scale window size，梯度通信用 fp32
+
+* 用 fp32 进行梯度通信累加得到的 scale vs. fp16 的梯度通信累加得到的 scale
+    * 以 fp16/32 混合精度训练为例，fp16 范围为 [6\*10e−5 ~ 65504]。scale 可能到 10e7 就上不去了，且 scale 下降到 10e6 会发生下溢。那么梯度的范围可估算为：`[6*10e-5/10e6，65504/10e7] = [6*10e-11，6.5*10e-3]`，平均梯度可通过 globalnorm 估算（globalnorm算的是所有梯度的平方和的开方，假设是 0.5，模型 100B （1e11）参数，平均梯度就是 5\*10e-6）
+    * window 相同，有一种情况是，fp16 梯度通信会有一些精度问题，导致出现一些异常的梯度值（例如超过 `65504/10e6`，虽然绝对值不大，但相对梯度的平均值很大了），就会导致上溢 scale 上不去。最后呈现出用 fp32 进行梯度通信的 scale 会更高
+
+    <p align="center" >
+    <img src="./pictures/loss_scale.png" width="600">
+    </p>
+
+<br>
 
 ## 分布式深度学习框架
 ### Overview  
@@ -343,9 +352,11 @@ Tensor 并行还是调用的 Deepspeed
 
 * 规约算子：Reduce、AllReduce、ReduceScatter
     * AllReduce = Reduce + Broadcast = ReduceScatter + AllGather
+        
         <p align="left" >
         <img src="./pictures/allreduce.png" width="800">
         </p>
+
     * ReduceScatter 是一种并行归约算法，它将要规约的大数据分成多个部分，分配给不同的处理器执行局部归约操作（为了并行化）
 
 <br>
@@ -373,15 +384,15 @@ Tensor 并行还是调用的 Deepspeed
 ### 张量并行
 > 详细介绍见：https://www.zhihu.com/question/319355346 
 
-<p align="left" >
-<img src="./pictures/mp_partition.png" width="900">
-</p>
-
 * `Y = XW` 按行切分权重 W：只有正向有reduce
 
     X 需要按列切，W 按行切  
     正向是 Scatter X 为 X1 X2 --> 计算 Y1=X1W1，Y2=X2W2 --> reduce 为 Y  
     反向是 Y broadcast --> 各节点分别求梯度 dL/dX1，dl/dX2 --> concat 得到 X 的梯度  
+
+    <p align="left" >
+    <img src="./pictures/mp_partition.png" width="900">
+    </p>
 
 * `Y = XW` 按列切分权重 W，只有反向有reduce
 
@@ -410,7 +421,7 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 <br>
 <br>
 
-# 大模型相关知识点
+# 大模型开销、优化算法
 ## 参数量、计算量、内存
 ### 参数量 O(12*lh^2)
 * Embedding layer 参数量：`(seq_len + vocab_size) * hidden_size`
@@ -435,9 +446,13 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 
 ### 内存
 训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
-* 静态内存：混合精度时，参数量*16
-    * fp6/fp32 混合精度训练时，模型和优化器参数大小：参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
-    * 混合精度训练，FP 和 BP 过程都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，cast 成 fp32后再缩小
+
+* 混合精度训练对内存的影响？
+
+    * 混合精度时，静态内存 = 参数量*16（Bytes）
+        * 参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
+        * 混合精度训练 FP 和 BP 都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，计算好 fp32 的梯度后再缩小
+    * 全 fp32 训练，静态内存也是 16N：优化器状态 8N，梯度和权重分别 4N。主要是提高了算力 FLOPS，然后减少了activation 这些非权重的动态显存
 
 * 动态内存
     * 前向运行时，所需要的瞬时内存（即便用全部重计算）
@@ -491,7 +506,6 @@ def sample_probs(probs, temperature=1.0, top_p=0.85):
     probs = probs**(1/temperature)
     return np.random.choice(a=len(probs), p=probs/np.sum(probs))
 ```
-
 
 ### 增量推理/全量推理、KV Cache
 * 增量推理和全量推理
@@ -552,8 +566,6 @@ def sample_probs(probs, temperature=1.0, top_p=0.85):
 
             return Wout @ rwkv, (x,num,den)
         ```
-
-
 
 
 * 利用矩阵乘法结合律，QKV 矩阵乘法先计算 KV，并用一个另外的核函数换掉 QK 的 Softmax

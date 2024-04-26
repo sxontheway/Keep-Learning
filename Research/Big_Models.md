@@ -39,7 +39,7 @@
         <img src="./pictures/train_token_GPT3.png" width="600">
         </p>
 
-## 常见模型
+## 大模型常见架构总结
 * Transformer 模型结构及参数：https://zhuanlan.zhihu.com/p/107891957
 * CLIP
     * Chinese CLIP：https://github.com/billjie1/Chinese-CLIP 
@@ -62,14 +62,14 @@
     
         code-davinci-002，text-davinci-002/003，ChatGPT 都叫 GPT-3.5，都是 code-davinci-002  的微调版本 
 
-        <p align="center" >
+        <p align="left" >
         <img src="./pictures/gpt_family.png" width="500">
         </p>
 
         * InstructGPT 三阶段：supervised fine-tuning on pre-trained GPT-3 --> Reward Model --> RL PPO；三阶段所用的标注的额外数据如下，总量并不大  
 
             <p align="left" >
-            <img src="./pictures/train_token_chatgpt.png" width="600">
+            <img src="./pictures/train_token_chatgpt.png" width="500">
             </p>
     
         * 结论：
@@ -77,28 +77,41 @@
             * code-davinci-002 推理能力很强（很强的基础模型），但与人的 alignment 不够  
             text-davinci-002 alignment 能力增强了，但在很多任务上跑分变低（上下文 ICL 能力变弱）  
             text-davinci-003 加上了 RLHF，普遍的生成通常比 text-davinci-002 长，然后上下文能力有所恢复     
-            ChatGPT 进一步接近和人对话
+            ChatGPT swish
             * 1.3B 的经过 RLHF 的 InstructGPT（模型来源于 GPT-3 XL，见 GPT-3 论文 Table E1），在 labeler 评测中，就可优于原始 175B GPT-3
             * **模型规模超过阈值后的涌现能力（大约100B）**：突破 scaling law
+            
 * 其他系列：PaLM，GLM，LLama, BLOOM，OPT
-    * 其中 GLM 的训练方法特别一点：用的 Autoregressive Blank Infilling，目标是在 NLU NLG 都表现得好
+    * GPT
+        * GeLU、MHA、Absolute Embedding、Pre-LayerNorm
+    * PaLM
+        * FFN 用的 SwiGLU，`Swish(xW)·xV `，2层 MLP 而非 3 层
+        * Parallel Layer、MQA、No bias、RoPE、Shared Vocab Embedding
+    * Lamma2：吸收了 PaLM、Gopher 等模型上架构的微改变，是现被业界广泛采纳的方案（Baichuan、Yi、Mixtral）
+        * SwishGLU FFN（3-Linear-layer）、MQA、Pre-RMSNorm、RoPE、No bias
 
-## 大模型架构总结
-趋势是：相对位置编码替代绝对位置编码，Pre-SwiGLU替代最早的GeLU，Causal-Decoder统治，AdamW + BF16混合精度，multi-query/group-query attention 
+            <p align="left" >
+            <img src="./pictures/swishgelu.png" width="700">
+            </p>
+    * Mixtral-7B 在 Lamma2 的基础上，结构上只加了 Sliding Window Attention
+    * 其中 GLM 的训练方法特别一点：用的 Autoregressive Blank Infilling，目标是在 NLU NLG 都表现得好（这种方案未被其他模型广泛采纳）
 
-| 模型 | 模型架构 | 注意力机制 | 激活函数 | 位置编码 | Normalization | 其他 |
-|-|-|-|-|-|-|-|  
-| GPT-3 | Causal-decoder | Multi-Head Attention | GeLU | 可学习绝对位置编码 | Pre-LayerNorm | - |
-| GPT-4 | Causal-decoder MoE | - | - | - | - | - |
-| PaLM | Causal-decoder | Multi-Query Attention | SwiGLU | 相对位置编码 RoPE | Pre-LN | Attention 层和 FFN 层并行；无 Bias 层；Adafactor 优化器 |  
-| Gopher 280B/Chinchilla 70B | Causal-decoder | MHA | GeLU | RoPE | Pre-RMSNorm | Gopher 用 Adam，Chinchilla 用 AdamW 优化器 |
-| Bloom | Causal-decoder | MHA | GeLU | ALiBi | Pre-LN | BF16混合精度 |
-| Falcon | Causal-decoder | MQA | GeLU | ALiBi | Pre-LN | - |
-| GLM-130B | **Prefix-Decoder** | MHA | GeGLU | RoPE | **Post-LN with Deep-Norm** | AdamW 优化器,FP16混合精度 |
-| ChatGLM2-6B | Causal-decoder | MQA | SwiGLU | RoPE | Pre-RMSNorm | - |
-| Baichuan-2 | Causal-decoder | MHA | SwiGLU | 7B-RoPE, 13B-ALiBi | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |  
-| LaMMa1 | Causal-decoder | MHA | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
-| LaMMa2 | Causal-decoder | Group-Query Attention | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
+
+* 趋势是：相对位置编码替代绝对位置编码，Pre-SwiGLU替代最早的GeLU，Causal-Decoder统治，AdamW+BF16混合精度，multi-query/group-query attention 
+
+    | 模型 | 模型架构 | 注意力机制 | 激活函数 | 位置编码 | Normalization | 其他 |
+    |-|-|-|-|-|-|-|  
+    | GPT-3 | Causal-decoder | Multi-Head Attention | GeLU | 可学习绝对位置编码 | Pre-LayerNorm | - |
+    | GPT-4 | Causal-decoder MoE | - | - | - | - | - |
+    | PaLM | Causal-decoder | Multi-Query Attention | SwiGLU | 相对位置编码 RoPE | Pre-LN (每层只有一个LN) | Attention 层和 FFN 层并行；无 Bias 层；Adafactor 优化器 |  
+    | Gopher 280B/Chinchilla 70B | Causal-decoder | MHA | GeLU | RoPE | Pre-RMSNorm | Gopher 用 Adam，Chinchilla 用 AdamW 优化器 |
+    | Bloom | Causal-decoder | MHA | GeLU | ALiBi | Pre-LN | BF16混合精度 |
+    | Falcon | Causal-decoder | MQA | GeLU | ALiBi | Pre-LN | - |
+    | GLM-130B | **Prefix-Decoder** | MHA | GeGLU | RoPE | **Post-LN with Deep-Norm** | AdamW 优化器,FP16混合精度 |
+    | ChatGLM2-6B | Causal-decoder | MQA | SwiGLU | RoPE | Pre-RMSNorm | - |
+    | Baichuan-2 | Causal-decoder | MHA | SwiGLU | 7B-RoPE, 13B-ALiBi | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |  
+    | LaMMa1 | Causal-decoder | MHA | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
+    | LaMMa2 | Causal-decoder | Group-Query Attention | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
 
 
 <br>
@@ -344,7 +357,6 @@ What Makes In-Context Learning Work?
 
 * 更进一步：引入 self-consistency
     * `Self-Consistency Improves Chain of Thought Reasoning in Language Models`: 思想是通过小样本链式思考生成多个不同的推理路径，并利用生成结果选择最一致的答案 
-
 
 
 ### XoT、Reflection 系列
