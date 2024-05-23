@@ -13,6 +13,31 @@ C，C++，java 这些高级语言都是图灵完备的，有 if else / for / go 
 
 
 # 深度学习知识
+## 反向传播
+### BP 基础
+* [代码见：bp.py](./bp.py)
+
+* 原理 https://blog.csdn.net/qq_27361945/article/details/109760708
+    * 先计算前向，过程中存储矩阵乘的结果 z，以及z的激活值 h
+    * 再计算 loss，以及计算每一层 z 的误差 delta
+        * sigmoid `y = 1/(1+e^(-x))`，反向 `y' = y(1-y)`  
+    * 最后更新权重
+        * 线性层 `Y = X W`，反向 `dL/dW = X^T dL/dy --> W' = X^T Y'`，https://zhuanlan.zhihu.com/p/25496760 
+
+* BP 的计算复杂度
+    * 约等于两倍前向，算 loss + 算梯度（未考虑更新权重）
+    * 如果有重计算，那么还要加一个算 z 的过程
+
+### 并行中的 BP 
+https://zhuanlan.zhihu.com/p/367908419
+
+| 特性 | DP | 简单模型并行 |
+| --- | --- | --- |
+| 参数初始化 | Broadcast 参数同步 | Scatter 参数分发 |
+| 前传 | 无操作 | AllGather 权重 |
+| BP处理delta | AllReduce | ReduceScatter |
+
+
 ## Optimizer
 ### Adam，L2, weight decay 和 AdamW
 > https://www.jiqizhixin.com/articles/2018-07-03-14   
