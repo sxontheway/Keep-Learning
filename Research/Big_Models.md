@@ -117,6 +117,22 @@
 <br>
 <br>
 
+## 关于样本隔离
+* 大模型在训练的时候，会把多个不同长度的样本拼成 2k、4k、8k 等。如果开样本隔离，会根据 
+end-of-sentence token 将 mask 分成很多小下三角
+    * 这会帮助真是训练的序列长度回归样本本身的真实长度
+* 一些影响
+    * 序列长度较短时，没有很大必要用样本隔离，也能训练：例如 GPT-3 没有做样本隔离（2k长度），但 LLama 3 用了（8k长度）
+    * 关闭样本隔离对提升吞吐有帮助。flash Attention 1/2 等优化方法默认不支持开样本隔离，虽然也可以手动修改加上 https://www.zhihu.com/question/652311359/answer/3461508767 
+    * 一些工作讨论，如果不开样本隔离，可能需要尽可能将相关的样本拼在一起（会影响 In Context 能力）
+        * https://arxiv.org/pdf/2312.17296
+* SFT 阶段
+    * 默认样本隔离需要打开，以分离每条指令之间的人设
+    * SFT 另外一个相比预训练的差别是，不计算 query 的 loss
+
+
+<br>
+<br>
 
 ## 长序列算法
 绝对可学习的位置编码、相对位置编码 RoPE、ALibi、NoPE、LM-Infinite、StreamingLLM、LLM Maybe LongLM: Self-Extend LLM Context Window Without Tuning
