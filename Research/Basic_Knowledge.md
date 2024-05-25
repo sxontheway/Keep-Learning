@@ -35,7 +35,7 @@ https://zhuanlan.zhihu.com/p/367908419
 | --- | --- | --- |
 | 参数初始化 | Broadcast 参数同步 | Scatter 参数分发 |
 | 前传 | 无操作 | AllGather 权重 |
-| BP处理delta | AllReduce | ReduceScatter |
+| BP处理梯度 | AllReduce | ReduceScatter |
 
 
 ## Optimizer
