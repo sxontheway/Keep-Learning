@@ -61,7 +61,7 @@
         * 见上图，175B 参数，其中 Common Crawl 有 45TB 原始数据，清洗后 **570GB**（400B BPE token），**所以千亿大模型大约 1-2 TB 高质量干净数据差不多够训练了**
     * GPT-3.5 / InstructGPT / ChatGPT
     
-        > [1. **拆解追溯 GPT-3.5 各项能力的起源**](https://yaofu.notion.site/GPT-3-5-360081d91ec245f29029d37b54573756)  
+        > [1. **拆解追溯 GPT-3.5 各项能力的起源**](https://yaofu.notion.site/GPT-3-5-360081d91ec245f29029d37b54573756)  x
         > [2. **Model index for researchers**](https://platform.openai.com/docs/model-index-for-researchers)   
     
         code-davinci-002，text-davinci-002/003，ChatGPT 都叫 GPT-3.5，都是 code-davinci-002  的微调版本 
@@ -93,7 +93,8 @@
         * Parallel Layer、MQA、No bias、RoPE、Shared Vocab Embedding
     * Lamma2：吸收了 PaLM、Gopher 等模型上架构的微改变，是现被业界广泛采纳的方案（Baichuan、Yi、Mixtral）
         * SwishGLU FFN（3-Linear-layer）、MQA、Pre-RMSNorm、RoPE、No bias
-
+           * 这里 swish 也就是 siLU (Sigmoid Linear Unit), `SiLU = x*σ(x)`，σ 代表 `sigmoid(x) = 1/(1+e^(-x))`
+           * GLU 是门控线性单元 `f(x) = x⊗σ(g(x))`，GeLU 是 ReLU 的一种平滑近似，可以用近似表示，见 https://arxiv.org/pdf/1606.08415
             <p align="left" >
             <img src="./pictures/swishgelu.png" width="700">
             </p>
