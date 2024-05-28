@@ -300,9 +300,12 @@ word embedding 和 positional encoding 相加得到输入网络的 embedding
     * 多个 Head 得到的 Attention concat 之后再经过一个 linear 层，使得 output 与 input 的 shape 是完全一致的，输入 Multi-head Attention 模块的分叉箭头代表多个 head
 
 * Position-wise Fully Connected Feed-Forward Network：FFN（蓝色）
+  * 这里表示的是一个两层 MLP 的 FFN，用的 ReLU 激活。FFN 的激活有很多方式：ReLU、GeLU、GeGLU、ReGLU、SwiGLU。其中后三个的 FFN 包含 3 层 MLP，见 [大模型常见架构总结](./Big_Models.md)
     <p align="center" >
 	<img src="./pictures/encoder2.png"  width="400">
     </p>
+
+* Attention 模块是没有激活函数的（除开 softmax），本质是一个线性变换，解决长距离依赖；非线性是由 FFN 中的激活函数提供的，进行了选择性的特征提取
 
 ### Decoder
 * 说 GPT 系列是 decoder-only 的意思：是说训练方式和 decoder 一样，只能看见上文，没有下文，不是说网络结构
