@@ -177,7 +177,7 @@
 |-|-|-|-|
 | 权重访存量 (fp16) | Byte | `12*l*d*d*2 = 2P` | 模型参数量 `12*l*d*d`，省略了词表, layer_norm 等部分参数 |
 | 推理计算量 - (Decode阶段) | Flop | `24*B*l*d*d = 2*B*P` | 每token的flops是参数量的两倍（未考虑长序列的Attention 计算量）|
-| 访存量-KV缓存 (fp16) | Byte | `2*B*T*l*d*`2 | 7B模型（4k维度32层），4k长度，KV-Cache占用 2GB|
+| 访存量-KV缓存 (fp16) | Byte | `2*B*T*l*d*2` | 7B模型（4k维度32层），4k长度，KV-Cache占用 2GB|
 
 其中，T 是序列长度，P 是参数量，d 是隐维度，B 是 bs
 
