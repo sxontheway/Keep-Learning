@@ -92,9 +92,11 @@
         * FFN 用的 SwiGLU，`Swish(xW)·xV `，2层 MLP 而非 3 层
         * Parallel Layer、MQA、No bias、RoPE、Shared Vocab Embedding
     * Lamma2：吸收了 PaLM、Gopher 等模型上架构的微改变，是现被业界广泛采纳的方案（Baichuan、Yi、Mixtral）
-        * SwishGLU FFN（3-Linear-layer）、MQA、Pre-RMSNorm、RoPE、No bias
-           * 这里 swish 也就是 siLU (Sigmoid Linear Unit), `SiLU = x*σ(x)`，σ 代表 `sigmoid(x) = 1/(1+e^(-x))`
-           * GLU 是门控线性单元 `f(x) = x⊗σ(g(x))`，GeLU 是 ReLU 的一种平滑近似（GeLU可以用fastGeLU近似，见 https://arxiv.org/pdf/1606.08415）
+        * MQA、Pre-RMSNorm、RoPE、No bias
+        * SwishGLU FFN（3-Linear-layer）
+           * 这里 **swish 也就是 siLU (Sigmoid Linear Unit)**, `SiLU = x*σ(x)`，σ 代表 `sigmoid(x) = 1/(1+e^(-x))`
+           * GLU 是门控线性单元 `f(x) = x⊗σ(g(x))`，相当于相比 siLU 要多加一层 MLP
+           * GeLU 是 ReLU 的一种平滑近似（GeLU可以用 fastGeLU 近似，y=x*σ(1.702x)，比 SiLU 多了个常数 1.792，见 https://arxiv.org/pdf/1606.08415）
             <p align="left" >
             <img src="./pictures/swishgelu.png" width="700">
             </p>
