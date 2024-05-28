@@ -94,7 +94,7 @@
     * Lamma2：吸收了 PaLM、Gopher 等模型上架构的微改变，是现被业界广泛采纳的方案（Baichuan、Yi、Mixtral）
         * SwishGLU FFN（3-Linear-layer）、MQA、Pre-RMSNorm、RoPE、No bias
            * 这里 swish 也就是 siLU (Sigmoid Linear Unit), `SiLU = x*σ(x)`，σ 代表 `sigmoid(x) = 1/(1+e^(-x))`
-           * GLU 是门控线性单元 `f(x) = x⊗σ(g(x))`，GeLU 是 ReLU 的一种平滑近似，可以用近似表示，见 https://arxiv.org/pdf/1606.08415
+           * GLU 是门控线性单元 `f(x) = x⊗σ(g(x))`，GeLU 是 ReLU 的一种平滑近似（GeLU可以用fastGeLU近似，见 https://arxiv.org/pdf/1606.08415）
             <p align="left" >
             <img src="./pictures/swishgelu.png" width="700">
             </p>
