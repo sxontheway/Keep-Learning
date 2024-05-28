@@ -9,6 +9,8 @@
     * 训练中途重启：包括改变截断梯度范数 (clip gradient norm)、学习率、改变优化器
     * 一些超参：词向量、layer normalization、激活函数、batch size 的逐渐增长
 
+<br>
+
 ## 模型-数据 的 规模 
 * 模型参数量
     | Model | Organization  | Date  | Size (# params)|
@@ -38,6 +40,8 @@
         <p align="left" >
         <img src="./pictures/train_token_GPT3.png" width="600">
         </p>
+
+<br>
 
 ## 大模型常见架构总结
 * Transformer 模型结构及参数：https://zhuanlan.zhihu.com/p/107891957
@@ -113,6 +117,59 @@
     | LaMMa1 | Causal-decoder | MHA | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
     | LaMMa2 | Causal-decoder | Group-Query Attention | SwiGLU | RoPE | Pre-RMSNorm | AdamW 优化器,BF16混合精度 |
 
+
+<br>
+<br>
+
+# 技术细节
+## 参数量、计算量、内存
+### 参数量 O(12*lh^2)
+* Embedding layer 参数量：`(seq_len + vocab_size) * hidden_size`
+* 每层 transformer layer：`hidden_size*hidden_size*12`，和 h 是平方关系
+    * Attention：`hidden_size*hidden_size*4` （QKV 3，concat 之后的 linear 1）
+    * FFN：一个 hidden layer，两个权重：`hidden_size*hidden_size*4*2` 
+* 所以 seq_len=4096, vocab_size=116444, hidden_size=768，12层
+    * 两个 embedding layer 参数量一共 176M
+    * transformer layer 参数量 81M
+### 计算量
+> https://zhuanlan.zhihu.com/p/624740065
+* 前向：`l * (24bsh^2 + 4bs^2h) + 2bshV`，后向乘以2，如果训练中用了重计算，整体再加一个前向的flops
+    * 计算 QKV：6bsh^2
+    * 计算 QK^T：2bs^2d
+    * 计算 V 的加权：2bs^2d
+    * 计算 attention 后的线性：2bsh^2
+    * 计算 FFN：8bsh^2
+    * 计算词表：2bshV
+    * Softmax：2bs^2
+* 所以长序列 `s>h` 时，`4bs^2h` 不可忽略了
+  * 非长序列场景，前向时，每 token 计算量约为参数量两倍
+
+### 内存
+训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
+
+* 混合精度训练对内存的影响？
+    * 混合精度时，静态内存 = 参数量*16（Bytes）
+        * 参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
+        * 混合精度训练 FP 和 BP 都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，计算好 fp32 的梯度后再缩小
+    * 全 fp32 训练，静态内存也是 16N：优化器状态 8N，梯度和权重分别 4N。主要是提高了算力 FLOPS，然后减少了activation 这些非权重的动态显存
+
+* 动态内存
+    * 前向运行时，所需要的瞬时内存（即便用全部重计算）
+    * 存储部分 Activation buffer 用于反传，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
+        * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
+            * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
+            * tensor并行 可以把一部分激活切成 t 份，但 LayerNorm，dropout 和 input activation 不能倍切分
+            * sequence并行 进一步让 t 能够覆盖到所有激活，但仍然是 O(as^2bh)，a 是注意力头数量
+                * `multi-head attention 中 s*s 的矩阵每个注意力头会出现一次，一共会出现 a 次；模型并行的话，每张卡需要存 a/t 个 s*s 矩阵` 
+            * 经过 recompute 优化后可以变为一次方 `O(sbh)`    
+
+                <p align="left" >
+                <img src="./pictures/memory_comp.png" width="900">
+                </p>
+
+* 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题（非超长）
+    * 100B 模型，模型和优化器参数需要 1600GB 显存；activation 需要 4800GB 的话，一共 6400GB，100张 A100 就能放下
+    * LLama paper：65B模型，1.4T token，需要 100w 个 A100 hour。换算下，100B模型，1T token，100张卡，要训练 400 多天，太慢了，所以一般都是千卡起步
 
 <br>
 <br>
