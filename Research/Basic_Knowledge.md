@@ -53,12 +53,12 @@ https://zhuanlan.zhihu.com/p/367908419
 * CAME
     * 需要比 Adafactor 多算一个 U_t，作为一个 confidence 的补偿：在 `m_t` 和 `u_hat_t` 差别较小时，`S_t` 也较小，从而步长更大
     * 需要保存 r、c、m、R、C。而 v、u、u_hat 都可以复用 g 的内存
-    * beta1 影响 momentum 的更新，beta2/eps1 影响 rc 的更新速度（从而影响梯度 "u"），beta3/eps2 影响 R/C 的更新（从而影响 S，和 lr 的自适应有关）
-    * 实际实现中，beta1/beta3 的作用对应于 adam 的 beta1/beta2，默认值为 0.9/0.999；beta2 是一个随时间增加逼近 1 的值，`beta2t = 1.0 - math.pow(state['step'], group['decay_rate'])`
-* ADAM、Adafactor、CAME 比较
-    
+    	* beta1 影响 momentum 的更新，beta2/eps1 影响 rc 的更新（从而影响 v，控制 g 的缩放），beta3/eps2 影响 R/C 的更新（从而影响 S，加入了 confidence-guided 的对 m 的缩放）
+    	* 实际实现中，beta1/beta3 的作用对应于 adam 的 beta1/beta2，默认值为 0.9/0.999；beta2 是一个随时间增加逼近 1 的值，`beta2t = 1.0 - math.pow(state['step'], group['decay_rate'])`
+
+* ADAM、Adafactor、CAME 比较  
     * CAME 和 Adafactor 所需要存储的优化器参数几乎为 Adam 的一半。但 CAME 和 ADAM 训练的模型精度可比，Adafactor 会差一点
-    * 混合精度训练，总计所需内存从 `16*参数量 -> 12*参数量（多一点）`
+    * 混合精度训练，总计所需内存从 `16*参数量 -> 12*参数量（多一点）`，16 = 4 (m) + 4(v) + 4 (master_weight) + 2 (model_weight) + 2 (grad)
     
     <p align="center" >
         <img src="./pictures/optimizer_3.png" width=1000>
