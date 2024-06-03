@@ -47,6 +47,11 @@ https://zhuanlan.zhihu.com/p/367908419
 
 ### Adam、Adafactor、CAME
 * Adam 是每个参数，维护一个自己的动量 m（来源于一阶梯度） 和速度 v（来源于二阶梯度，用于lr的自适应）
+    *  `m_t` 和 `v_t` 要除以 `(1-beta^t)` 是为了使得 `m_hat_t` 量级上和 `g_t` 一样（可以假设每一步的 `g_t` 都相等，然后把 `m_t` 展开，会发现除了 `(1-beta^t)` 之后 `m_hat_t = g_t` ）
+    *  Adam 的调参技巧：beta2 增加可以帮助收敛，但减少 beta2 可以获得更大自适应度
+	    <p align="left" >
+	        <img src="./pictures/adam_parameter.png" width=600>
+	    </p>
 * Adafactor 是利用矩阵的低秩分解，用向量 r 和 c 去替代矩阵 v
     * v 用于 lr 的自适应缩放：`u_t = g_t/sqrt(v_t)` 为缩放过后的梯度，然后会再进行一个 clip
     * Adafactor 需要保存 m、r、c，产生中间变量 v（但 v 可以复用 g 的内存）
