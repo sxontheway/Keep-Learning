@@ -69,6 +69,8 @@ https://zhuanlan.zhihu.com/p/367908419
         <img src="./pictures/optimizer_3.png" width=1000>
     </p>
 
+* 总的来讲，对于 Adam，CAME，Adafactor 等，都是减少 beta 能让动量更新更快。减少 eps 能让 parameter-wise 的自适应步长更明显。但坏处是更容易不收敛
+
 <br>
 
 ## Unstructure Pruning: Lottery Hypothesis
