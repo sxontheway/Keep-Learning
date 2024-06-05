@@ -69,7 +69,8 @@ https://zhuanlan.zhihu.com/p/367908419
         <img src="./pictures/optimizer_3.png" width=1000>
     </p>
 
-* 总的来讲，对于 Adam，CAME，Adafactor 等，都是减少 beta 能让动量更新更快。减少 eps 能让 parameter-wise 的自适应步长更明显。但坏处是更容易不收敛
+* 总的来讲，对于 Adam，CAME，Adafactor 等，都是减少 beta 能让动量更新更快。减少 eps 能让 parameter-wise 的自适应步长更明显。但坏处是更容易不收敛。
+	* 对于 Adam，一个 175B 参数模型，训练后期 global norm 下降到 0.5，那平均下来每个参数的梯度 `g ~ sqrt(0.5^2/175B) ~ 10e-6`。这时 learning rate 一般也 decay 到 1e-6 1e-5 之间。那这时 eps 的选择（例如 1e-5）其实会直接影响学习率，和多大程度能根据参数的梯度自适应步长 
 
 <br>
 
