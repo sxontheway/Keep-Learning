@@ -358,35 +358,39 @@ Tensor 并行还是调用的 Deepspeed
         </p>
 
     * ReduceScatter 是一种并行归约算法，它将要规约的大数据分成多个部分，分配给不同的处理器执行局部归约操作（为了并行化）
-* 最小测试样例：
-   * `all_to_all_single()` 的 input 和 output 都是一个 tensor，而 `dist.all_to_all(output, input)` 需要都是 list
-   * `all_to_all` 运算要求 input 和 output 类型不一样，并且输入数据的第一个维度能被 group size 整除
+* Torch `all_to_all`，`all_to_all_single` 最小测试样例：
+   * `dist.all_to_all(output, input)` 需要 input output 都是 list，`all_to_all_single()` 的 input 和 output 都是一个 tensor
+      * `all_to_all` 运算要求 input 和 output 类型一样，并且 `input.shape[0]` 能被 group_size 整除，否则结果会很随机
+      * `all_to_all_single()` 运算要求 input 和 output 类型一样，并且 `len(input)` 能被 group_size 整除，否则结果会很随机
    * input 和 ouput 可以是高维的，`all_to_all` 本质上时一个分布式的转置（在 input 第一维和 rank 之间）。所以除了第一维，其他维度都保序
       ```python
       import torch
       import torch.distributed as dist
       import torch.multiprocessing as mp
-      import os
+      import os, math
       
-      os.environ['MASTER_ADDR'] = 'localhost'
-      os.environ['MASTER_PORT'] = '6009'
+      os.environ['MASTER_ADDR'], os.environ['MASTER_PORT'] = 'localhost', '6009'
+      
+      def generate_tensor(shape, rank):
+          "generate tensor like tensor([[[ 0.,  1.], [ 2.,  3.], [ 4.,  5.]], ...]"
+          input = torch.arange(math.prod(shape)) + rank*math.prod(shape)*1.0
+          input = input.reshape(*shape)
+          input = input.to(f"cuda:{rank}")
+          return input
+      
       
       def run_all2all_single(rank, world_size):
           dist.init_process_group("nccl", rank=rank, world_size=world_size)
           local_rank = dist.get_rank()
       
-          a, b, c = 4, 3, 2
-          input = torch.arange(a*b*c) + rank*a*b*c*1.0
-          input = input.reshape(a,b,c)
-          input = input.to(f"cuda:{local_rank}")
-          output = torch.zeros([a,b,c]).to(f"cuda:{local_rank}")
+          shape = [4, 3, 2]
+          input = generate_tensor([4, 3, 2], local_rank)
+          output = torch.zeros(shape).to(f"cuda:{local_rank}")
       
           # 如果 input 和 output 类型不一样，all2all 将输出不正确数值
           assert input.dtype == output.dtype, "input output dtype are not the same"
-      
-          # 如果 all2all 输入数据的第一个维度不被卡数整除，all2all 将输出不正确数值
-          assert a % world_size == 0, "dim 0 of input/output tensor must divide equally by world_size"
-          
+          # 如果 all2all 输入数据的第一个维度不被 group size 整除，all2all 将输出不正确数值
+          assert shape[0] % world_size == 0, "dim 0 of input/output tensor must divide equally by world_size"
           print(input, local_rank, input.dtype)
           
           dist.all_to_all_single(output, input)
@@ -398,8 +402,27 @@ Tensor 并行还是调用的 Deepspeed
           dist.destroy_process_group()
       
       
+      def run_all2all(rank, world_size):
+          dist.init_process_group("nccl", rank=rank, world_size=world_size)
+          local_rank = dist.get_rank()
+          input = [generate_tensor([1,3,2], local_rank), generate_tensor([1,6,2], local_rank)]
+          if local_rank == 0:
+              output = [torch.zeros([1,3,2]).to(f"cuda:{local_rank}"), torch.ones([1,3,2]).to(f"cuda:{local_rank}")]
+          if local_rank == 1:
+              output = [torch.zeros([1,6,2]).to(f"cuda:{local_rank}"), torch.ones([1,6,2]).to(f"cuda:{local_rank}")]
+          print(input, local_rank)
+          
+          dist.all_to_all(output, input)
+          dist.barrier()
+          if local_rank == 0:
+              print("-----")
+          print(output)
+      
+          dist.destroy_process_group()
+      
+      
       if __name__ == "__main__":
-          n_gpus = 4
+          n_gpus = 2
           run = run_all2all_single
           mp.spawn(run, args=(n_gpus,), nprocs=n_gpus, join=True)
       ```
