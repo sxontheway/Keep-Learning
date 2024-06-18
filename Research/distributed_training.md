@@ -358,6 +358,51 @@ Tensor 并行还是调用的 Deepspeed
         </p>
 
     * ReduceScatter 是一种并行归约算法，它将要规约的大数据分成多个部分，分配给不同的处理器执行局部归约操作（为了并行化）
+* 最小测试样例：
+   * `all_to_all_single()` 的 input 和 output 都是一个 tensor，而 `dist.all_to_all(output, input)` 需要都是 list
+   * `all_to_all` 运算要求 input 和 output 类型不一样，并且输入数据的第一个维度能被 group size 整除
+   * input 和 ouput 可以是高维的，`all_to_all` 本质上时一个分布式的转置（在 input 第一维和 rank 之间）。所以除了第一维，其他维度都保序
+      ```python
+      import torch
+      import torch.distributed as dist
+      import torch.multiprocessing as mp
+      import os
+      
+      os.environ['MASTER_ADDR'] = 'localhost'
+      os.environ['MASTER_PORT'] = '6009'
+      
+      def run_all2all_single(rank, world_size):
+          dist.init_process_group("nccl", rank=rank, world_size=world_size)
+          local_rank = dist.get_rank()
+      
+          a, b, c = 4, 3, 2
+          input = torch.arange(a*b*c) + rank*a*b*c*1.0
+          input = input.reshape(a,b,c)
+          input = input.to(f"cuda:{local_rank}")
+          output = torch.zeros([a,b,c]).to(f"cuda:{local_rank}")
+      
+          # 如果 input 和 output 类型不一样，all2all 将输出不正确数值
+          assert input.dtype == output.dtype, "input output dtype are not the same"
+      
+          # 如果 all2all 输入数据的第一个维度不被卡数整除，all2all 将输出不正确数值
+          assert a % world_size == 0, "dim 0 of input/output tensor must divide equally by world_size"
+          
+          print(input, local_rank, input.dtype)
+          
+          dist.all_to_all_single(output, input)
+          dist.barrier()
+          if local_rank == 0:
+              print("-----")
+          print(output)
+      
+          dist.destroy_process_group()
+      
+      
+      if __name__ == "__main__":
+          n_gpus = 4
+          run = run_all2all_single
+          mp.spawn(run, args=(n_gpus,), nprocs=n_gpus, join=True)
+      ```
 
 <br>
 
