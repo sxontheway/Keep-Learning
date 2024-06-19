@@ -363,6 +363,7 @@ Tensor 并行还是调用的 Deepspeed
       * `all_to_all` 运算要求 input 和 output 类型一样，并且 `input.shape[0]` 能被 group_size 整除，否则结果会很随机
       * `all_to_all_single()` 运算要求 input 和 output 类型一样，并且 `len(input)` 能被 group_size 整除，否则结果会很随机
    * input 和 ouput 可以是高维的，`all_to_all` 本质上时一个分布式的转置（在 input 第一维和 rank 之间）。所以除了第一维，其他维度都保序
+   * 注意 input 和 output 的 dtype 和 shape 要匹配上，否则会出现数值错误或 ncclInvalidUsage Error
       ```python
       import torch
       import torch.distributed as dist
