@@ -405,11 +405,14 @@ Tensor 并行还是调用的 Deepspeed
       def run_all2all(rank, world_size):
           dist.init_process_group("nccl", rank=rank, world_size=world_size)
           local_rank = dist.get_rank()
-          input = [generate_tensor([1,3,2], local_rank), generate_tensor([1,6,2], local_rank)]
+          input = [generate_tensor([2,3], local_rank), generate_tensor([3,3], local_rank)+0.5]
+          output = []
+          # 这里如果 rank 0 上第一个tensor的尺寸小于 [2,3]，或 rank 1 上第二个tensor尺寸小于 [3,3]，会报 ncclInvalidUsage Error
+          # 如果 rank 0 第二个tensor，或 rank 1 第一个tensor尺寸变小，会出现数值问题
           if local_rank == 0:
-              output = [torch.zeros([1,3,2]).to(f"cuda:{local_rank}"), torch.ones([1,3,2]).to(f"cuda:{local_rank}")]
+              output = [torch.zeros([2,3]).to(f"cuda:{local_rank}"), torch.ones([2,3]).to(f"cuda:{local_rank}")]
           if local_rank == 1:
-              output = [torch.zeros([1,6,2]).to(f"cuda:{local_rank}"), torch.ones([1,6,2]).to(f"cuda:{local_rank}")]
+              output = [torch.zeros([3,3]).to(f"cuda:{local_rank}"), torch.ones([3,3]).to(f"cuda:{local_rank}")]
           print(input, local_rank)
           
           dist.all_to_all(output, input)
@@ -423,7 +426,7 @@ Tensor 并行还是调用的 Deepspeed
       
       if __name__ == "__main__":
           n_gpus = 2
-          run = run_all2all_single
+          run = run_all2all
           mp.spawn(run, args=(n_gpus,), nprocs=n_gpus, join=True)
       ```
 
