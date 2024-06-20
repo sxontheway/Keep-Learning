@@ -359,11 +359,12 @@ Tensor 并行还是调用的 Deepspeed
 
     * ReduceScatter 是一种并行归约算法，它将要规约的大数据分成多个部分，分配给不同的处理器执行局部归约操作（为了并行化）
 * Torch `all_to_all`，`all_to_all_single` 最小测试样例：
-   * `dist.all_to_all(output, input)` 需要 input output 都是 list，`all_to_all_single()` 的 input 和 output 都是一个 tensor
-      * `all_to_all` 运算要求 input 和 output 类型一样，并且 `input.shape[0]` 能被 group_size 整除，否则结果会很随机
-      * `all_to_all_single()` 运算要求 input 和 output 类型一样，并且 `len(input)` 能被 group_size 整除，否则结果会很随机
-   * input 和 ouput 可以是高维的，`all_to_all` 本质上时一个分布式的转置（在 input 第一维和 rank 之间）。所以除了第一维，其他维度都保序
+   * `dist.all_to_all(output, input)` 要求 input output 都是 list；而 `all_to_all_single()` 的 input 和 output 都是一个 tensor
+      * `all_to_all()` 运算要求 input 和 output 类型一样，并且 `input.shape[0]` 能被 group_size 整除，否则结果会出现意想不到的随机数
+      * `all_to_all_single()` 运算要求 input 和 output 类型一样，并且 `len(input)` 能被 group_size 整除，否则结果会出现意想不到的随机数
+      * input 和 ouput 可以是高维的，`all_to_all` 本质上时一个分布式的转置（在 input 第一维和 rank 之间）。所以除了第一维，其他维度都保序
    * 注意 input 和 output 的 dtype 和 shape 要匹配上，否则会出现数值错误或 ncclInvalidUsage Error
+   * 下面有一个使用 `dist.all_to_all` 和 `dist.all_to_all_single()` 的例子
       ```python
       import torch
       import torch.distributed as dist
@@ -378,7 +379,6 @@ Tensor 并行还是调用的 Deepspeed
           input = input.reshape(*shape)
           input = input.to(f"cuda:{rank}")
           return input
-      
       
       def run_all2all_single(rank, world_size):
           dist.init_process_group("nccl", rank=rank, world_size=world_size)
@@ -395,13 +395,10 @@ Tensor 并行还是调用的 Deepspeed
           print(input, local_rank, input.dtype)
           
           dist.all_to_all_single(output, input)
-          dist.barrier()
           if local_rank == 0:
               print("-----")
           print(output)
-      
           dist.destroy_process_group()
-      
       
       def run_all2all(rank, world_size):
           dist.init_process_group("nccl", rank=rank, world_size=world_size)
@@ -417,19 +414,34 @@ Tensor 并行还是调用的 Deepspeed
           print(input, local_rank)
           
           dist.all_to_all(output, input)
-          dist.barrier()
           if local_rank == 0:
               print("-----")
           print(output)
-      
           dist.destroy_process_group()
-      
       
       if __name__ == "__main__":
           n_gpus = 2
           run = run_all2all
           mp.spawn(run, args=(n_gpus,), nprocs=n_gpus, join=True)
       ```
+* 一般而言都只用 `dist.all_to_all_single()`，因为其输入输出都是 tensor，可以用 torch.autograd 构造正反向（autograd 不对 list 生效）
+   ```python
+   class _AllToAll(torch.autograd.Function):
+   
+    @staticmethod
+    def forward(ctx, input, input_splits, output_splits):  
+        ctx.input_splits = input_splits
+        ctx.output_splits = output_splits
+        output = torch.empty([sum(output_splits), *input.shape[1:]], dtype=input.dtype).to(input.device)
+        dist.all_to_all_single(output, input, output_splits, input_splits)
+        return output
+   
+    @staticmethod
+    def backward(ctx, grad_output):
+        return (_AllToAll.apply(grad_output, ctx.output_splits, ctx.input_splits), None, None)
+   ```
+   详细例子，见 [all2all 多卡训练最小样例](./a2a_bp)
+
 
 <br>
 
