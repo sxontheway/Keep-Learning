@@ -440,7 +440,7 @@ Tensor 并行还是调用的 Deepspeed
     def backward(ctx, grad_output):
         return (_AllToAll.apply(grad_output, ctx.output_splits, ctx.input_splits), None, None)
    ```
-   详细例子，见 [all2all 多卡训练最小样例](./a2a_bp)
+   详细例子，见 [all2all 多卡训练最小样例](./a2a_bp.py)
 
 
 <br>
