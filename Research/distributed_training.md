@@ -438,6 +438,7 @@ Tensor 并行还是调用的 Deepspeed
    
     @staticmethod
     def backward(ctx, grad_output):
+        # 返回值对应 forward 的输入，输入值 grad_output 对应 forwardn 的输出
         return (_AllToAll.apply(grad_output, ctx.output_splits, ctx.input_splits), None, None)
    ```
    详细例子，见 [all2all 多卡训练最小样例](./a2a_bp.py)
