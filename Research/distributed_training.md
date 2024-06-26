@@ -528,7 +528,7 @@ if __name__ == "__main__":
     main()
 ```
 * Node0：`python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="10.90.91.54" --master_port=12355 test.py`  
-* Node1：`python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="10.90.91.54" --master_port=12355 test.py`  
+* Node1：`python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr="10.90.91.54" --master_port=12355 test.py`  
 * 其中 `os.environ['NCCL_SOCKET_IFNAME']` 的配置很重要，例如这个代码是针对 PCIE 的，需要 `ip a` 或 `ifconfig` 找到通信的IP接口（网卡)  
 * 具体用的什么也可以查找 nccl 互联时的打印信息 `NCCL INFO Bootstrap` 查看，例如 `NCCL INFO Bootstrap : Using enp4s0f0:10.90.91.54<0>`
 <br>
