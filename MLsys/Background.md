@@ -1,3 +1,32 @@
+# GPU 互联
+> [GPU 进阶笔记（一）：高性能 GPU 服务器硬件拓扑与集群组网](https://arthurchiao.art/blog/gpu-advanced-notes-1-zh/)
+```
+# A100*8 的拓扑图：nvidia-smi topo -m
+        GPU0    GPU1    GPU2    GPU3    GPU4    GPU5    GPU6    GPU7    NIC0    NIC1    NIC2    NIC3    NIC4    NIC5    NIC6    NIC7    CPU Affinity    NUMA Affinity
+GPU0     X      NV12    NV12    NV12    NV12    NV12    NV12    NV12    PXB     PXB     NODE    NODE    SYS     SYS     SYS     SYS     0-31,64-95      0            
+GPU1    NV12     X      NV12    NV12    NV12    NV12    NV12    NV12    PXB     PXB     NODE    NODE    SYS     SYS     SYS     SYS     0-31,64-95      0            
+GPU2    NV12    NV12     X      NV12    NV12    NV12    NV12    NV12    NODE    NODE    PXB     PXB     SYS     SYS     SYS     SYS     0-31,64-95      0            
+GPU3    NV12    NV12    NV12     X      NV12    NV12    NV12    NV12    NODE    NODE    PXB     PXB     SYS     SYS     SYS     SYS     0-31,64-95      0           
+GPU4    NV12    NV12    NV12    NV12     X      NV12    NV12    NV12    SYS     SYS     SYS     SYS     PXB     PXB     NODE    NODE    32-63,96-127    1          
+GPU5    NV12    NV12    NV12    NV12    NV12     X      NV12    NV12    SYS     SYS     SYS     SYS     PXB     PXB     NODE    NODE    32-63,96-127    1           
+GPU6    NV12    NV12    NV12    NV12    NV12    NV12     X      NV12    SYS     SYS     SYS     SYS     NODE    NODE    PXB     PXB     32-63,96-127    1            
+GPU7    NV12    NV12    NV12    NV12    NV12    NV12    NV12     X      SYS     SYS     SYS     SYS     NODE    NODE    PXB     PXB     32-63,96-127    1           
+NIC0    PXB     PXB     NODE    NODE    SYS     SYS     SYS     SYS      X      PIX     NODE    NODE    SYS     SYS     SYS     SYS
+NIC1    PXB     PXB     NODE    NODE    SYS     SYS     SYS     SYS     PIX      X      NODE    NODE    SYS     SYS     SYS     SYS
+NIC2    NODE    NODE    PXB     PXB     SYS     SYS     SYS     SYS     NODE    NODE     X      PIX     SYS     SYS     SYS     SYS
+NIC3    NODE    NODE    PXB     PXB     SYS     SYS     SYS     SYS     NODE    NODE    PIX      X      SYS     SYS     SYS     SYS
+NIC4    SYS     SYS     SYS     SYS     PXB     PXB     NODE    NODE    SYS     SYS     SYS     SYS      X      PIX     NODE    NODE
+NIC5    SYS     SYS     SYS     SYS     PXB     PXB     NODE    NODE    SYS     SYS     SYS     SYS     PIX      X      NODE    NODE
+NIC6    SYS     SYS     SYS     SYS     NODE    NODE    PXB     PXB     SYS     SYS     SYS     SYS     NODE    NODE     X      PIX
+NIC7    SYS     SYS     SYS     SYS     NODE    NODE    PXB     PXB     SYS     SYS     SYS     SYS     NODE    NODE    PIX      X 
+```
+* NIC (Network Interface Card)：网卡；NUMA（Non-uniform memory access）非统一内存访问，每个节点通常包含自己的处理器、内存和 I/O 设备，同 NUMA 内的内存访问比跨 NUMA 的快
+* NV12：8个GPU，每个都和 6 个 NVSwitch 芯片有共 12 条 NVlink，双向带宽 50GB*12=600GB/2，单向是 300GB/s
+* PXB：经过 `PCIE Gen4 Swicth` RDMA（直接内存访问）
+* NODE：不需要跨 NUMA 但要跨多个 PCIE：`GPU0 <--> PCIE Switch 1 <--> CPU <--> PCIE Switch 2 <--> GPU2`
+* SYS：跨 NUMA 节点通过 SMP 互连（如 QPI/UPI）。PS：SMP-Symmetric Multi-Processor；QPI/UPI 都是 CPU 之间互联的协议
+
+
 # 矩阵乘法/卷积优化的原理
 > [tvm schedule详细举例](https://zhuanlan.zhihu.com/p/94846767)
 
