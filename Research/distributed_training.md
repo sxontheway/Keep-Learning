@@ -502,7 +502,35 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 ### 优化器并行
 * 优化器并行时，对于每个参数都会进行 AllGather 操作和 ReduceScatter 操作
 
+### Torch 最小分布式测试代码
+```python
+# test.py
+import os
+import torch
+import torch.distributed as dist
 
+os.environ['NCCL_DEBUG'] = 'INFO'
+os.environ['NCCL_SOCKET_IFNAME'] = 'enp4s0f0'  # docker,eth,em,bond
+# os.environ['NCCL_IB_DISABLE'] = '1'
+
+def main():
+    dist.init_process_group(backend='nccl')
+    rank = dist.get_rank()
+    world_size = dist.get_world_size()
+    print(rank, world_size)
+    
+    torch.cuda.set_device(rank % torch.cuda.device_count())
+    tensor = torch.ones(1).cuda()
+    dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+    print(f'Rank {rank} has data {tensor[0]}')
+
+if __name__ == "__main__":
+    main()
+```
+* Node0：`python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="10.90.91.54" --master_port=12355 test.py`  
+* Node1：`python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="10.90.91.54" --master_port=12355 test.py`  
+* 其中 `os.environ['NCCL_SOCKET_IFNAME']` 的配置很重要，例如这个代码是针对 PCIE 的，需要 `ip a` 或 `ifconfig` 找到通信的IP接口（网卡)  
+* 具体用的什么也可以查找 nccl 互联时的打印信息 `NCCL INFO Bootstrap` 查看，例如 `NCCL INFO Bootstrap : Using enp4s0f0:10.90.91.54<0>`
 <br>
 <br>
 
