@@ -221,7 +221,8 @@
         * 上面的 `--ulimit memlock` 用于设置每个进程可以锁定的最大内存量，防止内存被swap出去
         * `--shm-size` 设置容器内共享内存的总大小，用于进程间通信
 
-* ***最终命令：`docker run -dit --gpus all --ipc=host --network host --ulimit memlock=-1 --ulimit stack=67108864 --shm-size 16G -v /nas:/nas -v /mnt:/mnt -p 6003:6003 --name sx_test images:torch1.11_cuda11.6`***，其中 `-p 6003:6003` 为了让主机和 docker 内部的 6003 联通
+* ***最终命令：`docker run -dit --gpus all --ipc=host --network=host --ulimit memlock=-1 --ulimit stack=67108864 --shm-size 16G -v /nas:/nas -v /mnt:/mnt -p 6003:6003 --name sx_test images:torch1.11_cuda11.6`***，其中 `-p 6003:6003` 为了让主机和 docker 内部的 6003 连通
+    * --network=host 选作用：容器可以直接使用主机的网络，而不是创建自己的网络命名空间。容器内的网络配置（如IP地址、端口等）与主机完全相同。     
     * 最后进入容器：`docker start -i sx_test`
     * 可以用如下的代码测试，或用 [torch分布式通信测试代码](https://github.com/sxontheway/Keep-Learning/blob/master/Research/distributed_training.md#torch-%E6%9C%80%E5%B0%8F%E5%88%86%E5%B8%83%E5%BC%8F%E6%B5%8B%E8%AF%95%E4%BB%A3%E7%A0%81)
       ```python
