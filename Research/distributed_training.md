@@ -114,7 +114,7 @@
 
 
 ### 总结
-* 一般对通信量：Tensor并行 > 专家并行 > 数据并行 > pipeline并行
+* 一般对通信量：Tensor并行 >= 专家并行 > 数据并行 > pipeline并行
     * 其中 数据并行和 pipeline并行 的比较，见 https://www.high-flyer.cn/blog/model_parallel-2/ ，当 Transform 变宽时，pipeline 并行通信量上更占优。**但这个规则不是死的，见下文**
     * 经验：
         * **首先满足 tensor 并行，把最高速的 intra-server gpu 通信留给 tensor 并行**
@@ -501,6 +501,28 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 
 ### 优化器并行
 * 优化器并行时，对于每个参数都会进行 AllGather 操作和 ReduceScatter 操作
+
+
+<br>
+
+## 实例
+### Profiling tensor parallel 实例
+<p align="left" >
+<img src="./pictures/forward_profiling.png" width="1200">
+</p>
+<p align="left" >
+<img src="./pictures/backward_profiling.png" width="1200">
+</p>
+
+* 前向没有 通信-计算 重叠（通信的红色块阻塞了计算的蓝色块）
+    * 因为用了 Megatron3 的 sequence-parallel，前向在 attention 前后、在 FFN 前后，分别有一个 reduce-scatter 和 all-gather（记住 all-reduce = RS + AG）
+* 反向可以有 --overlap-grad-reduce：让 BP 的计算和梯度 all-reduce 并行
+    * 图中未画出 data-parallel 通信的 stream，但是可以和 BP 计算并行的
+    * 正常情况下，反向是 `AG -> FFN -> RS -> AG -> FA (SA) -> RS`。但图中多了一个 AG（绿色的和蓝色的 AG），原因猜测可能是：fuse-qkv（qkv 用一个大矩阵计算再 split 得到），和 swishglu 都是用的大矩阵计算再 split，所以需要先 all-gather 在按 tp split
+    * 反向计算量是正向的两倍，因为正向只需要 `Y=XW`，而反向要求 `dL/dx` 和 `dL/dw`
+        * 其中 `dL/dx` 先做，做了之后就可以让 R-S 通信和 `dL/dw` 的计算重叠
+
+
 
 ### Torch 最小分布式测试代码
 ```python
