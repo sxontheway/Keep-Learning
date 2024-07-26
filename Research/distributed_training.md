@@ -515,12 +515,14 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 </p>
 
 * 前向没有 通信-计算 重叠（通信的红色块阻塞了计算的蓝色块）
-    * 因为用了 Megatron3 的 sequence-parallel，前向在 attention 前后、在 FFN 前后，分别有一个 reduce-scatter 和 all-gather（记住 all-reduce = RS + AG）
+    * 因为用了 Megatron3 的 sequence-parallel，前向在 attention 前后、在 FFN 前后，分别有一个 reduce-scatter 和 all-gather（通信量没增加，记住 all-reduce = RS + AG）
 * 反向可以有 --overlap-grad-reduce：让 BP 的计算和梯度 all-reduce 并行
-    * 图中未画出 data-parallel 通信的 stream，但是可以和 BP 计算并行的
-    * 正常情况下，反向是 `AG -> FFN -> RS -> AG -> FA (SA) -> RS`。但图中多了一个 AG（绿色的和蓝色的 AG），原因猜测可能是：fuse-qkv（qkv 用一个大矩阵计算再 split 得到），和 swishglu 都是用的大矩阵计算再 split，所以需要先 all-gather 在按 tp split
+    * 图中未画出 data-parallel 通信的 stream，但是会发现其 allreduce 通信是和 BP 的计算重叠的（因为用了梯度累加，图中仅显示了一次梯度计算）
+    * 正常情况下，反向是 `AG -> FFN -> RS -> AG -> FA (SA) -> RS`。但图中多了两个 AG（绿色的和蓝色的 AG），原因是：
+       * LayerNorm的激活其实是被切分的，但是 FFN 和 Attention 的 TP 的反传需要未切分的激活，所以重计算了 all-gather（Megatron3 paper 公式 3 下面）。但是这个可以和计算部分重叠，例如图中 FFN 部分的 `dL/dx_1` 的梯度计算比这个 AG 时间长，就完全遮盖了
+       * 但是 Attention 部分的梯度计算耗时比 AG 短，所以 AG 的蓝色块导致了阻塞（上面的红色）
     * 反向计算量是正向的两倍，因为正向只需要 `Y=XW`，而反向要求 `dL/dx` 和 `dL/dw`
-        * 其中 `dL/dx` 先做，做了之后就可以让 R-S 通信和 `dL/dw` 的计算重叠
+        * 例如图中 `dL/dx_1` 先做，做了之后就可以让 R-S 通信和 `dL/dw_1` 的计算重叠
 
 
 
