@@ -28,7 +28,7 @@
                 <img src="./pictures/seq_parr.png" width="600">
                 </p>
         * 方法二：recompute activation
-            * 详见上面的 paper：softmax/dropout/attention over V 的激活占存储很大，但 FLOPs 不大，可以对它们进行重计算即可；其他 matrix 乘法相关部分就不进行重计算了，这样能减小 memory，但不增加很多计算开销
+            * 详见上面的 paper：softmax/dropout/attention over V 的激活占存储很大，但 FLOPs 不大，可以对它们进行重计算即可；其他 matrix 乘法相关部分就不进行重计算了，这样能减小 memory，但不增加很多计算开销（在不是超长序列的情况下）
 
                 <p align="left" >
                 <img src="./pictures/qkv_detail.png" width="500">
@@ -448,12 +448,15 @@ Tensor 并行还是调用的 Deepspeed
 
 ## 通信算子和并行方式的关系
 ### 概括
-* 数据并行、张量并行、优化器并行会引入 Reduce（或 reduce 衍生的 all-reduce，reduce-scatter）    
+* 数据并行会引入对梯度的 all reduce（或拆分成 all-gather 和 reduce-scatter 实现）
+   * 优化器并行会额外引入额外的 all-gather，和 reduce-scatter（zero 1 只切分优化器状态，zero2/3 分别加上对梯度、模型权重的切分）
+* 张量并行会引入对激活的 all reduce（或用了 sequence parallel 之后的 all-gather 和 reduce-scatter）
 * 流水线并行只 send/recv，不引入reduce
-* 数据并行的通信一般和计算可以重叠隐藏，但张量并行的通信几乎无法隐藏（阻塞的），流水线并行中的通信在但个 microbath 是无法隐藏的，但在多个 microbatch 之间是可以隐藏的，bubble 也是无法消除的（只能尽量减少）
+* 数据并行的通信一般和计算可以重叠隐藏，但张量并行的通信几乎很难隐藏（也有优化方案，例如 [Ascend MC2 ](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/mc2.md)），流水线并行中的通信在单个 microbath 是无法隐藏的，但在多个 microbatch 之间是可以隐藏的，并尽可能去减小 bubble
 
 ### 数据并行
-* 数据并行训练，前向：各设备独立计算即可，不需要用到通信；后向：需要各设备实现梯度的 AllReduce    
+* 数据并行训练，前向后向各设备独立计算即可，不需要用到通信。后向得到梯度后，各设备再进行梯度的 AllReduce（DDP）
+   * 有 BN 这种需要整个 batch 数据同步的除外，在前后向分别都需要通信     
 
 * 其他场景，例如计算loss/accuracy，比如对各设备上的值进行求和，然后求平均等，也会用到 Reduce 操作
 
