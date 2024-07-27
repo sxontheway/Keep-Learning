@@ -137,3 +137,32 @@ opencv读入的图像是BGR，要转化为RGB，可以有如下两种实现，�
 * weight_decay 会导致本来不应该梯度更新的参数改变
   * FC 层得到的 logit 是 (batch_size, 10)。我们只选取第 1,3,5,7,9 类，得到 (batch_size, 5) 的 tensor，进行 CrossEntropy 求 loss。在这种情况下，对应第 0,2,4,6,8 类的权重是应该不会变的，但训练发现它们都变了  
   * 问题出在 weight_decay：没有设成 0。现象：将 grad print 出来，发现 grad 都是 0，然后 weight 的 parameter 随着训练不断减小
+
+<br>
+
+* 在 forward 函数中临时修改定义的模块，会导致权重不能更新  
+  * `self.weight = self.weight.float()` 这一行会导致 `self.weight` 不能被更新    
+  * 正确做法：`logits = torch.nn.functional.linear(input_fp32, weight=self.wg.weight.float(), bias=None)`，这会在计算图中多加一个 case 操作，而不是重新新建一个 parameter，见 https://github.com/microsoft/DeepSpeed/pull/5156/commits/aab9fc3a29bab6e50b62c7f39d4df734058ead9d 
+
+    ```python
+    class TopkGate(Module):
+
+        def __init__(self, config: Config) -> None:
+            super().__init__()
+            
+            # Only top-1 and top-2 are supported at the moment.
+            if config.topk != 1 and config.topk != 2:
+                raise ValueError('Only top-1 and top-2 gatings are supported.')
+            self.weight = torch.nn.Linear(config.hidden_size, config.num_experts, bias=False).float() 
+            self.config = config
+
+        def forward(self, input: torch.Tensor) -> Tuple[Tensor, ...]: # type: ignore
+            self.weight = self.weight.float()
+            logits = self.weight(input.float())
+            if self.config.topk == 1:
+                gate_output = top1gating(logits, self.config)
+            else:
+                gate_output = top2gating(logits, self.config)
+            
+            return gate_output
+    ```
