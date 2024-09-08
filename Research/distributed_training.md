@@ -28,7 +28,7 @@
                 <img src="./pictures/seq_parr.png" width="600">
                 </p>
         * 方法二：recompute activation
-            * 详见上面的 paper：softmax/dropout/attention over V 的激活占存储很大，但 FLOPs 不大，可以对它们进行重计算即可；其他 matrix 乘法相关部分就不进行重计算了，这样能减小 memory，但不增加很多计算开销
+            * 详见上面的 paper：softmax/dropout/attention over V 的激活占存储很大，但 FLOPs 不大，可以对它们进行重计算即可；其他 matrix 乘法相关部分就不进行重计算了，这样能减小 memory，但不增加很多计算开销（在不是超长序列的情况下）
 
                 <p align="left" >
                 <img src="./pictures/qkv_detail.png" width="500">
@@ -42,12 +42,16 @@
 
 
 ### pipeline 并行
-* GPipe，PipeDream 分别为 同步和异步
-* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation（总计 micro_size 份激活），而一般 `micro_size >> pipeline_num`
-* PipeDream-1F1B 体现在最后一个 worker，一次 forward 过后就执行一次 backward，从而解决 micro_size 份激活的内存开销问题
-    * 但其可能会导致一个 mini-batch 在 forward 和 backward 的时候用的是不同的版本权重。例如下图红色箭头中 work-3 microbatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了一次（和深度学习假设冲突了），会导致训练效果下降
-    * 为了解决这个问题，Pipedream 每个 worker 最多需要存储 4 个版本的 weight（4 是 stage 数量，一般是比 microsize 数量小很多）
+* Pipeline 并行分为 同步 和 异步
+   * 同步：GPipie（F-then-B），PipeDream-Flush
+   * 异步：PipeDream（最早的方案即为1F1B），PipeDream-2BW
+   * 其中 PipeDream-2BW，PipeDream-Flash 是 PipeDream-1F1B 的两种变体。目标是减少 GPipie bubble，但同时也不像 PipeDream-1F1B 一样存很多版本权重，并且尽可能同步 flash
 
+* GPipie 中每个 worker 都需要保存图中 mini-batch 1234 的 activation（总计 micro_size 份激活），而一般 `micro_size >> pipeline_num`
+
+* PipeDream-1F1B 体现在最后一个 worker，一次 forward 过后就执行一次 backward，解决了 micro_size 份激活的内存开销问题。从而可以增大 micro_size 来减少 bubble
+    * 但异步可能会导致一个 mini-batch 在 forward 和 backward 时用了不同的版本权重。例如下图红色箭头中 work-3 microbatch-4 的 forward 和 backward 之间被插入了 3 的 backward，使得权重改变了一次（和深度学习假设冲突了），会导致训练效果下降
+    * 为了解决这个问题，Pipedream-1F1B 第一个 worker 最多需要存储 4 个版本的 weight（4 是 stage 数量，一般是比 microsize 数量小很多）
         <p align="left" >
         <img src="./pictures/pipeline_p.png" width="900">
         </p>
@@ -55,16 +59,27 @@
         > 图中 W_i(v) indicates weights on worker i with version v  
         > 红色箭头表示了一个 microbatch-4 的 FP 和 BP
 
-* PipeDream 之后又有两种变体 PipeDream-2BW，PipeDream-Flash；目标是减少 GPipie bubble，但同时也不像 PipeDream 一样存很多版本权重，并且尽可能同步 flash
-    * Megatron-2 用的就是 PipeDream-Flash（下图），需要存 p 份（流水线数量）激活 + 和一个权重版本（对内存最友好）
-    * PipeDream-Flush 其会比初版 PipeDream 慢一些，主要体现在：
+ * PipeDream-Flash（下图，pp 4，num_micro_batch 8）
+    * 需要存 p 份（流水线数量）激活 + 和一个权重版本（对内存最友好）
+    * PipeDream-Flush 其会比 PipeDream-1F1B 慢一些，主要体现在：
         * 和 GPipe 一样有定期的 flush（黑色线，而不像上图 PipeDream 中在第 4 个 batch 之后就没有 flush 了，所以 bubble 会变大）
             * 下图 microsize=8，pp=4，但每个 device 最多堆积 pp 个 microbatch 的前向（device 3）
         * 还有一个区别是 worker3 的 microbatch 1 backward 之后，不执行 microbatch 3 forward 了， 而是闲置等待，直到可以执行 microbatch 2 backward
+     <p align="left" >
+     <img src="./pictures/pipedream_flush.png" width="700">
+     </p>
 
-        <p align="left" >
-        <img src="./pictures/pipedream_flush.png" width="800">
-        </p>
+* Interleaved PipeDream-Flush-1F1B（Megatron-2 paper 提出的）
+   * 假设 stage=4，virtual_stage=2。前向的顺序是：`GPU 0 -> 1 -> 2 -> 3 -> 0 -> 1 -> 2 -> 3`
+   * 用通信换取更小的 bubble，能够将 bubble 减小 v 倍。下图深蓝色是第一个 chunk，浅蓝色是第二个 chunk
+     <p align="left" >
+     <img src="./pictures/pipedream_interleaved.png" width="700">
+     </p>
+     
+* 几个著名框架中的使用情况
+   * Pytorch 原生: 用的是 GPipe 方案（F-then-B）
+   * DeepSpeed: PipeDream-Flush-1F1B, non-interleaved（高精度、最少内存、少通信、稍慢）
+   * Megatron-LM: PipeDream-Flush-1F1B, interleaved
 
 
 ### 数据并行
@@ -114,7 +129,7 @@
 
 
 ### 总结
-* 一般对通信量：Tensor并行 > 专家并行 > 数据并行 > pipeline并行
+* 一般对通信量：Tensor并行 >= 专家并行 > 数据并行 > pipeline并行
     * 其中 数据并行和 pipeline并行 的比较，见 https://www.high-flyer.cn/blog/model_parallel-2/ ，当 Transform 变宽时，pipeline 并行通信量上更占优。**但这个规则不是死的，见下文**
     * 经验：
         * **首先满足 tensor 并行，把最高速的 intra-server gpu 通信留给 tensor 并行**
@@ -358,17 +373,105 @@ Tensor 并行还是调用的 Deepspeed
         </p>
 
     * ReduceScatter 是一种并行归约算法，它将要规约的大数据分成多个部分，分配给不同的处理器执行局部归约操作（为了并行化）
+* Torch `all_to_all`，`all_to_all_single` 最小测试样例：
+   * `dist.all_to_all(output, input)` 要求 input output 都是 list；而 `all_to_all_single()` 的 input 和 output 都是一个 tensor
+      * `all_to_all()` 运算要求 input 和 output 类型一样，并且 `input.shape[0]` 能被 group_size 整除，否则结果会出现意想不到的随机数
+      * `all_to_all_single()` 运算要求 input 和 output 类型一样，并且 `len(input)` 能被 group_size 整除，否则结果会出现意想不到的随机数
+      * input 和 ouput 可以是高维的，`all_to_all` 本质上时一个分布式的转置（在 input 第一维和 rank 之间）。所以除了第一维，其他维度都保序
+   * 注意 input 和 output 的 dtype 和 shape 要匹配上，否则会出现数值错误或 ncclInvalidUsage Error
+   * 下面有一个使用 `dist.all_to_all` 和 `dist.all_to_all_single()` 的例子
+      ```python
+      import torch
+      import torch.distributed as dist
+      import torch.multiprocessing as mp
+      import os, math
+      
+      os.environ['MASTER_ADDR'], os.environ['MASTER_PORT'] = 'localhost', '6009'
+      
+      def generate_tensor(shape, rank):
+          "generate tensor like tensor([[[ 0.,  1.], [ 2.,  3.], [ 4.,  5.]], ...]"
+          input = torch.arange(math.prod(shape)) + rank*math.prod(shape)*1.0
+          input = input.reshape(*shape)
+          input = input.to(f"cuda:{rank}")
+          return input
+      
+      def run_all2all_single(rank, world_size):
+          dist.init_process_group("nccl", rank=rank, world_size=world_size)
+          local_rank = dist.get_rank()
+      
+          shape = [4, 3, 2]
+          input = generate_tensor([4, 3, 2], local_rank)
+          output = torch.zeros(shape).to(f"cuda:{local_rank}")
+      
+          # 如果 input 和 output 类型不一样，all2all 将输出不正确数值
+          assert input.dtype == output.dtype, "input output dtype are not the same"
+          # 如果 all2all 输入数据的第一个维度不被 group size 整除，all2all 将输出不正确数值
+          assert shape[0] % world_size == 0, "dim 0 of input/output tensor must divide equally by world_size"
+          print(input, local_rank, input.dtype)
+          
+          dist.all_to_all_single(output, input)
+          if local_rank == 0:
+              print("-----")
+          print(output)
+          dist.destroy_process_group()
+      
+      def run_all2all(rank, world_size):
+          dist.init_process_group("nccl", rank=rank, world_size=world_size)
+          local_rank = dist.get_rank()
+          input = [generate_tensor([2,3], local_rank), generate_tensor([3,3], local_rank)+0.5]
+          output = []
+          # 这里如果 rank 0 上第一个tensor的尺寸小于 [2,3]，或 rank 1 上第二个tensor尺寸小于 [3,3]，会报 ncclInvalidUsage Error
+          # 如果 rank 0 第二个tensor，或 rank 1 第一个tensor尺寸变小，会出现数值问题
+          if local_rank == 0:
+              output = [torch.zeros([2,3]).to(f"cuda:{local_rank}"), torch.ones([2,3]).to(f"cuda:{local_rank}")]
+          if local_rank == 1:
+              output = [torch.zeros([3,3]).to(f"cuda:{local_rank}"), torch.ones([3,3]).to(f"cuda:{local_rank}")]
+          print(input, local_rank)
+          
+          dist.all_to_all(output, input)
+          if local_rank == 0:
+              print("-----")
+          print(output)
+          dist.destroy_process_group()
+      
+      if __name__ == "__main__":
+          n_gpus = 2
+          run = run_all2all
+          mp.spawn(run, args=(n_gpus,), nprocs=n_gpus, join=True)
+      ```
+* 一般而言都只用 `dist.all_to_all_single()`，因为其输入输出都是 tensor，可以用 torch.autograd 构造正反向（autograd 不对 list 生效）
+   ```python
+   class _AllToAll(torch.autograd.Function):
+   
+    @staticmethod
+    def forward(ctx, input, input_splits, output_splits):  
+        ctx.input_splits = input_splits
+        ctx.output_splits = output_splits
+        output = torch.empty([sum(output_splits), *input.shape[1:]], dtype=input.dtype).to(input.device)
+        dist.all_to_all_single(output, input, output_splits, input_splits)
+        return output
+   
+    @staticmethod
+    def backward(ctx, grad_output):
+        # 返回值对应 forward 的输入，输入值 grad_output 对应 forwardn 的输出
+        return (_AllToAll.apply(grad_output, ctx.output_splits, ctx.input_splits), None, None)
+   ```
+   详细例子，见 [all2all 多卡训练最小样例](./a2a_bp.py)
+
 
 <br>
 
 ## 通信算子和并行方式的关系
 ### 概括
-* 数据并行、张量并行、优化器并行会引入 Reduce（或 reduce 衍生的 all-reduce，reduce-scatter）    
+* 数据并行会引入对梯度的 all reduce（或拆分成 all-gather 和 reduce-scatter 实现）
+   * 优化器并行会额外引入额外的 all-gather，和 reduce-scatter（zero 1 只切分优化器状态，zero2/3 分别加上对梯度、模型权重的切分）
+* 张量并行会引入对激活的 all reduce（或用了 sequence parallel 之后的 all-gather 和 reduce-scatter）
 * 流水线并行只 send/recv，不引入reduce
-* 数据并行的通信一般和计算可以重叠隐藏，但张量并行的通信几乎无法隐藏（阻塞的），流水线并行中的通信在但个 microbath 是无法隐藏的，但在多个 microbatch 之间是可以隐藏的，bubble 也是无法消除的（只能尽量减少）
+* 数据并行的通信一般和计算可以重叠隐藏，但张量并行的通信几乎很难隐藏（也有优化方案，例如 [Ascend MC2 ](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/mc2.md)），流水线并行中的通信在单个 microbath 是无法隐藏的，但在多个 microbatch 之间是可以隐藏的，并尽可能去减小 bubble
 
 ### 数据并行
-* 数据并行训练，前向：各设备独立计算即可，不需要用到通信；后向：需要各设备实现梯度的 AllReduce    
+* 数据并行训练，前向后向各设备独立计算即可，不需要用到通信。后向得到梯度后，各设备再进行梯度的 AllReduce（DDP）
+   * 有 BN 这种需要整个 batch 数据同步的除外，在前后向分别都需要通信     
 
 * 其他场景，例如计算loss/accuracy，比如对各设备上的值进行求和，然后求平均等，也会用到 Reduce 操作
 
@@ -419,61 +522,63 @@ in Large Transformer Models 是把下图的 AllReduce 变成了 变成 `先AllGa
 
 
 <br>
+
+## 实例
+### Profiling tensor parallel 实例
+<p align="left" >
+<img src="./pictures/forward_profiling.png" width="1200">
+</p>
+<p align="left" >
+<img src="./pictures/backward_profiling.png" width="1200">
+</p>
+
+* 前向没有 通信-计算 重叠（通信的红色块阻塞了计算的蓝色块）
+    * 因为用了 Megatron3 的 sequence-parallel，前向在 attention 前后、在 FFN 前后，分别有一个 reduce-scatter 和 all-gather（通信量没增加，记住 all-reduce = RS + AG）
+* 反向可以有 --overlap-grad-reduce：让 BP 的计算和梯度 all-reduce 并行
+    * 图中未画出 data-parallel 通信的 stream，但是会发现其 allreduce 通信是和 BP 的计算重叠的（因为用了梯度累加，图中仅显示了一次梯度计算）
+    * 正常情况下，反向是 `AG -> FFN -> RS -> AG -> FA (SA) -> RS`。但图中多了两个 AG（绿色的和蓝色的 AG），原因是：
+       * LayerNorm的激活其实是被切分的，但是 FFN 和 Attention 的 TP 的反传需要未切分的激活，所以重计算了 all-gather（Megatron3 paper 公式 3 下面）。但是这个可以和计算部分重叠，例如图中 FFN 部分的 `dL/dx_1` 的梯度计算比这个 AG 时间长，就完全遮盖了
+       * 但是 Attention 部分的梯度计算耗时比 AG 短，所以 AG 的蓝色块导致了阻塞（上面的红色）
+    * 反向计算量是正向的两倍，因为正向只需要 `Y=XW`，而反向要求 `dL/dx` 和 `dL/dw`
+        * 例如图中 `dL/dx_1` 先做，做了之后就可以让 R-S 通信和 `dL/dw_1` 的计算重叠
+
+
+
+### Torch 最小分布式测试代码
+```python
+# test.py
+import os
+import torch
+import torch.distributed as dist
+
+os.environ['NCCL_DEBUG'] = 'INFO'
+os.environ['NCCL_SOCKET_IFNAME'] = 'enp4s0f0' 
+# os.environ['NCCL_IB_DISABLE'] = '1'
+
+def main():
+    dist.init_process_group(backend='nccl')
+    rank = dist.get_rank()
+    world_size = dist.get_world_size()
+    print(rank, world_size)
+    
+    torch.cuda.set_device(rank % torch.cuda.device_count())
+    tensor = torch.ones(1).cuda()
+    dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+    print(f'Rank {rank} has data {tensor[0]}')
+
+if __name__ == "__main__":
+    main()
+```
+* Node0：`python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="10.90.91.54" --master_port=12355 test.py`  
+* Node1：`python -m torch.distributed.launch --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr="10.90.91.54" --master_port=12355 test.py`  
+* 其中 `os.environ['NCCL_SOCKET_IFNAME']` 的配置很重要，否则会报错
+   * 具体用的什么也可以查找 nccl 互联时的打印信息 `NCCL INFO Bootstrap` 查看，例如 `NCCL INFO Bootstrap : Using enp4s0f0:10.90.91.54<0>`
+   * 需要 `ip a` 或 `ifconfig` 找到通信的IP接口（网卡) ，例如这个代码是针对 PCIE 的，有 `os.environ['NCCL_SOCKET_IFNAME'] = 'enp4s0f0'`
+* 如果用了 docker 需要在 `docker run` 的时候加 `--network host` 选项，让容器会直接使用宿主机的网络栈
+<br>
 <br>
 
-# 大模型开销、优化算法
-## 参数量、计算量、内存
-### 参数量 O(12*lh^2)
-* Embedding layer 参数量：`(seq_len + vocab_size) * hidden_size`
-* 每层 transformer layer：`hidden_size*hidden_size*12`，和 h 是平方关系
-    * Attention：`hidden_size*hidden_size*4` （QKV 3，concat 之后的 linear 1）
-    * FFN：一个 hidden layer，两个权重：`hidden_size*hidden_size*4*2` 
-* 所以 seq_len=4096, vocab_size=116444, hidden_size=768，12层
-    * 两个 embedding layer 参数量一共 176M
-    * transformer layer 参数量 81M
-
-### 计算量
-> https://zhuanlan.zhihu.com/p/624740065
-* 前向：`l * (24bsh^2 + 4bs^2h) + 2bshV`，后向乘以2
-    * 计算 QKV：6bsh^2
-    * 计算 QK^T：2bs^2d
-    * 计算 V 的加权：2bs^2d
-    * 计算 attention 后的线性：2bsh^2
-    * 计算 FFN：8bsh^2
-    * 计算词表：2bshV
-    * Softmax：2bs^2
-* 所以长序列 `s>h` 时，`4bs^2h` 不可忽略了
-
-### 内存
-训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
-
-* 混合精度训练对内存的影响？
-
-    * 混合精度时，静态内存 = 参数量*16（Bytes）
-        * 参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
-        * 混合精度训练 FP 和 BP 都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，计算好 fp32 的梯度后再缩小
-    * 全 fp32 训练，静态内存也是 16N：优化器状态 8N，梯度和权重分别 4N。主要是提高了算力 FLOPS，然后减少了activation 这些非权重的动态显存
-
-* 动态内存
-    * 前向运行时，所需要的瞬时内存（即便用全部重计算）
-    * 存储部分 Activation buffer 用于反传，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
-        * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
-            * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
-            * tensor并行 可以把一部分激活切成 t 份，但 LayerNorm，dropout 和 input activation 不能倍切分
-            * sequence并行 进一步让 t 能够覆盖到所有激活，但仍然是 O(as^2bh)，a 是注意力头数量
-                * `multi-head attention 中 s*s 的矩阵每个注意力头会出现一次，一共会出现 a 次；模型并行的话，每张卡需要存 a/t 个 s*s 矩阵` 
-            * 经过 recompute 优化后可以变为一次方 `O(sbh)`    
-
-                <p align="left" >
-                <img src="./pictures/memory_comp.png" width="900">
-                </p>
-
-
-* 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题（非超长）
-    * 100B 模型，模型和优化器参数需要 1600GB 显存；activation 需要 4800GB 的话，一共 6400GB，100张 A100 就能放下
-    * LLama paper：65B模型，1.4T token，需要 100w 个 A100 hour。换算下，100B模型，1T token，100张卡，要训练 400 多天，太慢了，所以一般都是千卡起步
-
-<br>
+# 大模型优化算法
 
 ## 位置编码
 > https://zhuanlan.zhihu.com/p/525552086  

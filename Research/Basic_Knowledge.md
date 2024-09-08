@@ -13,6 +13,31 @@ C，C++，java 这些高级语言都是图灵完备的，有 if else / for / go 
 
 
 # 深度学习知识
+## 反向传播
+### BP 基础
+* [代码见：bp.py](./bp.py)
+
+* 原理 https://blog.csdn.net/qq_27361945/article/details/109760708
+    * 先计算前向，过程中存储矩阵乘的结果 z，以及z的激活值 h
+    * 再计算 loss，以及计算每一层 z 的误差 delta
+        * sigmoid `y = 1/(1+e^(-x))`，反向 `y' = y(1-y)`  
+    * 最后更新权重
+        * 线性层 `Y = X W`，反向 `dL/dW = X^T dL/dy --> W' = X^T Y'`，https://zhuanlan.zhihu.com/p/25496760 
+
+* BP 的计算复杂度
+    * 约等于两倍前向，算 loss + 算梯度（未考虑更新权重）
+    * 如果有重计算，那么还要加一个算 z 的过程
+
+### 并行中的 BP 
+https://zhuanlan.zhihu.com/p/367908419
+
+| 特性 | DP | 简单模型并行 |
+| --- | --- | --- |
+| 参数初始化 | Broadcast 参数同步 | Scatter 参数分发 |
+| 前传 | 无操作 | AllGather 权重 |
+| BP处理梯度 | AllReduce | ReduceScatter |
+
+
 ## Optimizer
 ### Adam，L2, weight decay 和 AdamW
 > https://www.jiqizhixin.com/articles/2018-07-03-14   
@@ -22,20 +47,30 @@ C，C++，java 这些高级语言都是图灵完备的，有 if else / for / go 
 
 ### Adam、Adafactor、CAME
 * Adam 是每个参数，维护一个自己的动量 m（来源于一阶梯度） 和速度 v（来源于二阶梯度，用于lr的自适应）
+    *  `m_t` 和 `v_t` 要除以 `(1-beta^t)` 是为了使得 `m_hat_t` 量级上和 `g_t` 一样（可以假设每一步的 `g_t` 都相等，然后把 `m_t` 展开，会发现除了 `(1-beta^t)` 之后 `m_hat_t = g_t` ）
+    *  Adam 的调参技巧：beta2 增加可以帮助收敛，但减少 beta2 可以获得更大自适应度
+	    <p align="left" >
+	        <img src="./pictures/adam_parameter.png" width=600>
+	    </p>
 * Adafactor 是利用矩阵的低秩分解，用向量 r 和 c 去替代矩阵 v
     * v 用于 lr 的自适应缩放：`u_t = g_t/sqrt(v_t)` 为缩放过后的梯度，然后会再进行一个 clip
     * Adafactor 需要保存 m、r、c，产生中间变量 v（但 v 可以复用 g 的内存）
 * CAME
     * 需要比 Adafactor 多算一个 U_t，作为一个 confidence 的补偿：在 `m_t` 和 `u_hat_t` 差别较小时，`S_t` 也较小，从而步长更大
     * 需要保存 r、c、m、R、C。而 v、u、u_hat 都可以复用 g 的内存
-* ADAM、Adafactor、CAME 比较
-    
+    	* beta1 影响 momentum 的更新，beta2/eps1 影响 rc 的更新（从而影响 v，控制 g 的缩放），beta3/eps2 影响 R/C 的更新（从而影响 S，加入了 confidence-guided 的对 m 的缩放）
+    	* 实际实现中，beta1/beta3 的作用对应于 adam 的 beta1/beta2，默认值为 0.9/0.999；beta2 是一个随时间增加逼近 1 的值，`beta2t = 1.0 - math.pow(state['step'], group['decay_rate'])`
+
+* ADAM、Adafactor、CAME 比较  
     * CAME 和 Adafactor 所需要存储的优化器参数几乎为 Adam 的一半。但 CAME 和 ADAM 训练的模型精度可比，Adafactor 会差一点
-    * 混合精度训练，总计所需内存从 `16*参数量 -> 12*参数量（多一点）`
+    * 混合精度训练，总计所需内存从 `16*参数量 -> 12*参数量（多一点）`，16 = 4 (m) + 4(v) + 4 (master_weight) + 2 (model_weight) + 2 (grad)
     
     <p align="center" >
         <img src="./pictures/optimizer_3.png" width=1000>
     </p>
+
+* 总的来讲，对于 Adam，CAME，Adafactor 等，都是减少 beta 能让动量更新更快。减少 eps 能让 parameter-wise 的自适应步长更明显。但坏处是更容易不收敛。
+	* 对于 Adam，一个 175B 参数模型，训练后期 global norm 下降到 0.5，那平均下来每个参数的梯度 `g ~ sqrt(0.5^2/175B) ~ 10e-6`。这时 learning rate 一般也 decay 到 1e-6 1e-5 之间。那这时 eps 的选择（例如 1e-5）其实会直接影响学习率，和多大程度能根据参数的梯度自适应步长 
 
 <br>
 
@@ -275,9 +310,12 @@ word embedding 和 positional encoding 相加得到输入网络的 embedding
     * 多个 Head 得到的 Attention concat 之后再经过一个 linear 层，使得 output 与 input 的 shape 是完全一致的，输入 Multi-head Attention 模块的分叉箭头代表多个 head
 
 * Position-wise Fully Connected Feed-Forward Network：FFN（蓝色）
+  * 这里表示的是一个两层 MLP 的 FFN，用的 ReLU 激活。FFN 的激活有很多方式：ReLU、GeLU、GeGLU、ReGLU、SwiGLU。其中后三个的 FFN 包含 3 层 MLP，见 [大模型常见架构总结](./Big_Models.md)
     <p align="center" >
 	<img src="./pictures/encoder2.png"  width="400">
     </p>
+
+* Attention 模块是没有激活函数的（除开 softmax），本质是一个线性变换，解决长距离依赖；非线性是由 FFN 中的激活函数提供的，进行了选择性的特征提取
 
 ### Decoder
 * 说 GPT 系列是 decoder-only 的意思：是说训练方式和 decoder 一样，只能看见上文，没有下文，不是说网络结构

@@ -9,6 +9,8 @@
     * 训练中途重启：包括改变截断梯度范数 (clip gradient norm)、学习率、改变优化器
     * 一些超参：词向量、layer normalization、激活函数、batch size 的逐渐增长
 
+<br>
+
 ## 模型-数据 的 规模 
 * 模型参数量
     | Model | Organization  | Date  | Size (# params)|
@@ -39,6 +41,8 @@
         <img src="./pictures/train_token_GPT3.png" width="600">
         </p>
 
+<br>
+
 ## 大模型常见架构总结
 * Transformer 模型结构及参数：https://zhuanlan.zhihu.com/p/107891957
 * CLIP
@@ -57,7 +61,7 @@
         * 见上图，175B 参数，其中 Common Crawl 有 45TB 原始数据，清洗后 **570GB**（400B BPE token），**所以千亿大模型大约 1-2 TB 高质量干净数据差不多够训练了**
     * GPT-3.5 / InstructGPT / ChatGPT
     
-        > [1. **拆解追溯 GPT-3.5 各项能力的起源**](https://yaofu.notion.site/GPT-3-5-360081d91ec245f29029d37b54573756)  
+        > [1. **拆解追溯 GPT-3.5 各项能力的起源**](https://yaofu.notion.site/GPT-3-5-360081d91ec245f29029d37b54573756)  x
         > [2. **Model index for researchers**](https://platform.openai.com/docs/model-index-for-researchers)   
     
         code-davinci-002，text-davinci-002/003，ChatGPT 都叫 GPT-3.5，都是 code-davinci-002  的微调版本 
@@ -88,8 +92,11 @@
         * FFN 用的 SwiGLU，`Swish(xW)·xV `，2层 MLP 而非 3 层
         * Parallel Layer、MQA、No bias、RoPE、Shared Vocab Embedding
     * Lamma2：吸收了 PaLM、Gopher 等模型上架构的微改变，是现被业界广泛采纳的方案（Baichuan、Yi、Mixtral）
-        * SwishGLU FFN（3-Linear-layer）、MQA、Pre-RMSNorm、RoPE、No bias
-
+        * MQA、Pre-RMSNorm、RoPE、No bias
+        * SwishGLU FFN（3-Linear-layer）
+           * 这里 **swish 也就是 siLU (Sigmoid Linear Unit)**, `SiLU = x*σ(x)`，σ 代表 `sigmoid(x) = 1/(1+e^(-x))`
+           * GLU 是门控线性单元 `f(x) = x⊗σ(g(x))`，相当于相比 siLU 要多加一层 MLP
+           * GeLU 是 ReLU 的一种平滑近似（GeLU可以用 fastGeLU 近似，y=x*σ(1.702x)，比 SiLU 多了个常数 1.792，见 https://arxiv.org/pdf/1606.08415）
             <p align="left" >
             <img src="./pictures/swishgelu.png" width="700">
             </p>
@@ -117,6 +124,91 @@
 <br>
 <br>
 
+# 技术细节
+## 参数量、计算量、内存
+### 参数量 O(12*lh^2)
+* Embedding layer 参数量：`(seq_len + vocab_size) * hidden_size`
+* 每层 transformer layer：`hidden_size*hidden_size*12`，和 h 是平方关系
+    * Attention：`hidden_size*hidden_size*4` （QKV 3，concat 之后的 linear 1）
+    * FFN：一个 hidden layer，两个权重：`hidden_size*hidden_size*4*2` 
+* 所以 seq_len=4096, vocab_size=116444, hidden_size=768，12层
+    * 两个 embedding layer 参数量一共 176M
+    * transformer layer 参数量 81M
+### 计算量
+> https://zhuanlan.zhihu.com/p/624740065
+* 前向：`l * (24bsh^2 + 4bs^2h) + 2bshV`，后向乘以2，如果训练中用了重计算，整体再加一个前向的flops
+    * 计算 QKV：6bsh^2
+    * 计算 QK^T：2bs^2d
+    * 计算 V 的加权：2bs^2d
+    * 计算 attention 后的线性：2bsh^2
+    * 计算 FFN：8bsh^2
+    * 计算词表：2bshV
+    * Softmax：2bs^2
+* 所以长序列 `s>h` 时，`4bs^2h` 不可忽略了
+  * 非长序列场景，前向时，每 token 计算量约为参数量两倍
+
+### 内存
+训练时需要保存的信息包括：parameters，gradients，optimizer states，activations (用于BP) 
+
+* 混合精度训练对内存的影响？
+    * 混合精度时，静态内存 = 参数量*16（Bytes）
+        * 参数量为 N 的模型，训练一般至少需要 16N Bytes 显存，其中模型参数 fp16、模型梯度 fp16、Adam状态（模型参数备份 fp32，momentum fp32，variance fp32），这里就 2+2+4+4+4。可以看到其中 Adam 的 optimizer states 最大（12/16），parameters 反而不大 
+        * 混合精度训练 FP 和 BP 都用的 fp16，但在优化器参数更新时，用的 fp32。为了避免 fp16 的梯度下溢，要先 loss scaling，先放大 loss，计算好 fp32 的梯度后再缩小
+    * 全 fp32 训练，静态内存也是 16N：优化器状态 8N，梯度和权重分别 4N。主要是提高了算力 FLOPS，然后减少了activation 这些非权重的动态显存
+
+* 动态内存
+    * 前向运行时，所需要的瞬时内存（即便用全部重计算）
+    * 存储部分 Activation buffer 用于反传，关于大小可以参考 `Reducing Activation Recomputation in Large Transformer Models`
+        * 每层的激活大小见下图，其中右图的 micro_batch_size 分别为 1,4,4,4（都是假设存储激活用的 fp16，表格中单位都是 byte）
+            * 如果不进行 softmax recompute 的话，和 seq_len 成二次方，`O(s^2bh)`，对长序列、大batch很不友好
+            * tensor并行 可以把一部分激活切成 t 份，但 LayerNorm，dropout 和 input activation 不能倍切分
+            * sequence并行 进一步让 t 能够覆盖到所有激活，但仍然是 O(as^2bh)，a 是注意力头数量
+                * `multi-head attention 中 s*s 的矩阵每个注意力头会出现一次，一共会出现 a 次；模型并行的话，每张卡需要存 a/t 个 s*s 矩阵` 
+            * 经过 recompute 优化后可以变为一次方 `O(sbh)`    
+
+                <p align="left" >
+                <img src="./pictures/memory_comp.png" width="900">
+                </p>
+
+* 但总的来说：大模型训练还是 compute-throughput-bound，memory 不是最主要的问题（非超长）
+    * 100B 模型，模型和优化器参数需要 1600GB 显存；activation 需要 4800GB 的话，一共 6400GB，100张 A100 就能放下
+    * LLama paper：65B模型，1.4T token，需要 100w 个 A100 hour。换算下，100B模型，1T token，100张卡，要训练 400 多天，太慢了，所以一般都是千卡起步
+
+### 推理时的计算和访存
+
+| 项 | 单位 | 公式 | 含义 |
+|-|-|-|-|
+| 权重访存量 (fp16) | Byte | `12*l*d*d*2 = 2P` | 模型参数量 `12*l*d*d`，省略了词表, layer_norm 等部分参数 |
+| 推理计算量 - (Decode阶段) | Flop | `24*B*l*d*d = 2*B*P` | 每token的flops是参数量的两倍（未考虑长序列的Attention 计算量）|
+| 访存量-KV缓存 (fp16) | Byte | `2*B*T*l*d*2` | 7B模型（4k维度32层），4k长度，KV-Cache占用 2GB|
+
+其中，T 是序列长度，P 是参数量，d 是隐维度，B 是 bs
+
+* 计算强度
+   * Flops 计算量 `24Bld^2`   
+   * fp/bf16 下，参数量访存 `24ld^2`，kv-cache访存 `4BTld`  
+   * `I = 24Bld^2 / (24ld^2 + 4BTld)` ，增大 B 能增大计算强度，模型量化也能增大模型计算强度（但是设备的计算强度上限也变大了）
+
+
+<br>
+<br>
+
+## 关于样本隔离
+* 大模型在训练的时候，会把多个不同长度的样本拼成 2k、4k、8k 等。如果开样本隔离，会根据 
+end-of-sentence token 将 mask 分成很多小下三角
+    * 这会帮助真是训练的序列长度回归样本本身的真实长度
+* 一些影响
+    * 序列长度较短时，没有很大必要用样本隔离，也能训练：例如 GPT-3 没有做样本隔离（2k长度），但 LLama 3 用了（8k长度）
+    * 关闭样本隔离对提升吞吐有帮助。flash Attention 1/2 等优化方法默认不支持开样本隔离，虽然也可以手动修改加上 https://www.zhihu.com/question/652311359/answer/3461508767 
+    * 一些工作讨论，如果不开样本隔离，可能需要尽可能将相关的样本拼在一起（会影响 In Context 能力）
+        * https://arxiv.org/pdf/2312.17296
+* SFT 阶段
+    * 默认样本隔离需要打开，以分离每条指令之间的人设
+    * SFT 另外一个相比预训练的差别是，不计算 query 的 loss
+
+
+<br>
+<br>
 
 ## 长序列算法
 绝对可学习的位置编码、相对位置编码 RoPE、ALibi、NoPE、LM-Infinite、StreamingLLM、LLM Maybe LongLM: Self-Extend LLM Context Window Without Tuning
