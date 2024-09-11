@@ -108,6 +108,14 @@ MCTS 算法一共4步：Selection、Expansion、Simulation、BP。整个过程�
 <br>
 
 ## LLM 中的 RL
+### RLHF, PPO, DPO
+> [Direct Preference Optimization (DPO) for LLM Alignment (From Scratch)](https://github.com/rasbt/LLMs-from-scratch/blob/main/ch07/04_preference-tuning-with-dpo/dpo-from-scratch.ipynb)
+
+* DPO：作为 PPO 的简化，直接利用偏好数据训练 LLM Policy 网络
+     <p align="left" >
+     <img src="./pictures/dpo.png" width="700">
+     </p>
+
 ### MSTC + LLM Reasoning
 > Toward Self-Improvement of LLMs via Imagination,
 Searching, and Criticizing 
