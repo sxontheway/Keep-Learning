@@ -110,8 +110,10 @@ MCTS 算法一共4步：Selection、Expansion、Simulation、BP。整个过程�
 
 
 ## LLM 中的 RL
-核心是（训练）得到一个能够给出评分的 `reward model / verifier`，对 policy model 的 solution 给出评分。  
-其中，PPO 是在 post-training 阶段用 reward model。MCTS 等是在 inference 阶段用 reward model
+核心是（训练）得到一个能够给出评分的 `reward model / verifier`，对 policy model 的 solution 给出评分
+
+其中，**PPO 是在 post-training 阶段用 reward model，主要是用于对齐人类偏好；
+MCTS 等是在 inference 阶段用 reward model，结合 LLM searching（通过提出很多猜测+验证，提升模型能力）**
 
 ### Post-training 阶段：RLHF（PPO）, DPO
 > [Direct Preference Optimization (DPO) for LLM Alignment (From Scratch)](https://github.com/rasbt/LLMs-from-scratch/blob/main/ch07/04_preference-tuning-with-dpo/dpo-from-scratch.ipynb)
