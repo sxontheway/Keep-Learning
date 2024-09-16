@@ -1,11 +1,10 @@
-## RL：策略网络、价值函数
-
-### RL 基础背景
+## RL 基础背景
 *  符号定义
     * 状态 `s`、动作 `a`、奖励 `r`、回报 `u`（奖励 reward 的折现和）。  
     例如，AlphaGo 中 `s_t` 是棋局，`a_t` 是下一步可以落子的位置，`U_t` 是回报。
 
     * `π_θ(a|s)` 代表策略网络，`θ` 是 `π` 的权重。`Q(s,a)` 是动作价值函数，`V(s)` 是状态价值函数。
+
 * Value-based 和 Policy-Based
    | Value-Based | Policy-Based |
    |-------------|--------------|
@@ -39,6 +38,8 @@
 
 * 状态价值：`V_π(s_t) = E[U_t|s_t]`
     * 衡量的是当前状态下的胜率。可以用一个神经网络 `v(s;w)` 来近似 `V_π(s)`，其中 `w` 是网络权重
+
+<br>
 
 ## MCTS
 ### MCTS 算法步骤：Selection、Expansion、Simulation、BP
@@ -87,7 +88,7 @@ MCTS 算法一共4步：Selection、Expansion、Simulation、BP。整个过程�
         </p>
     * 其中策略网络和价值网络可以用相同的主干网络得到，但用不同的 head。对于围棋（19*19），策略网络的输出是 361 维的向量，价值网络是标量。
 
-* 在实战推理的时候用 MCTS（策略网络和价值网络都训练好了，只更新 MCTS 数中的值）
+* 在实战推理的时候用 MCTS（策略网络和价值网络都训练好了，只更新 MCTS 树中的值）
 
     * 其 selection 用的是如下公式
         <p align="left" >
@@ -107,16 +108,21 @@ MCTS 算法一共4步：Selection、Expansion、Simulation、BP。整个过程�
 
 <br>
 
-## LLM 中的 RL
-### RLHF, PPO, DPO
-> [Direct Preference Optimization (DPO) for LLM Alignment (From Scratch)](https://github.com/rasbt/LLMs-from-scratch/blob/main/ch07/04_preference-tuning-with-dpo/dpo-from-scratch.ipynb)
 
+## LLM 中的 RL
+核心是（训练）得到一个能够给出评分的 `reward model / verifier`，对 policy model 的 solution 给出评分。  
+其中，PPO 是在 post-training 阶段用 reward model。MCTS 等是在 inference 阶段用 reward model
+
+### Post-training 阶段：RLHF（PPO）, DPO
+> [Direct Preference Optimization (DPO) for LLM Alignment (From Scratch)](https://github.com/rasbt/LLMs-from-scratch/blob/main/ch07/04_preference-tuning-with-dpo/dpo-from-scratch.ipynb)
+* PPO 会先训练一个 reward model，用 reward model 去训练 policy 网络
 * DPO：作为 PPO 的简化，直接利用偏好数据训练 LLM Policy 网络
      <p align="left" >
      <img src="./pictures/dpo.png" width="700">
      </p>
 
-### MSTC + LLM Reasoning
+### 推理阶段使用 reward model
+#### MCTS
 > Toward Self-Improvement of LLMs via Imagination,
 Searching, and Criticizing 
 * 概念
@@ -127,7 +133,7 @@ Searching, and Criticizing
        * ORM：用于给出  a sequence of actions or options `o_{1:T}` 的整体的分数，代表整个 sequence 的成败或质量
        * PRM helps predicts the immediate action-specific reward given the state and the option (可以理解为动作): `R(s_t, o_t)`
 
-* Paper：Toward Self-Improvement of LLMs via Imagination, Searching, and Criticizing
+* Paper：Toward Self-Improvement of LLMs via Imagination, Searching, and Criticizing 文章
     * 训练 `价值网络 value function`，还有 ORM，PRM 等，用于在 MCTS 中给出相应分数（作为 critic）
     * 用 MCTS 去构建更好的 trajectory（也即更高质量的数据）
     * 用新构建的数据对 `策略网络 policy networks` 进行 SFT
@@ -136,13 +142,13 @@ Searching, and Criticizing
     <img src="./pictures/llm_mcts.png" width="600">
     </p>
 
-### LLM + Outcome Value Models + BeamSearch
+#### Outcome Value Models + BeamSearch
 > OVM, Outcome-supervised Value Models for Planning
 in Mathematical Reasoning
 * 推理前：用 `mean squared error + 构建的 (question, solution, binary label) 数据集（N个问题，每个问题 n 个path）`，去微调 LLM 得到 OVM（Outcome Value Models）
 * 推理时：对于 top-k 的 beamsearch，也考虑进 OVM 的分数，选取 top-b 的 path。最终的 final answer 选取 final value 最高的 path
 
-### LLM + RL + CoT
+#### Verifier + CoT
 > Generative Verifiers: Reward Modeling as Next-Token Prediction
 * 推理前：训练一个能对 CoT 过程进行 yes/no 的 verifier
-* 推理后： At test-time, we sample multiple CoT rationales and use `majority voting` to compute the average probability of ‘Yes’
+* 推理时：At test-time, we sample multiple CoT rationales and use `majority voting` to compute the average probability of ‘Yes’
