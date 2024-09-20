@@ -1,8 +1,85 @@
 > 本文记录代码实现过程中遇到的各种奇怪的 bug 及解决方案
 
+<br>
+
+## Torch
+* weight_decay 会导致本来不应该梯度更新的参数改变
+  * FC 层得到的 logit 是 (batch_size, 10)。我们只选取第 1,3,5,7,9 类，得到 (batch_size, 5) 的 tensor，进行 CrossEntropy 求 loss。在这种情况下，对应第 0,2,4,6,8 类的权重是应该不会变的，但训练发现它们都变了  
+  * 问题出在 weight_decay：没有设成 0。现象：将 grad print 出来，发现 grad 都是 0，但是 weight 的 parameter 仍然会随着训练不断减小
+
+<br>
+
+* init 中初始化了，但 forward 没用的 nn.Module，会导致训练 loss 有问题
+  ```python
+  import torch
+  
+  class TokenRouter(torch.nn.Module):
+      def __init__(self, embed_dim):
+          super().__init__()
+          self.router = torch.nn.Linear(embed_dim, 1).float()
+      def forward(self, input):
+          input_dtype = input.dtype
+          input_fp32 = input.float()
+          output = torch.nn.functional.linear(input_fp32, weight=self.router.weight.float(), bias=None)
+          return output.to(input_dtype)
+  
+  class Net(torch.nn.Module):
+      def __init__(self, capacity, block):
+          super().__init__()
+          self.block = block
+          self.capacity = capacity
+          self.training_step = 0
+          self.router = TokenRouter(block.config.hidden_size)
+          for param in self.router.parameters():  
+              param.requires_grad = False    # 如果 forwad 中没调用，需要加这一行
+  
+      def forward(self,
+                  hidden_states: torch.Tensor,
+                  attention_mask: torch.Tensor,
+                  **kwargs: Any
+                  ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+          return hidden_states
+  ```
+  * 发现如果在 `MoD` 的 init 中加了 `self.router = TokenRouter(block.config.hidden_size)`，但是不加 `param.requires_grad = False`，会导致网络的训练 loss 偏高
+  * 原因：
+    * 优化器在初始化时会收集所有 `requires_grad=True` 的参数。然后在训练时，即使参数没有梯度，优化器会对其进行 weight decay。
+    * 因为用的是 `Adam+L2正则`，而不是 `AdamW`。前者直接加载 loss 上，或等效于加在梯度上，后者是把正则加载权重上。两种添加方式在 SGD 上等效，但是在 Adam 上不等效
+    * 但如果 init 有冗余模型参数的话，正则加在 loss 上也不会等效于加载梯度上。会抑制其他正常的模型参数，导致 loss 偏高
+  * **解决方案：养成好习惯，不要定义冗余模型参数。实在要加来调试，确保设置 `param.requires_grad = False`**
+
+<br>
+
+* 在 forward 函数中临时就地修改 nn.Module，会导致权重不能更新  
+  * `self.weight = self.weight.float()` 这一行会导致 `self.weight` 不能被更新    
+  * 正确做法：`logits = torch.nn.functional.linear(input_fp32, weight=self.wg.weight.float(), bias=None)`，这会在计算图中多加一个 cast 操作，而不会重新建立一个 parameter（优化器中存的是原先的 parameter，导致有梯度但权重不更新）。见 https://github.com/microsoft/DeepSpeed/pull/5156/commits/aab9fc3a29bab6e50b62c7f39d4df734058ead9d 
+
+    ```python
+    class TopkGate(Module):
+
+        def __init__(self, config: Config) -> None:
+            super().__init__()
+            
+            # Only top-1 and top-2 are supported at the moment.
+            if config.topk != 1 and config.topk != 2:
+                raise ValueError('Only top-1 and top-2 gatings are supported.')
+            self.weight = torch.nn.Linear(config.hidden_size, config.num_experts, bias=False).float() 
+            self.config = config
+
+        def forward(self, input: torch.Tensor) -> Tuple[Tensor, ...]: # type: ignore
+            self.weight = self.weight.float()
+            logits = self.weight(input.float())
+            if self.config.topk == 1:
+                gate_output = top1gating(logits, self.config)
+            else:
+                gate_output = top2gating(logits, self.config)
+            
+            return gate_output
+    ```
+
 ---
 <br>
 
+## 其他
 * 联邦学习在 server 上用多进程模拟多个 client，报错：  
 `RuntimeError: unable to open shared memory object </torch_161471_2025326299> in read-write mode`，  
   * 解决方案：将 `import torch.multiprocessing` 改成 `import multiprocessing` 就好了   
@@ -132,37 +209,3 @@ opencv读入的图像是BGR，要转化为RGB，可以有如下两种实现，�
     b = b[torch.where((1<b[:, 1]) & (b[:, 1]<3))]  # 正确
     ```
 
-<br>
-
-* weight_decay 会导致本来不应该梯度更新的参数改变
-  * FC 层得到的 logit 是 (batch_size, 10)。我们只选取第 1,3,5,7,9 类，得到 (batch_size, 5) 的 tensor，进行 CrossEntropy 求 loss。在这种情况下，对应第 0,2,4,6,8 类的权重是应该不会变的，但训练发现它们都变了  
-  * 问题出在 weight_decay：没有设成 0。现象：将 grad print 出来，发现 grad 都是 0，然后 weight 的 parameter 随着训练不断减小
-
-<br>
-
-* 在 forward 函数中临时修改定义的模块，会导致权重不能更新  
-  * `self.weight = self.weight.float()` 这一行会导致 `self.weight` 不能被更新    
-  * 正确做法：`logits = torch.nn.functional.linear(input_fp32, weight=self.wg.weight.float(), bias=None)`，这会在计算图中多加一个 case 操作，而不是重新新建一个 parameter，见 https://github.com/microsoft/DeepSpeed/pull/5156/commits/aab9fc3a29bab6e50b62c7f39d4df734058ead9d 
-
-    ```python
-    class TopkGate(Module):
-
-        def __init__(self, config: Config) -> None:
-            super().__init__()
-            
-            # Only top-1 and top-2 are supported at the moment.
-            if config.topk != 1 and config.topk != 2:
-                raise ValueError('Only top-1 and top-2 gatings are supported.')
-            self.weight = torch.nn.Linear(config.hidden_size, config.num_experts, bias=False).float() 
-            self.config = config
-
-        def forward(self, input: torch.Tensor) -> Tuple[Tensor, ...]: # type: ignore
-            self.weight = self.weight.float()
-            logits = self.weight(input.float())
-            if self.config.topk == 1:
-                gate_output = top1gating(logits, self.config)
-            else:
-                gate_output = top2gating(logits, self.config)
-            
-            return gate_output
-    ```
