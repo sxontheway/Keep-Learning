@@ -14,6 +14,7 @@
 
 * Value Function 是什么有什么用？
    * Value Function 也用于提供反馈信号。相比 reward 的不同点：When evaluating partial paths, reward focuses on the current states, while value focuses on the unseen future outcomes
+      * `reward 一般指当前的反馈，value 可以理解成当前和未来 reward 的期望`
    * 例如：
       * Actor-Critic：同时用到 `π_θ(a|s)` 和 `V_π(s_t)`，其中 `V` 用来评价 `π_θ` 的好坏    
       * MCTS 需要用到哪些网络？一个策略网络 `π_θ(a|s)`、一个状态价值网络 `V_π(s_t)`，`V`用来构建蒙特卡洛树
