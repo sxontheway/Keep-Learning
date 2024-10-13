@@ -10,14 +10,8 @@
 
 三张报表的关系总结：
 <p align="center" >
-    <img src="./Figures/3table_1.png" height=600/>
+    <img src="./Figures/3table_1.png" height=800/>
 </p>
-资产：流动资产、长期资产  
-
-负债：流动负债、长期负债   
-净资产（股东权益）：实收资本（股本）+ 资本公积 + 盈余公积 + 未分配利润 
-<br>
-
 
 <br>
 
