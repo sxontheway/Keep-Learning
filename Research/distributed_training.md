@@ -324,16 +324,16 @@ Using Megatron-LM，**在第一代基础上，加上了 pipeline 并行（用的
     * 根据 NVIDIA 最新的那篇论文（链接：https://arxiv.org/abs/2104.04473 )，Megatron 在大规模训练的效率是超过 DeepSpeed 不少的
     * DeepSpeed 的论文一直强调：可以用更少机器训练更大的模型，但没有突出过在效率上的优势。DeepSpeed 后来又出了一篇论文：ZeRO-Infinity（链接：https://arxiv.org/abs/2104.07857 ），当单层参数量在单张显卡上放不下的时候，它通过对这一层算子切片，一片一片来执行，使得单卡也能跑起来一个巨大的层，可以理解成一种 “时间” 轴上展开的模型并行
 * Zero-1/2/3 对比
-核心：每张卡上，只更新 optimizer state 切片部分对应的参数
+核心：每张卡上，只需要更新 optimizer state 切片部分对应的参数
    
    | 特性 | ZeRO-1 | ZeRO-2 | ZeRO-3 |
    |------|--------|--------|--------|
    | **优化内容** | 优化器状态分片 | 优化器状态和梯度分片 | 参数（权重）、梯度、优化器状态全部分片 |
-   | **内存优化**（原16倍参数量Φ） | 其中 12Φ 分片 | 其中 14Φ 分片了 | 其中的 16Φ 全部分片 |
-   | **单卡总通信量**（2倍参数量Φ） | 2Φ | 2Φ | 3Φ |
-   | **梯度的通信** | reduce 梯度（所有梯度） | reduce-scatter 梯度（1/N 的） | reduce-scatter 梯度（1/N 的） |
+   | **内存优化**（原内存为16倍参数量Φ） | 其中 12Φ 分片 | 其中的 14Φ 分片 | 全部 16Φ 都分片 |
+   | **单卡总通信量**（模型参数量Φ） | 2Φ | 2Φ | 3Φ |
+   | **梯度的通信** | reduce-scatter 梯度 | reduce-scatter 梯度 | reduce-scatter 梯度（1/N 的） |
    | **参数的通信** | all-gather 更新后的参数 | all-gather 更新后的参数 | 前反向各要 all-gather 一次参数，但更新后的参数 all-gather 不用了 |
-   | **解释** | 每张卡上有完整梯度，所以是 reduce | reduce-scatter 梯度（1/N 梯度） | all-gather 聚合权重、reduce-scatter 梯度（1/N 梯度） |
+   | **解释** | 每张卡上有完整梯度，但只 Average Gradient Partition | Get Needed Gradient | all-gather 聚合权重、reduce-scatter 梯度（1/N 梯度） |
 
 ### Megatron-Deepspeed 
 > https://github.com/microsoft/Megatron-DeepSpeed  
